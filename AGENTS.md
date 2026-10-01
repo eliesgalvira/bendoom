@@ -30,7 +30,7 @@ Keep tracked docs to current usage, constraints and open work. Delete completed 
 
 When creating or updating a ticket, use `docs/agents/issue-tracker.md`. Open issues live under `.scratch/<feature>/`.
 
-When dispatching ticket agents, include `docs/agents/ticket-agent.md` in their instructions.
+When dispatching ticket agents, include `docs/agents/ticket-agent.md` in their instructions. Before orchestrating a milestone, read `docs/agents/orchestrator.md`.
 
 ### Bend constraints
 
