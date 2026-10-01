@@ -14,6 +14,7 @@ import ./keys.bend as K
 import ./random.bend as M
 import ./draw.bend as D
 import ./sim.bend as S
+import ./tic.bend as Tic
 import ./sound.bend as Sn
 import ./project.bend as P
 import ./render.bend as R
@@ -734,7 +735,7 @@ type Play.Step is Data:
 # The level as loaded, at its start: Doom's G_DoLoadLevel, shared by
 # death and intermission restarts.
 def Play.start(+level: L.Level) -> Play:
-  Playing{S.State.start(level)}
+  Playing{Tic.State.start(level)}
 
 def Play.restarted(reborn: Bool, +level: L.Level, state: S.State) -> Play:
   match reborn:
@@ -772,7 +773,7 @@ def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
 def Play.step.showing(over: Bool, +level: L.Level, +cmd: K.Cmd, +press: Bool, +wi: Inter) -> Play.Step:
   match over:
     case True{}:
-      Step{Play.after(S.Sim.tic(cmd, S.State.start(level))), []}
+      Step{Play.after(Tic.Sim.tic(cmd, Tic.State.start(level))), []}
     case False{}:
       +after = Inter.tic(press, wi)
       Step{Showing{after}, Inter.sound(press, wi, after)}
@@ -780,7 +781,7 @@ def Play.step.showing(over: Bool, +level: L.Level, +cmd: K.Cmd, +press: Bool, +w
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
     case Playing{state}:
-      +after = S.Sim.tic(cmd, state)
+      +after = Tic.Sim.tic(cmd, state)
       Step{Play.after(after), S.State.sounds(after)}
     case Showing{+wi}:
       +press = Play.pressed(held, cmd)

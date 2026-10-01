@@ -35,6 +35,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/inventory.bend as I
 import ../src/inter.bend as W
 import ../src/sound.bend as Sn
@@ -141,13 +142,13 @@ def back() -> List<&2, K.Cmd>:
   List.concat(&2, K.Cmd, [held(1n, 0, 0, 128, False{}), held(15n, 25, 0, 0, False{}), idle(8n)])
 
 def initial(+level: L.Level) -> W.Play:
-  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   W.Play.ended(S.State.ended(took), took)
 
 def summary(+level: L.Level) -> IO(Unit):
-  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(S.State.start(level))))
+    IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(Tic.State.start(level))))
     IO.print("exit " ++ S.Sim.Tally.show(S.Sim.tally(took)) ++ " ended " ++ Bool.show(S.State.ended(took))
       ++ " random " ++ U32.show(S.State.mrnd(took)))
     return Unit{}
@@ -173,11 +174,11 @@ def soundcheck(+level: L.Level) -> IO(Unit):
 
 def secrets(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    s0 : S.State <- secret("in the secret", level, S.State.at(level, L.Start{F.Fixed.of_map(400),
+    s0 : S.State <- secret("in the secret", level, Tic.State.at(level, L.Start{F.Fixed.of_map(400),
       F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
-    s1 : S.State <- secret("stood a tic", level, S.Sim.tic(K.Cmd.idle(), s0))
-    s2 : S.State <- secret("out south", level, S.Sim.replay(out(), s1))
-    s3 : S.State <- secret("back north", level, S.Sim.replay(back(), s2))
+    s1 : S.State <- secret("stood a tic", level, Tic.Sim.tic(K.Cmd.idle(), s0))
+    s2 : S.State <- secret("out south", level, Tic.Sim.replay(out(), s1))
+    s3 : S.State <- secret("back north", level, Tic.Sim.replay(back(), s2))
     return Unit{}
 
 def play(+level: L.Level) -> IO(Unit):

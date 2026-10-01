@@ -3,6 +3,7 @@ import ../../src/level.bend as L
 import ../../src/things.bend as H
 import ../../src/vec.bend as V
 import ../../src/sim.bend as S
+import ../../src/tic.bend as Tic
 import ../../src/keys.bend as K
 
 # The oracle's --things replacement: remove the E1M1 monsters, then
@@ -28,17 +29,17 @@ def Combat.isolated(level: L.Level, +id: U32, x: U32, y: U32, kind: U32) -> L.Le
     texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}, sectors, specials, heard}
 
 def Combat.door(level: L.Level) -> S.State:
-  S.State.at(Combat.isolated(level, 265, 448, 2088, 3004), L.Start{29360128, 134217728, 1073741824})
+  Tic.State.at(Combat.isolated(level, 265, 448, 2088, 3004), L.Start{29360128, 134217728, 1073741824})
 
 def Combat.fought(level: L.Level) -> S.State:
-  S.Sim.replay(List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 20n, K.Cmd.idle()),
+  Tic.Sim.replay(List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 20n, K.Cmd.idle()),
     [K.Cmd.demo(0, 0, 0, 2)], List.replicate(K.Cmd, 19n, K.Cmd.demo(0, 0, 0, 1))]), Combat.door(level))
 
 # The isolated zombieman dies across door 80. Its closing ceiling turns
 # the corpse into POL5A0 and removes the dropped clip. This 360-tic
 # demo matches Chocolate Doom, including the final S_GIBS state.
 def Combat.crushed(level: L.Level) -> S.State:
-  S.Sim.replay(List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 20n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, 2)],
+  Tic.Sim.replay(List.concat(&2, K.Cmd, [List.replicate(K.Cmd, 20n, K.Cmd.idle()), [K.Cmd.demo(0, 0, 0, 2)],
     List.replicate(K.Cmd, 60n, K.Cmd.demo(0, 0, 0, 1)), [K.Cmd.demo(0, 0, 32, 1)],
     List.replicate(K.Cmd, 28n, K.Cmd.demo(0, 0, 0, 1)), List.replicate(K.Cmd, 250n, K.Cmd.idle())]),
     Combat.door(level))

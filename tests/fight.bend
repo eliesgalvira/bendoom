@@ -7,6 +7,7 @@ import ../src/bytes.bend as B
 import ../src/wad.bend as W
 import ../src/level.bend as L
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/fixed.bend as F
@@ -44,7 +45,7 @@ def Fight.report(+s: S.State) -> String:
     ++ " monsters" ++ Fight.monsters(U32.to_nat(H.Things.count(things)), 0, things)
 
 def Fight.run(+level: L.Level, cmds: List<&2, K.Cmd>) -> IO(Unit):
-  IO.print(Fight.report(S.Sim.replay(cmds, S.State.start(level))))
+  IO.print(Fight.report(Tic.Sim.replay(cmds, Tic.State.start(level))))
 
 def Fight.start(w: Array<U32> & L.Level, cmds: List<&2, K.Cmd>) -> IO(Unit):
   (mem, level) = w

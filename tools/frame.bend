@@ -16,6 +16,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/inter.bend as I
 import ../src/project.bend as P
 import ./script.bend as T
@@ -49,7 +50,7 @@ def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, g
   (+gfx, +level) = gl
   do IO<Unit>:
     rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(P.Project.tables(level), gfx,
-      I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), False{}, mem)))
+      I.Play.replay(script, level, I.Playing{Tic.State.at(level, place)}), False{}, mem)))
     Frame.rows(200n, 0, rest)
 
 def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):

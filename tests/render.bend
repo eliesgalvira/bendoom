@@ -194,6 +194,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/clip.bend as Cl
 import ../src/project.bend as P
 import ../src/draw.bend as D
@@ -309,7 +310,7 @@ def said(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: 
 # place: x and y in map units, west and south given as negatives, the
 # angle in degrees.
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
-  S.State.at(level, L.Start{x, y, A.Angle.of_thing(degrees)})
+  Tic.State.at(level, L.Start{x, y, A.Angle.of_thing(degrees)})
 
 def east(units: U32) -> U32:
   F.Fixed.of_map(units)
@@ -319,13 +320,13 @@ def west(units: U32) -> U32:
 
 # The state after running east from the start for some tics.
 def ran(+level: L.Level, tics: Nat) -> S.State:
-  S.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, 0)),
-    S.State.start(level))
+  Tic.Sim.replay(List.replicate(K.Cmd, tics, K.Cmd.demo(50, 0, 0, 0)),
+    Tic.State.start(level))
 
 # The state after runs of commands in a demo's units from a place: the
 # scripts the oracle plays.
 def after(runs: List<&2, List<&2, K.Cmd>>, s: S.State) -> S.State:
-  S.Sim.replay(List.concat(&2, K.Cmd, runs), s)
+  Tic.Sim.replay(List.concat(&2, K.Cmd, runs), s)
 
 def strafe(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(0, 4294967272, 0, 0))
@@ -335,7 +336,7 @@ def idle(n: Nat) -> List<&2, K.Cmd>:
 
 # A place after the oracle's 20 idle tics.
 def rested(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
-  S.Sim.replay(idle(20n), at(level, x, y, degrees))
+  Tic.Sim.replay(idle(20n), at(level, x, y, degrees))
 
 def walk(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(25, 0, 0, 0))
@@ -374,7 +375,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   +tables = P.Project.tables(level)
   do IO<Unit>:
     fight : List<&2, K.Cmd> <- Rt.Route.fight()
-    m1 : Array<U32> <- frame("start", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), mem)
+    m1 : Array<U32> <- frame("start", tables, gfx, Tic.Sim.replay(idle(20n), Tic.State.start(level)), mem)
     m2 : Array<U32> <- frame("lit 736 464 135", tables, gfx, rested(level, east(736), east(464), 135), m1)
     m3 : Array<U32> <- frame("dark -416 256 90", tables, gfx, rested(level, west(416), east(256), 90), m2)
     m4 : Array<U32> <- frame("step 137 256 45", tables, gfx, rested(level, east(137), east(256), 45), m3)
@@ -390,7 +391,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     d1 : Array<U32> <- frame("yard -640 256 0", tables, gfx, rested(level, west(640), east(256), 0), s4)
     d2 : Array<U32> <- frame("bars 1024 200 0", tables, gfx, rested(level, east(1024), east(200), 0), d1)
     n1 : Array<U32> <- frame("demon head on 48 1616 180", tables, gfx,
-      S.Sim.replay(idle(6n), at(level, east(48), east(1616), 180)), d2)
+      Tic.Sim.replay(idle(6n), at(level, east(48), east(1616), 180)), d2)
     n2 : Array<U32> <- frame("shotgun guy from behind 896 2048 270", tables, gfx,
       rested(level, east(896), east(2048), 270), n1)
     n3 : Array<U32> <- frame("shotgun guy from the side 987 1947 225", tables, gfx,
@@ -437,18 +438,18 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(3158), east(2176), 180)), m29)
     m31 : Array<U32> <- frame("chainsaw refused", tables, gfx, strafed(4294967280, 13n,
       full(at(level, east(3158), east(2176), 180))), m30)
-    w1 : Array<U32> <- frame("pistol rising 8", tables, gfx, after([idle(8n)], S.State.start(level)), m31)
-    w2 : Array<U32> <- frame("pistol bob low 48", tables, gfx, after([idle(20n), walk(28n)], S.State.start(level)), w1)
-    w3 : Array<U32> <- frame("pistol bob right 64", tables, gfx, after([idle(20n), walk(44n)], S.State.start(level)),
+    w1 : Array<U32> <- frame("pistol rising 8", tables, gfx, after([idle(8n)], Tic.State.start(level)), m31)
+    w2 : Array<U32> <- frame("pistol bob low 48", tables, gfx, after([idle(20n), walk(28n)], Tic.State.start(level)), w1)
+    w3 : Array<U32> <- frame("pistol bob right 64", tables, gfx, after([idle(20n), walk(44n)], Tic.State.start(level)),
       w2)
     d1 : Array<U32> <- frame("dead 1600 1000 90", tables, gfx, after([idle(650n)],
       at(level, east(1600), east(1000), 90)), w3)
     r1 : Array<U32> <- frame("nukage 1600 1000 90", tables, gfx, after([idle(1n)],
       at(level, east(1600), east(1000), 90)), d1)
-    w4 : Array<U32> <- frame("pistol firing 25", tables, gfx, after([idle(20n), fired(4n)], S.State.start(level)),
+    w4 : Array<U32> <- frame("pistol firing 25", tables, gfx, after([idle(20n), fired(4n)], Tic.State.start(level)),
       r1)
     w5 : Array<U32> <- frame("pistol flash over 32", tables, gfx, after([idle(20n), fired(11n)],
-      S.State.start(level)), w4)
+      Tic.State.start(level)), w4)
     w6 : Array<U32> <- frame("puff on the ledge 25", tables, gfx, after([idle(20n), fired(4n)],
       at(level, east(704), east(256), 0)), w5)
     w7 : Array<U32> <- frame("shotgun lowering", tables, gfx, after([idle(20n), walk(5n), idle(8n)],
@@ -458,15 +459,15 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     w9 : Array<U32> <- frame("shotgun firing", tables, gfx, after([idle(20n), walk(5n), idle(40n), fired(3n)],
       at(level, east(824), east(896), 0)), w8)
     w10 : Array<U32> <- frame("fist at rest", tables, gfx, after([idle(20n), first(), idle(40n)],
-      S.State.start(level)), w9)
+      Tic.State.start(level)), w9)
     w11 : Array<U32> <- frame("fist attacking", tables, gfx, after([idle(20n), first(), idle(40n), fired(4n)],
-      S.State.start(level)), w10)
+      Tic.State.start(level)), w10)
     w12 : Array<U32> <- frame("saw at rest", tables, gfx, after([idle(40n)], strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180))), w11)
     w13 : Array<U32> <- frame("saw attacking", tables, gfx, after([idle(40n), fired(4n)], strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180))), w12)
     w14 : Array<U32> <- frame("long fight 1453", tables, gfx,
-      S.Sim.replay(fight, S.State.start(level)), w13)
+      Tic.Sim.replay(fight, Tic.State.start(level)), w13)
     w15 : Array<U32> <- frame("zombieman firing 53", tables, gfx, after([idle(53n)],
       at(level, east(488), east(256), 0)), w14)
     w16 : Array<U32> <- frame("shotgun guy firing 61", tables, gfx, after([idle(61n)],
@@ -478,7 +479,7 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180)), n2)
-    n4 : Array<U32> <- said("said none", tables, gfx, S.Sim.replay(idle(20n), S.State.start(level)), n3)
+    n4 : Array<U32> <- said("said none", tables, gfx, Tic.Sim.replay(idle(20n), Tic.State.start(level)), n3)
     IO.print("end")
 
 def words(xs: List<&2, U32>) -> String:
