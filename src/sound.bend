@@ -131,7 +131,8 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{41, "DSSGTSIT", 98}, Sfx{59, "DSPODTH1", 70}, Sfx{60, "DSPODTH2", 70}, Sfx{61, "DSPODTH3", 70},
     Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
     Sfx{2, "DSSHOTGN", 64}, Sfx{16, "DSFIRSHT", 70}, Sfx{17, "DSFIRXPL", 70}, Sfx{55, "DSCLAW", 70}, Sfx{83, "DSPUNCH", 64},
-    Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}]
+    Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}, Sfx{43, "DSBRSSIT", 94},
+    Sfx{67, "DSBRSDTH", 32}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel

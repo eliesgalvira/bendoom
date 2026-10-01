@@ -1,9 +1,8 @@
 # Doom's info.c, P_SpawnMobj, P_SpawnMapThing, P_SetThingPosition,
 # P_RemoveMobj, P_ZMovement and the state half of P_MobjThinker for the
-# things Bendoom spawns: the definitions of the DoomEd types either E1M1
-# places, less the starts and the spectre, which Hurt Me Plenty never
-# spawns, the state rows their spawn states lead to and the pistol's
-# with its entry in d_items.c's weaponinfo and the bullet puff's, the
+# things Bendoom spawns: the definitions of the DoomEd types the
+# shareware maps place, less the starts, the state rows they reach and
+# the weapons' with their entries in d_items.c's weaponinfo, the
 # map's THINGS records made the level's first things, the state half of
 # a thing's tic, whose actions the sim runs, its rise by its vertical
 # momentum under gravity, what a blow and a death leave on it, and the
@@ -225,19 +224,11 @@ type Thing.Action is Data:
 type Thing.Row is Data:
   Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32, action: Thing.Action, light: U32}
 
-# The state rows by Bendoom's number: every state the spawn states of the
-# types below lead to, in vanilla's order, then the pistol's ready and
-# raise states, then the monsters' two idle states each, where A_Look
-# watches for the player, then the pistol's down state and the player
-# mobj's own, whose death ends in row 0, the corpse a dead marine record
-# spawns in, then the pistol's fire states, its muzzle flash's, the
-# state that puts the flash's light out, the bullet puff's, then the
-# monsters' eight run states each, where A_Chase hunts the player, their
-# pain, death and gib rows, the barrel's explosion, the blood, and last
-# the three attack rows each of the zombieman and the shotgun guy. A monster's second pain row leads back to its see state.
-# Only S_LIGHTDONE, row 84, has 0 tics, and it is a player sprite's; it
-# carries A_Light0 in vanilla and here only puts the light out by being
-# the last row before S_NULL.
+# The state rows by Bendoom's number, appended a group at a time as
+# types and weapons arrived. Row 238 is vanilla's S_NULL row, which the
+# teleport destination stands in. Only S_LIGHTDONE, row 84, has 0 tics,
+# and it is a player sprite's; it carries A_Light0 in vanilla and here
+# only puts the light out by being the last row before S_NULL.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}, 0}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}, 0},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}, 0}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}, 0},
@@ -356,7 +347,33 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SAWG", 2, False{}, 4, 224, WeaponReady{}, 0}, Row{"SAWG", 3, False{}, 4, 223, WeaponReady{}, 0},
     Row{"SAWG", 2, False{}, 1, 225, Lower{}, 0}, Row{"SAWG", 2, False{}, 1, 226, Raise{}, 0},
     Row{"SAWG", 0, False{}, 4, 228, Saw{}, 0}, Row{"SAWG", 1, False{}, 4, 229, Saw{}, 0},
-    Row{"SAWG", 1, False{}, 0, 223, ReFire{}, 0}]
+    Row{"SAWG", 1, False{}, 0, 223, ReFire{}, 0},
+    Row{"", 0, False{}, 0, 0, Null{}, 0}, Row{"", 0, False{}, 0, 0, Null{}, 0}, Row{"", 0, False{}, 0, 0, Null{}, 0},
+    Row{"", 0, False{}, 0, 0, Null{}, 0}, Row{"", 0, False{}, 0, 0, Null{}, 0}, Row{"", 0, False{}, 0, 0, Null{}, 0},
+    Row{"", 0, False{}, 0, 0, Null{}, 0}, Row{"", 0, False{}, 0, 0, Null{}, 0},
+    Row{"TROO", 0, False{}, 4294967295, 238, Null{}, 0},
+    Row{"YKEY", 0, False{}, 10, 240, Null{}, 0}, Row{"YKEY", 1, True{}, 10, 239, Null{}, 0},
+    Row{"RKEY", 0, False{}, 10, 242, Null{}, 0}, Row{"RKEY", 1, True{}, 10, 241, Null{}, 0},
+    Row{"CAND", 0, True{}, 4294967295, 243, Null{}, 0},
+    Row{"TRED", 0, True{}, 4, 245, Null{}, 0}, Row{"TRED", 1, True{}, 4, 246, Null{}, 0},
+    Row{"TRED", 2, True{}, 4, 247, Null{}, 0}, Row{"TRED", 3, True{}, 4, 244, Null{}, 0},
+    Row{"PINS", 0, True{}, 6, 249, Null{}, 0}, Row{"PINS", 1, True{}, 6, 250, Null{}, 0},
+    Row{"PINS", 2, True{}, 6, 251, Null{}, 0}, Row{"PINS", 3, True{}, 6, 248, Null{}, 0},
+    Row{"SUIT", 0, True{}, 4294967295, 252, Null{}, 0},
+    Row{"PMAP", 0, True{}, 6, 254, Null{}, 0}, Row{"PMAP", 1, True{}, 6, 255, Null{}, 0},
+    Row{"PMAP", 2, True{}, 6, 256, Null{}, 0}, Row{"PMAP", 3, True{}, 6, 257, Null{}, 0},
+    Row{"PMAP", 2, True{}, 6, 258, Null{}, 0}, Row{"PMAP", 1, True{}, 6, 253, Null{}, 0},
+    Row{"PVIS", 0, True{}, 6, 260, Null{}, 0}, Row{"PVIS", 1, False{}, 6, 259, Null{}, 0},
+    Row{"BOSS", 0, False{}, 10, 262, Look{}, 0}, Row{"BOSS", 1, False{}, 10, 261, Look{}, 0},
+    Row{"BOSS", 0, False{}, 3, 264, Chase{}, 0}, Row{"BOSS", 0, False{}, 3, 265, Chase{}, 0},
+    Row{"BOSS", 1, False{}, 3, 266, Chase{}, 0}, Row{"BOSS", 1, False{}, 3, 267, Chase{}, 0},
+    Row{"BOSS", 2, False{}, 3, 268, Chase{}, 0}, Row{"BOSS", 2, False{}, 3, 269, Chase{}, 0},
+    Row{"BOSS", 3, False{}, 3, 270, Chase{}, 0}, Row{"BOSS", 3, False{}, 3, 263, Chase{}, 0},
+    Row{"BOSS", 7, False{}, 2, 272, Null{}, 0}, Row{"BOSS", 7, False{}, 2, 263, Pain{}, 0},
+    Row{"BOSS", 8, False{}, 8, 274, Null{}, 0}, Row{"BOSS", 9, False{}, 8, 275, Scream{}, 0},
+    Row{"BOSS", 10, False{}, 8, 276, Null{}, 0}, Row{"BOSS", 11, False{}, 8, 277, Fall{}, 0},
+    Row{"BOSS", 12, False{}, 8, 278, Null{}, 0}, Row{"BOSS", 13, False{}, 8, 279, Null{}, 0},
+    Row{"BOSS", 14, False{}, 4294967295, 279, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -487,9 +504,10 @@ def Thing.entering(th: Thing, +state: U32) -> Thing:
 
 # A type's mobjinfo_t: its DoomEd type, its spawn state's row, its
 # radius and height in map units, vanilla's flags: 1 special, 2
-# solid, 4 shootable, 16 in no blockmap cell, 256 hung from the ceiling,
-# 512 no gravity, 524288 no blood, 4194304 a kill and 8388608 an item
-# the tally counts, 33554432 not in deathmatch.
+# solid, 4 shootable, 8 in no sector's list, 16 in no blockmap cell, 256
+# hung from the ceiling, 512 no gravity, 262144 shadow, 524288 no blood,
+# 4194304 a kill and 8388608 an item the tally counts, 33554432 not in
+# deathmatch.
 type Thing.Def is Data:
   Def{kind: U32, state: U32, radius: U32, height: U32, flags: U32}
 
@@ -506,7 +524,10 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{2035, 10, 10, 42, 524294}, Def{2046, 38, 20, 16, 1}, Def{2047, 39, 20, 16, 1}, Def{2048, 36, 20, 16, 1},
     Def{2049, 42, 20, 16, 1}, Def{3004, 61, 20, 56, 4194310}, Def{9, 63, 20, 56, 4194310},
     Def{3001, 65, 20, 56, 4194310}, Def{3002, 67, 30, 56, 4194310}, Def{4294967295, 85, 20, 16, 528},
-    Def{4294967294, 181, 20, 16, 16}, Def{4294967293, 196, 6, 8, 328208}]
+    Def{4294967294, 181, 20, 16, 16}, Def{4294967293, 196, 6, 8, 328208}, Def{6, 239, 20, 16, 33554433},
+    Def{13, 241, 20, 16, 33554433}, Def{14, 238, 20, 16, 24}, Def{34, 243, 20, 16, 0}, Def{46, 244, 16, 16, 2},
+    Def{58, 67, 30, 56, 4456454}, Def{2024, 248, 20, 16, 8388609}, Def{2025, 252, 20, 16, 1},
+    Def{2026, 253, 20, 16, 8388609}, Def{2045, 259, 20, 16, 8388609}, Def{3003, 261, 24, 64, 4194310}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -545,91 +566,90 @@ def Thing.Def.flags(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
   flags
 
-# Doom's MF_NOBLOCKMAP: a mobj of the type is in no blockmap cell, so
-# nothing that walks the blockmap ever meets it.
-def Thing.Def.unlisted(d: Thing.Def) -> Bool:
-  Bool.not(U32.is_zero((Thing.Def.flags(d) .&. 16 : U32)))
+# The rest of Doom's mobjinfo, read by kind and not kept in the
+# definition, because a record's width is a budget the whole program
+# shares. Its fields in info.c's order: the spawn health, the see state
+# A_Look sends the type to and the sound it makes on sight, the sound
+# A_Chase starts as it enters the melee state, the pain state, the pain
+# chance and the sound A_Pain starts, the melee and missile states A_Chase
+# enters to claw and to shoot, the death and gib death states and the
+# sound A_Scream starts, the map units a chasing thing walks a move tic,
+# the mass a thrust divides by, and the call a chasing thing makes on a
+# draw under 3. A state the type has none of is 0 for the see, melee and
+# missile states and S_NULL for the others, and silence is 0. The baron's
+# melee and missile states are 0 until its attack rows exist, which keeps
+# its A_Chase from attacking. The fireball's sight sound is P_SpawnMissile's,
+# which the sim starts itself. Every other type is scenery at vanilla's
+# default health of 1000 and mass of 100, which no blow reaches, since
+# nothing that is not shootable is ever damaged.
+def Thing.fight.row(kind: U32) -> List<&2, U32>:
+  match kind:
+    case 3004:
+      [20, 89, 36, 0, 121, 200, 27, 0, 184, 123, 128, 59, 8, 100, 75]
+    case 9:
+      [30, 97, 37, 0, 137, 170, 27, 0, 187, 139, 144, 60, 8, 100, 75]
+    case 3001:
+      [60, 105, 39, 0, 153, 200, 27, 190, 190, 155, 160, 62, 8, 100, 76]
+    case 3002:
+      [150, 113, 41, 52, 168, 180, 26, 193, 0, 170, 4294967295, 64, 10, 400, 77]
+    case 58:
+      [150, 113, 41, 52, 168, 180, 26, 193, 0, 170, 4294967295, 64, 10, 400, 77]
+    case 3003:
+      [1000, 263, 43, 0, 271, 50, 26, 0, 0, 273, 4294967295, 67, 8, 1000, 77]
+    case 2035:
+      [20, 0, 0, 0, 4294967295, 0, 0, 0, 0, 176, 4294967295, 82, 0, 100, 0]
+    case 4294967293:
+      [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 198, 4294967295, 17, 0, 100, 0]
+    case _:
+      [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 4294967295, 4294967295, 0, 0, 100, 0]
 
-# Doom's mobjinfo seestate and seesound for the four types that wake:
-# the state each chases the player in and the sound it makes on sight,
-# both 0 for a type that never does. They are read by kind and not kept
-# in the definition, because a record's width is a budget the whole
-# program shares.
-def Thing.see(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 89, Bool.pick(U32, U32.is_eq(kind, 9), 97,
-    Bool.pick(U32, U32.is_eq(kind, 3001), 105, Bool.pick(U32, U32.is_eq(kind, 3002), 113, 0))))
-
-def Thing.seesound(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 36, Bool.pick(U32, U32.is_eq(kind, 9), 37,
-    Bool.pick(U32, U32.is_eq(kind, 3001), 39, Bool.pick(U32, U32.is_eq(kind, 3002), 41, 0))))
-
-# Doom's mobjinfo speed, the map units a chasing thing of the type walks
-# a move tic: 8 for the former humans and the imp, 10 for the demon.
-def Thing.speed(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3002), 10, 8)
-
-# Doom's mobjinfo activesound, the call a chasing thing makes on a draw
-# under 3.
-def Thing.activesound(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3001), 76, Bool.pick(U32, U32.is_eq(kind, 3002), 77, 75))
-
-# Doom's mobjinfo attacksound, which A_Chase starts as it enters a
-# melee state. Only the demon of these four has one, and its melee is
-# ticket 18's.
-def Thing.attacksound(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3002), 52, 0)
-
-# Doom's mobjinfo meleestate and missilestate, the rows A_Chase enters
-# to claw and to shoot, 0 where the type has none. The imp's and the
-# demon's are ticket 18's: until it gives them their rows both answer 0
-# here, which is the guard that keeps their A_Chase from ever attacking.
-def Thing.melee(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3001), 190, Bool.pick(U32, U32.is_eq(kind, 3002), 193, 0))
-
-def Thing.missile(+kind: U32) -> U32:
-  Bool.pick(U32, U32.is_eq(kind, 3004), 184, Bool.pick(U32, U32.is_eq(kind, 9), 187,
-    Bool.pick(U32, U32.is_eq(kind, 3001), 190, 0)))
-
-# The rest of Doom's mobjinfo for the types a blow reaches, read by kind
-# for the same reason: the spawn health, the pain chance, the rows of
-# the pain state, the death and the gib death, the mass the thrust
-# divides by, and the sounds A_Pain and A_Scream start, S_NULL for a row
-# the type has none of and 0 for silence. Every other type is scenery at
-# vanilla's default health of 1000 and mass of 100, which no blow
-# reaches, since nothing that is not shootable is ever damaged.
 def Thing.fight(+kind: U32) -> V.Vec:
-  V.Vec.of(Bool.pick(List<&2, U32>, U32.is_eq(kind, 3004), [20, 200, 121, 123, 128, 100, 27, 59],
-    Bool.pick(List<&2, U32>, U32.is_eq(kind, 9), [30, 170, 137, 139, 144, 100, 27, 60],
-      Bool.pick(List<&2, U32>, U32.is_eq(kind, 3001), [60, 200, 153, 155, 160, 100, 27, 62],
-        Bool.pick(List<&2, U32>, U32.is_eq(kind, 3002), [150, 180, 168, 170, 4294967295, 400, 26, 64],
-          Bool.pick(List<&2, U32>, U32.is_eq(kind, 2035), [20, 0, 4294967295, 176, 4294967295, 100, 0, 82],
-            Bool.pick(List<&2, U32>, U32.is_eq(kind, 4294967293),
-              [1000, 0, 4294967295, 198, 4294967295, 100, 0, 17],
-              [1000, 0, 4294967295, 4294967295, 4294967295, 100, 0, 0])))))))
+  V.Vec.of(Thing.fight.row(kind))
 
 def Thing.spawnhealth(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 0)
 
-def Thing.painchance(+kind: U32) -> U32:
+def Thing.see(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 1)
 
-def Thing.painstate(+kind: U32) -> U32:
+def Thing.seesound(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 2)
 
-def Thing.deathstate(+kind: U32) -> U32:
+def Thing.attacksound(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 3)
 
-def Thing.xdeathstate(+kind: U32) -> U32:
+def Thing.painstate(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 4)
 
-def Thing.mass(+kind: U32) -> U32:
+def Thing.painchance(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 5)
 
 def Thing.painsound(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 6)
 
-def Thing.deathsound(+kind: U32) -> U32:
+def Thing.melee(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 7)
+
+def Thing.missile(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 8)
+
+def Thing.deathstate(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 9)
+
+def Thing.xdeathstate(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 10)
+
+def Thing.deathsound(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 11)
+
+def Thing.speed(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 12)
+
+def Thing.mass(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 13)
+
+def Thing.activesound(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 14)
 
 # Doom's mobj_t as P_SpawnMobj leaves it: the type's spawn health, no
 # target, vanilla's reaction time of 8, no threshold, no momentum, the
@@ -909,45 +929,46 @@ def Things.edit(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, +lists
   V.Tree.set(List<&2, U32>, lists, i,
     Some{edit(Maybe.default(&2, List<&2, U32>, V.Tree.get(List<&2, U32>, lists, i), []), id)})
 
-def Things.edit.cell(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, inside: Bool,
-  cells: V.Tree<List<&2, U32>>, i: U32, id: U32) -> V.Tree<List<&2, U32>>:
-  match inside:
+def Things.edit.if(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, listed: Bool,
+  lists: V.Tree<List<&2, U32>>, i: U32, id: U32) -> V.Tree<List<&2, U32>>:
+  match listed:
     case False{}:
-      cells
+      lists
     case True{}:
-      Things.edit(~edit, cells, i, id)
+      Things.edit(~edit, lists, i, id)
 
-# A mobj at (x, y) in a sector, in the list of the blockmap cell its
-# centre is in and in its sector's; off the map, or flagged for no
-# blockmap, it is in no cell.
+# A mobj with some flags at (x, y) in a sector, in the list of the
+# blockmap cell its centre is in and in its sector's; off the map, or
+# flagged MF_NOBLOCKMAP, it is in no cell, and flagged MF_NOSECTOR, in no
+# sector's list.
 def Things.placed(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, ts: Things, +bm: L.Level.Blockmap,
-  +unlisted: Bool, +id: U32, x: U32, y: U32, sector: U32) -> Things:
+  +flags: U32, +id: U32, x: U32, y: U32, sector: U32) -> Things:
   Things{tree, count, you, cells, sectors, heard} = ts
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
   +c = L.Level.cell_of(bm, x, y)
-  Things{tree, count, you, Things.edit.cell(~edit, Bool.and(Bool.not(unlisted),
+  Things{tree, count, you, Things.edit.if(~edit, Bool.and(U32.is_zero((flags .&. 16 : U32)),
       L.Level.cell.inside(cols, rows, c)), cells, L.Level.cell.number(cols, c), id),
-    Things.edit(~edit, sectors, sector, id), heard}
+    Things.edit.if(~edit, U32.is_zero((flags .&. 8 : U32)), sectors, sector, id), heard}
 
 # Doom's P_SetThingPosition: the mobj goes first in its cell's list and
 # first in its sector's.
-def Things.link(ts: Things, bm: L.Level.Blockmap, unlisted: Bool, id: U32, x: U32, y: U32, sector: U32) -> Things:
-  Things.placed(~Things.first, ts, bm, unlisted, id, x, y, sector)
+def Things.link(ts: Things, bm: L.Level.Blockmap, flags: U32, id: U32, x: U32, y: U32, sector: U32) -> Things:
+  Things.placed(~Things.first, ts, bm, flags, id, x, y, sector)
 
 # Doom's P_UnsetThingPosition: the mobj leaves both lists.
-def Things.unlink(ts: Things, bm: L.Level.Blockmap, unlisted: Bool, id: U32, x: U32, y: U32, sector: U32) -> Things:
-  Things.placed(~Things.without, ts, bm, unlisted, id, x, y, sector)
+def Things.unlink(ts: Things, bm: L.Level.Blockmap, flags: U32, id: U32, x: U32, y: U32, sector: U32) -> Things:
+  Things.placed(~Things.without, ts, bm, flags, id, x, y, sector)
 
 # The population with a thing in it, linked where it is: one that
 # spawned, or one that moved, once unlinked from where it was.
 def Things.entered(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
   Thing{+id, +kind, +x, +y, z, floorz, ceilz, angle, +sector, state, tics, momz, hurt} = th
   Things.link(Things.put(ts, id, Some{Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz,
-    hurt}}), bm, Thing.Def.unlisted(Thing.info(kind)), id, x, y, sector)
+    hurt}}), bm, Thing.Def.flags(Thing.info(kind)), id, x, y, sector)
 
 def Things.unlinked(ts: Things, bm: L.Level.Blockmap, th: Thing) -> Things:
   Thing{id, +kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
-  Things.unlink(ts, bm, Thing.Def.unlisted(Thing.info(kind)), id, x, y, sector)
+  Things.unlink(ts, bm, Thing.Def.flags(Thing.info(kind)), id, x, y, sector)
 
 # A thing at another place, once unlinked from where it was: Doom's
 # P_UnsetThingPosition and P_SetThingPosition about a move.
