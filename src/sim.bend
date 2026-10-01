@@ -937,7 +937,7 @@ def Sim.passes(f: Sim.Fit, +z: U32, +height: U32) -> Bool:
     Bool.and(F.Fixed.ge((ceil - z : U32), height), F.Fixed.le((floor - z : U32), Sim.step_up()))))
 
 # P_TryMove's last rule, for a mobj with neither MF_DROPOFF nor
-# MF_FLOAT, which is every monster either E1M1 spawns: it will not stand
+# MF_FLOAT, which is every monster Bendoom spawns: it will not stand
 # where the floor it would leave behind is more than 24 units below the
 # floor it would stand on. The player carries MF_DROPOFF and never
 # meets it.
@@ -1109,8 +1109,8 @@ def Sim.spechit(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32) -> List<
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
 def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, +y: U32) -> H.Things:
-  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), False{}, H.Things.you(things), ox, oy,
-    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), False{}, H.Things.you(things), x, y,
+  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), 0, H.Things.you(things), ox, oy,
+    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), 0, H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
 def Sim.crossed.at(lines: List<&2, U32>, +x: U32, +y: U32) -> List<&2, Sim.Cross>:
@@ -4639,7 +4639,7 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # started.
 def State.entered.you(s: State) -> State:
   State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), False{}, H.Things.you(things),
+  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), 0, H.Things.you(things),
     Player.x(player), Player.y(player), L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex,
     thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, Mobj{H.Things.you(things)})
 
@@ -5049,8 +5049,7 @@ def Sim.sector.hurt(due: Bool, +s: State) -> State:
 # 7 is nukage, which takes 5 health every 32 tics of the level's clock
 # while the player's feet are at that sector's floor. It is the only
 # special either map carries that hurts, so the switch is the one test.
-# Neither map spawns a radiation suit on this skill, so the suit's
-# protection has no code.
+# The radiation suit's protection is not here yet.
 def Sim.sector(+level: L.Level, +clock: U32, +s: State) -> State:
   +sector = L.Level.sector_at(level, Player.x(State.player(s)), Player.y(State.player(s)))
   Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(State.level(s), sector), 7),
@@ -5401,9 +5400,9 @@ def Sim.chase.newdir(w: Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level) -
   Sim.chase.newdir.at(Walk{ok, id, s}, deltax, deltay,
     Sim.thing.reads(State.things(s), id, H.Thing.hurt.movedir()), level)
 
-# Doom's A_FaceTarget: the thing turns to face its target. The shadow
-# branch that spreads the turn is the spectre's, which neither map
-# spawns on this skill.
+# Doom's A_FaceTarget: the thing turns to face its target. Vanilla's
+# shadow branch, which spreads the turn at a target flagged MF_SHADOW, a
+# spectre or an invisible player, is not here yet.
 def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
   H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, +ai} = th
   H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),

@@ -133,9 +133,16 @@ def Inventory.green_armour() -> U32:
 def Inventory.blue_armour() -> U32:
   2
 
-# The blue card's and the blue skull's bits among the cards.
+# The bits among the cards of card_t's it_bluecard, it_yellowcard,
+# it_redcard and it_blueskull.
 def Inventory.bluecard() -> U32:
   1
+
+def Inventory.yellowcard() -> U32:
+  2
+
+def Inventory.redcard() -> U32:
+  4
 
 def Inventory.blueskull() -> U32:
   8
@@ -169,14 +176,40 @@ def Inventory.plasma() -> U32:
 def Inventory.chainsaw() -> U32:
   128
 
-# powertype_t's pw_strength, the berserk pack's power.
+# powertype_t's indexes of the powers the shareware maps give.
 def Inventory.pw_strength() -> U32:
   1
 
-# The berserk power's counter, which counts up from 1 while it is on.
-def Inventory.strength(inv: Inventory) -> U32:
+def Inventory.pw_invisibility() -> U32:
+  2
+
+def Inventory.pw_ironfeet() -> U32:
+  3
+
+def Inventory.pw_allmap() -> U32:
+  4
+
+def Inventory.pw_infrared() -> U32:
+  5
+
+# Doom's INVISTICS, INFRATICS and IRONTICS: a timed power's tics.
+def Inventory.invistics() -> U32:
+  2100
+
+def Inventory.infratics() -> U32:
+  4200
+
+def Inventory.irontics() -> U32:
+  2100
+
+# A power's counter: the tics a timed power has left, the computer map's
+# 1 once it is had, and the berserk power's count up from 1 while on.
+def Inventory.power.of(+power: U32, inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
-  V.Vec.get(powers, Inventory.pw_strength())
+  V.Vec.get(powers, power)
+
+def Inventory.strength(+inv: Inventory) -> U32:
+  Inventory.power.of(Inventory.pw_strength(), inv)
 
 # Whether the blue card or the blue skull is owned.
 def Inventory.blue(inv: Inventory) -> Bool:
@@ -272,11 +305,17 @@ def Inventory.heal(+amount: U32, +cap: U32, inv: Inventory) -> Inventory:
 def Inventory.body(+amount: U32, msg: U32, +inv: Inventory) -> Maybe<&2, Inventory>:
   Inventory.taken(U32.is_lt(Inventory.health(inv), 100), msg, Inventory.heal(amount, 100, inv))
 
-# The strength power on, its counter at 1.
-def Inventory.strong(inv: Inventory) -> Inventory:
+# P_GivePower's counter set: a power on for so many tics, or at 1 for
+# the berserk power and the computer map.
+def Inventory.power(+power: U32, +tics: U32, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-    V.Vec.set(powers, Inventory.pw_strength(), 1), items, bonus, line, kills, secrets}
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, V.Vec.set(powers, power, tics), items,
+    bonus, line, kills, secrets}
+
+# A timed power's pickup, always taken: P_GivePower sets its counter
+# whether it ran or not.
+def Inventory.timed(+power: U32, +tics: U32, +msg: U32, inv: Inventory) -> Maybe<&2, Inventory>:
+  Some{Inventory.saying(msg, Inventory.power(power, tics, inv))}
 
 # The armour bonus: a point more up to 200, and green armour's type if
 # none is worn.
@@ -370,17 +409,20 @@ def Inventory.backpack(inv: Inventory) -> Inventory:
 
 # P_TouchSpecialThing's switch for the types Bendoom spawns: the
 # inventory after the grant, saying the message that case sets, and none
-# when the thing stays. The blue card, the two bonuses, the soul sphere
-# and the backpack are always taken, and so is the berserk pack,
-# P_GivePower's strength with P_GiveBody's 100 whether it heals or not;
-# the stimpack heals 10, the medikit 25; a box holds five clips; a weapon
-# brings two clips of its ammo, and the chainsaw has none. The types
-# neither E1M1 places keep their grant and say nothing, since no play
-# could show their strings.
+# when the thing stays. The cards, the two bonuses, the soul sphere, the
+# backpack and the timed powers are always taken, and so is the berserk
+# pack, P_GivePower's strength with P_GiveBody's 100 whether it heals or
+# not; the computer map is taken once; the stimpack heals 10, the medikit
+# 25; a box holds five clips; a weapon brings two clips of its ammo, and
+# the chainsaw has none. A type whose message is none says nothing.
 def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inventory>:
   match kind:
     case 5:
       Some{Inventory.card(Inventory.bluecard(), Msg.Message.gotbluecard(), inv)}
+    case 6:
+      Some{Inventory.card(Inventory.yellowcard(), Msg.Message.gotyelwcard(), inv)}
+    case 13:
+      Some{Inventory.card(Inventory.redcard(), Msg.Message.gotredcard(), inv)}
     case 8:
       Some{Inventory.backpack(inv)}
     case 17:
@@ -416,9 +458,19 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
     case 2019:
       Inventory.suit(Inventory.blue_armour(), Msg.Message.gotmega(), inv)
     case 2023:
-      Some{Inventory.want(0, Inventory.saying(Msg.Message.gotberserk(), Inventory.strong(Inventory.heal(100, 100, inv))))}
+      Some{Inventory.want(0, Inventory.saying(Msg.Message.gotberserk(),
+        Inventory.power(Inventory.pw_strength(), 1, Inventory.heal(100, 100, inv))))}
+    case 2024:
+      Inventory.timed(Inventory.pw_invisibility(), Inventory.invistics(), Msg.Message.gotinvis(), inv)
+    case 2025:
+      Inventory.timed(Inventory.pw_ironfeet(), Inventory.irontics(), Msg.Message.gotsuit(), inv)
+    case 2026:
+      Inventory.taken(U32.is_zero(Inventory.power.of(Inventory.pw_allmap(), inv)), Msg.Message.gotmap(),
+        Inventory.power(Inventory.pw_allmap(), 1, inv))
+    case 2045:
+      Inventory.timed(Inventory.pw_infrared(), Inventory.infratics(), Msg.Message.gotvisor(), inv)
     case 2046:
-      Inventory.ammo(Inventory.am_misl(), 5, Msg.Message.none(), inv)
+      Inventory.ammo(Inventory.am_misl(), 5, Msg.Message.gotrockbox(), inv)
     case 2047:
       Inventory.ammo(Inventory.am_cell(), 1, Msg.Message.gotcell(), inv)
     case 2048:
@@ -429,11 +481,12 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
       None{}
 
 # P_TouchSpecialThing's sound for a type taken: the weapons' (2001 to
-# 2005), the power's for the soul sphere and the berserk pack, and the
-# item's for the rest.
+# 2005), the power's for the soul sphere, the visor and the powers from
+# 2022 to 2026, and the item's for the rest.
 def Inventory.sound(+kind: U32) -> U32:
   Bool.pick(U32, Bool.and(U32.is_ge(kind, 2001), U32.is_le(kind, 2005)), Sn.Sound.wpnup(),
-    Bool.pick(U32, Bool.or(U32.is_eq(kind, 2013), U32.is_eq(kind, 2023)), Sn.Sound.getpow(), Sn.Sound.itemup()))
+    Bool.pick(U32, Bool.and(U32.is_ge(kind, 2022), U32.is_le(kind, 2026)) || U32.is_eq(kind, 2013)
+      || U32.is_eq(kind, 2045), Sn.Sound.getpow(), Sn.Sound.itemup()))
 
 # The end of P_TouchSpecialThing for a thing taken: the tally counts an
 # item flagged for it, and the flash grows by 6.
@@ -442,12 +495,19 @@ def Inventory.took(counted: Bool, inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers,
     (items + Bool.to_u32(counted) : U32), (bonus + 6 : U32), line, kills, secrets}
 
+# A power's counter one tic on, by one more for one that counts up and
+# one less for one that counts down, and left where it is at zero.
+def Inventory.power.tic(+powers: V.Vec, +power: U32, +step: U32) -> V.Vec:
+  +n = V.Vec.get(powers, power)
+  V.Vec.set(powers, power, (n + step * Inventory.on(n) : U32))
+
 # P_PlayerThink's counters, with HU_Ticker's: strength counts up once
-# on, the flash fades by one a tic, and so does the heads-up line's
-# counter, which goes out at zero.
+# on, the timed powers run down, the flash fades by one a tic, and so
+# does the heads-up line's counter, which goes out at zero.
 def Inventory.tic(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, +powers, items, +bonus, +line, kills, secrets} = inv
-  +strength = V.Vec.get(powers, Inventory.pw_strength())
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, +bonus, +line, kills, secrets} = inv
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-    V.Vec.set(powers, Inventory.pw_strength(), (strength + Inventory.on(strength) : U32)), items,
+    Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(powers, Inventory.pw_strength(), 1),
+      Inventory.pw_invisibility(), 4294967295), Inventory.pw_infrared(), 4294967295), Inventory.pw_ironfeet(),
+      4294967295), items,
     (bonus - Inventory.on(bonus) : U32), (line - Inventory.on((line .&. 255 : U32)) : U32), kills, secrets}
