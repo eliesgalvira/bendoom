@@ -36,6 +36,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/project.bend as P
 import ../src/game.bend as M
@@ -137,10 +138,10 @@ def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
 # A player killed where it stands in the nukage of sector 173, which
 # five health a blow would take 609 tics to do.
 def killed.at(+s: S.State) -> S.State:
-  S.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
+  Tic.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
 
 def killed(level: L.Level) -> S.State:
-  killed.at(S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
+  killed.at(Tic.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
 
 # A game whose player is dead: a frame with Space pressed asks for the
 # level again, and the next frame, with no time gone, answers it.
@@ -151,12 +152,12 @@ def reborn(g: Maybe<M.Game>) -> IO(Maybe<M.Game>):
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
-  +beside = S.Sim.replay(route(), S.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
+  +beside = Tic.Sim.replay(route(), Tic.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
     A.Angle.of_thing(180)}))
   do IO<Unit>:
-    IO.print(line("start", S.State.start(level)))
+    IO.print(line("start", Tic.State.start(level)))
     IO.print(line("beside", beside))
-    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
+    IO.print(clicked(Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     d : Maybe<M.Game> <- reborn(Some{M.Game{level, gfx, P.Project.tables(level), I.Playing{killed(level)},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))

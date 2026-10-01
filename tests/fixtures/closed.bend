@@ -7,6 +7,8 @@ import ../../src/tables.bend as T
 import ../../src/level.bend as L
 import ../../src/keys.bend as K
 import ../../src/sim.bend as S
+import ../../src/special.bend as Sp
+import ../../src/tic.bend as Tic
 import ../../src/things.bend as H
 import ../../src/inventory.bend as I
 import ../../src/sound.bend as Sn
@@ -54,7 +56,7 @@ def Closed.running(s: S.State) -> List<&2, S.Thinker>:
 
 # The player after a script in the room, from a player and a clock.
 def Closed.room(script: List<&2, K.Cmd>, p: S.Player, clock: U32) -> S.Player:
-  S.State.player(S.Sim.replay(script, Closed.state(p, L.Level.room(0, 128), clock)))
+  S.State.player(Tic.Sim.replay(script, Closed.state(p, L.Level.room(0, 128), clock)))
 
 # The pistol at rest, the state A_Raise leaves it in.
 def Closed.ready() -> S.Psprites:
@@ -85,7 +87,7 @@ def Closed.counted(+s: S.State) -> U32 & U32:
 # The health and the damage count left by a blow from nobody on a player
 # at rest in the room with a hundred health.
 def Closed.blow.at(damage: U32, +s: S.State) -> U32 & U32:
-  Closed.counted(S.Sim.damage(H.Things.you(S.State.things(s)), damage, H.Thing.you(), H.Thing.you(), s))
+  Closed.counted(Tic.Sim.damage(H.Things.you(S.State.things(s)), damage, H.Thing.you(), H.Thing.you(), s))
 
 def Closed.blow(damage: U32) -> U32 & U32:
   Closed.blow.at(damage,
@@ -143,13 +145,13 @@ def Closed.met(+s: S.State) -> List<&2, S.Sim.Meet>:
   S.Sim.meets(S.State.level(s), S.State.things(s), S.State.player(s), True{}, True{}, 2097152, 4194304, 6291456,
     4194304)
 
-def Closed.reach(+s: S.State) -> S.Sim.Reach:
-  S.Sim.path(~S.Sim.Reach, ~S.Sim.use.visit, S.State.level(s), S.State.things(s), S.State.player(s), True{},
-    False{}, 2097152, 4194304, 6291456, 4194304, S.Nothing{})
+def Closed.reach(+s: S.State) -> Sp.Sim.Reach:
+  S.Sim.path(~Sp.Sim.Reach, ~Sp.Sim.use.visit, S.State.level(s), S.State.things(s), S.State.player(s), True{},
+    False{}, 2097152, 4194304, 6291456, 4194304, Sp.Nothing{})
 
 # The state after a tic of use and then idle tics.
 def Closed.used(idle: Nat, s: S.State) -> S.State:
-  S.Sim.replay(K.Cmd{0, 0, 0, 2} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
+  Tic.Sim.replay(K.Cmd{0, 0, 0, 2} <> List.replicate(K.Cmd, idle, K.Cmd.idle()), s)
 
 def Closed.ceil(s: S.State, sector: U32) -> U32:
   L.Level.ceil(S.State.level(s), sector)
@@ -160,7 +162,7 @@ def Closed.moving(level: L.Level, t: S.Thinker, x: U32, y: U32, ceilz: U32) -> S
   Closed.at(Closed.player(x, y, 0, ceilz), level, [t], [])
 
 def Closed.idled(n: Nat, s: S.State) -> S.State:
-  S.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
+  Tic.Sim.replay(List.replicate(K.Cmd, n, K.Cmd.idle()), s)
 
 # The literal level with line 0 a walk-over turbo floor (special 36; its
 # tag 0 is every sector), the door sector's floor at 16, its ceiling and
@@ -204,7 +206,7 @@ def Closed.coincident(starting: Bool) -> U32 & U32:
 # for a sector special, the random index at 1 as it is once Doom has
 # spawned the player.
 def Closed.lit(special: U32, west: U32) -> S.State:
-  S.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
+  Sp.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, False{}, False{},
     [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
 
@@ -422,7 +424,7 @@ def Closed.cell(s: S.State) -> List<&2, U32>:
 # elements the run does not read, so one thinker takes its turn and the
 # rest stay due, where an action's spawn joins them.
 def Closed.midrun(+s: S.State) -> S.State:
-  S.Sim.thinkers.go([S.Mobj{0}], K.Cmd.idle(), L.Level.geo(S.State.level(s)), s)
+  Tic.Sim.thinkers.go([S.Mobj{0}], K.Cmd.idle(), L.Level.geo(S.State.level(s)), s)
 
 # A health bonus spawned into the west room once the player's mobj, the
 # only thinker there, has taken its turn.
@@ -432,7 +434,7 @@ def Closed.spawned() -> S.State:
 
 # The rest of that run.
 def Closed.spawned.ran() -> S.State:
-  S.Sim.thinkers.all(8n, K.Cmd.idle(), L.Level.geo(Closed.doors()), Closed.spawned())
+  Tic.Sim.thinkers.all(8n, K.Cmd.idle(), L.Level.geo(Closed.doors()), Closed.spawned())
 
 def Closed.tics(m: Maybe<&2, H.Thing>) -> Maybe<&2, U32>:
   match m:
@@ -454,14 +456,14 @@ def Closed.things(s: S.State) -> List<&2, H.Thing>:
 
 def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
   Closed.things(Closed.idled(n, Closed.moving.among(Closed.doors(),
-    S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}], S.Sim.noise.floor()}, 13107200,
+    S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}], Sp.Sim.noise.floor()}, 13107200,
     [Closed.thing(29, 60, 2097152, 6553600, 3932160), Closed.thing(24, 2035, 2097152, 1048576, 0)])))
 
 # The door open at 68 and closing, 2 a tic, over a thing, the west room's
 # player at (32, 64) in the one cell.
 def Closed.closing(th: H.Thing) -> S.State:
   Closed.moving.among(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
-    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()},
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door()},
     2097152, [th])
 
 def Closed.over_barrel() -> S.State:
@@ -476,7 +478,7 @@ def Closed.over_barrel() -> S.State:
 # S_BON1 12, then S_BON1A to S_BON1E 13 to 17, 6 tics each, then S_BON1
 # again; S_ARM1 6, 6 tics, and S_ARM1A 7, 7 tics, in turn.
 def Closed.stocked() -> S.State:
-  S.State.at(Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 2014, 7, 16, 96, 0, 2018, 7], 15), 3),
+  Tic.State.at(Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 2014, 7, 16, 96, 0, 2018, 7], 15), 3),
     L.Start{2097152, 4194304, 0})
 
 def Closed.looking(a: H.Thing.Action) -> Bool:
