@@ -1,4 +1,4 @@
-{ lib, callPackage, writers, bend, coreutils, ffmpeg-headless, iwad, music, sounds }:
+{ lib, callPackage, writers, bend, coreutils, ffmpeg-headless, iwad, sounds }:
 
 let
   inherit (lib.lists) singleton;
@@ -10,7 +10,6 @@ let
     root = ../film.bend;
     sources = singleton ../src;
   };
-  song = music iwad;
   effects = sounds iwad;
 in
 (writers.writeNuBin "bendoom-film" /* nu */ ''
@@ -26,7 +25,6 @@ in
         DEMO: $demo
         AUDIO: $audio_hex
         BENDOOM_IWAD: ($env.BENDOOM_IWAD? | default "${iwad}")
-        BENDOOM_MUSIC: "${song}"
         BENDOOM_SOUNDS: "${effects}"
       } { ^${getExe frames} --threads 1 } o> $video_hex
       ^${coreutils}/bin/basenc --base16 -d $audio_hex o> $audio_raw

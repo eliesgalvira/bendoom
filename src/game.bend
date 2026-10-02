@@ -21,8 +21,7 @@ import ./stream.bend as M
 # the tally after it. The level is the map as loaded, which the tally
 # builds a fresh state from. Again is whether Space or Enter is down,
 # which accelerates the tally. The demo is the one being recorded, until
-# the level ends, and the music the song being streamed, if there is
-# one.
+# the level ends, and the music the mixer, if there is a sound device.
 type Game is Type:
   Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, play: I.Play, input: K.Input,
     again: Bool, last: Nat, owed: Nat, mem: Array<U32>, demo: Maybe<D.Demo.Rec>, music: Maybe<M.Stream>}
@@ -156,10 +155,10 @@ def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
       do IO<Bool & Game>:
         moved : Maybe<M.Stream> <- M.Stream.update(~S.State,
           ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music)
-        playing : Maybe<M.Stream> <- M.Stream.play(moved)
+        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state}), moved)
         return (quit, Game{level, gfx, tables, I.Playing{state}, input, again, last, owed, mem, demo, playing})
     case I.Showing{+wi}:
-      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(music),
+      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(I.Showing{wi}), music),
         playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi}, input, again, last, owed,
           mem, demo, playing})))
 
@@ -173,9 +172,9 @@ def Game.tick(events: List<Event>, g: Game) -> IO(Bool & Game):
     stepped : Bool & Game <- Game.frame(now, events, g)
     Game.mixed(stepped)
 
-# The window, the demo and the song let go, whether the game quits or
+# The window, the demo and the mixer let go, whether the game quits or
 # its fuel runs out: the frames whose top-up found the device's queue
-# empty, if the music played.
+# empty, if the mixer ran.
 def Game.shut(window: Window, g: Game) -> IO(Maybe<U32>):
   Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music} = g
   do IO<Maybe<U32>>:
@@ -221,15 +220,15 @@ def Game.start.go(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Ma
   (+gfx, +level) = gl
   do IO<Maybe<U32>>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
-    music : Maybe<M.Stream> <- M.Stream.open()
+    music : Maybe<M.Stream> <- M.Stream.open(I.Play.songs())
     Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
       I.Play.replay(script, level, I.Play.start(level)), input, False{}, now, 0n, mem, demo, music})
 
 # The window opened and the loop run for at most so many frames, from
 # the player 1 start after a script, with the given input at first,
-# recording the demo if one is open. The song starts with the loop, as
-# vanilla's does at the level's load, and plays on through the level's
-# end and a restart. It answers what Game.shut does.
+# recording the demo if one is open. Each frame plays the scene's song,
+# which starts as vanilla's does at the level's load and the tally's
+# start. It answers what Game.shut does.
 def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
   world: Array<U32> & G.Gfx & L.Level) -> IO(Maybe<U32>):
   (mem, gl) = world
