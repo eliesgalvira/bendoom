@@ -1,4 +1,4 @@
-# The graphics E1M1 names, copied from the WAD into one linear array the
+# The graphics a map names, copied from the WAD into one linear array the
 # draw threads, since a texel read through a copyable tree costs three
 # hundred times one through an array (bench/lookup.bend). The array
 # holds the frame and the draw's per-column scratch first, then the
@@ -1329,7 +1329,7 @@ def Gfx.load.textures(+base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, a: Array<U32>,
   Gfx.load.counts(base, dir, pnames, Gfx.texlumps(dir, texture1),
     B.Bytes.each(~U32, ~B.Bytes.u32, Gfx.plan(Gfx.texlumps(dir, texture1), [0]), a))
 
-def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
+def Gfx.load.go(+marker: String, +lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +level) = q
   +dir = Gfx.dir(lumps, Map.new(&2, W.Wad.Lump))
@@ -1338,6 +1338,7 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
     Gfx.names(L.Level.flatnames(level), unnamed))
   +fl = Gfx.names.after(frames, L.Level.flatnames(level), unnamed)
   do Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
+    start : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", marker)
     pal : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PLAYPAL")
     cmap : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "COLORMAP")
     flats : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(fl), dir, "R_FlatNumForName")
@@ -1388,32 +1389,33 @@ def Gfx.deh.loaded(bright: U32, p: Array<U32> & Gfx & L.Level) -> Array<U32> & G
   (a, Gfx{flats, pics, sky, texs, cols, sidetex, skytex, Gfx.deh.views(8n, 0, bright, sprites), anims, bar,
     font}, level)
 
-def Gfx.deh.read(+lumps: List<&2, W.Wad.Lump>, p: Array<U32> & String) ->
+def Gfx.deh.read(+episode: U32, +map: U32, +lumps: List<&2, W.Wad.Lump>, p: Array<U32> & String) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, text) = p
   +bright = Gfx.deh.lines(String.lines(text), False{}, 5)
   Result.map(&1, &1, U32 & String, Array<U32> & Gfx & L.Level, Array<U32> & Gfx & L.Level,
-    loaded => Gfx.deh.loaded(bright, loaded), Gfx.load.go(lumps, L.Level.load((a, lumps))))
+    loaded => Gfx.deh.loaded(bright, loaded),
+    Gfx.load.go(L.Level.marker(episode, map), lumps, L.Level.load(episode, map, (a, lumps))))
 
-def Gfx.deh.at(+lumps: List<&2, W.Wad.Lump>, a: Array<U32>, span: U32 & U32) ->
+def Gfx.deh.at(+episode: U32, +map: U32, +lumps: List<&2, W.Wad.Lump>, a: Array<U32>, span: U32 & U32) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (pos, size) = span
-  Gfx.deh.read(lumps, B.Bytes.text(a, pos, U32.to_nat(size)))
+  Gfx.deh.read(episode, map, lumps, B.Bytes.text(a, pos, U32.to_nat(size)))
 
-# The level and its graphics from the WAD's bytes and directory, or
+# Map ExMy and its graphics from the WAD's bytes and directory, or
 # Doom's error for a name the WAD lacks. The WAD's bytes are dropped.
-def Gfx.load(p: Array<U32> & List<&2, W.Wad.Lump>) ->
+def Gfx.load(+episode: U32, +map: U32, p: Array<U32> & List<&2, W.Wad.Lump>) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +lumps) = p
-  Gfx.deh.at(lumps, a, W.Wad.find(lumps, "DEHACKED"))
+  Gfx.deh.at(episode, map, lumps, a, W.Wad.find(lumps, "DEHACKED"))
 
-# The level and its graphics from the WAD BENDOOM_IWAD names; a WAD that
+# Map ExMy and its graphics from the WAD BENDOOM_IWAD names; a WAD that
 # cannot be read, or a name it lacks, ends the program with the error.
-def Gfx.open() -> IO(Array<U32> & Gfx & L.Level):
+def Gfx.open(+episode: U32, +map: U32) -> IO(Array<U32> & Gfx & L.Level):
   do IO<Array<U32> & Gfx & L.Level>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    IO.pass(Array<U32> & Gfx & L.Level, Gfx.load(W.Wad.dir(bytes)))
+    IO.pass(Array<U32> & Gfx & L.Level, Gfx.load(episode, map, W.Wad.dir(bytes)))
 
 # Lookups
 # -------

@@ -209,8 +209,8 @@ def set_twice(b: Bool, +d1: Bool, +d2: Bool, +old: Bool) ->
     case False{}:
       {==}
 
-def at_twice(ns: List<&2, Bool>, place: Nat, +d1: Bool, +d2: Bool) ->
-  {K.Keys.numbers.at(ns, place, d2) == K.Keys.numbers.at(K.Keys.numbers.at(ns, place, d1), place, d2)
+def numbers_twice(ns: List<&2, Bool>, place: Nat, +d1: Bool, +d2: Bool) ->
+  {K.Keys.numbers(ns, place, d2) == K.Keys.numbers(K.Keys.numbers(ns, place, d1), place, d2)
     : List<&2, Bool>}:
   match ns:
     case []:
@@ -220,20 +220,12 @@ def at_twice(ns: List<&2, Bool>, place: Nat, +d1: Bool, +d2: Bool) ->
         case 0n:
           {==}
         case 1n+p:
-          %at_twice(rest, p, d1, d2)
-            : {held <> K.Keys.numbers.at(rest, p, d2) == held <> _ : List<&2, Bool>}
+          %numbers_twice(rest, p, d1, d2)
+            : {held <> K.Keys.numbers(rest, p, d2) == held <> _ : List<&2, Bool>}
           {==}
 
-def numbers_twice(place: Maybe<&2, Nat>, ns: List<&2, Bool>, +d1: Bool, +d2: Bool) ->
-  {K.Keys.numbers(ns, place, d2) == K.Keys.numbers(K.Keys.numbers(ns, place, d1), place, d2) : List<&2, Bool>}:
-  match place:
-    case None{}:
-      {==}
-    case Some{p}:
-      at_twice(ns, p, d1, d2)
-
 def press9(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool, b8: Bool, b9: Bool,
-  place: Maybe<&2, Nat>, +d1: Bool, +d2: Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool, +sleft: Bool,
+  place: Nat, +d1: Bool, +d2: Bool, +up: Bool, +dn: Bool, +left: Bool, +right: Bool, +sleft: Bool,
   +sright: Bool, +run: Bool, +use: Bool, +fire: Bool, +numbers: List<&2, Bool>) ->
   {K.Keys{K.Keys.set(b1, d2, K.Keys.set(b1, d1, up)), K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)),
     K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)),
@@ -245,7 +237,7 @@ def press9(b1: Bool, b2: Bool, b3: Bool, b4: Bool, b5: Bool, b6: Bool, b7: Bool,
       K.Keys.set(b5, d2, sleft), K.Keys.set(b6, d2, sright),
       K.Keys.set(b7, d2, run), K.Keys.set(b8, d2, use),
       K.Keys.set(b9, d2, fire), K.Keys.numbers(numbers, place, d2)} : K.Keys}:
-  %numbers_twice(place, numbers, d1, d2)
+  %numbers_twice(numbers, place, d1, d2)
     : {K.Keys{K.Keys.set(b1, d2, K.Keys.set(b1, d1, up)), K.Keys.set(b2, d2, K.Keys.set(b2, d1, dn)),
       K.Keys.set(b3, d2, K.Keys.set(b3, d1, left)), K.Keys.set(b4, d2, K.Keys.set(b4, d1, right)),
       K.Keys.set(b5, d2, K.Keys.set(b5, d1, sleft)), K.Keys.set(b6, d2, K.Keys.set(b6, d1, sright)),
