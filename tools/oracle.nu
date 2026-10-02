@@ -179,25 +179,28 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
 }
 
 # Our frame and vanilla's after the tics of a demo on the IWAD copy
-# given, and where they differ.
-def compare [wad: path, iwad: binary, header: binary, tics: binary, frame: path, tally: bool, keep: bool]: nothing -> record {
+# given, and where they differ. The run is the flags both commands take.
+def compare [
+  iwad: binary, header: binary, tics: binary
+  run: record<wad: path, frame: path, tally: bool, keep: bool>
+]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
-  let told = if $tally { finished $iwad } else { patch-pixels $iwad M_PAUSE 126 4 }
+  let told = if $run.tally { finished $iwad } else { patch-pixels $iwad M_PAUSE 126 4 }
   let dir = mktemp --directory
-  let name = $wad | path basename
+  let name = $run.wad | path basename
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
-  let tail = if $tally { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
+  let tail = if $run.tally { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
   let shot = vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
   $tics | demo $header | save ($dir | path join ours.lmp)
-  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$frame } | lines
+  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let face = face-box $iwad
-  let masked = if $tally { anim-boxes $iwad } else { ($told | get at) ++ $face }
+  let masked = if $run.tally { anim-boxes $iwad } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
   let playpal = $iwad | lumps | where name == "PLAYPAL" | last | get pos
-  if not $keep { rm --recursive $dir }
+  if not $run.keep { rm --recursive $dir }
   {
     differing: ($differing | length)
     face: ($off | where $it in $face | length)
@@ -205,7 +208,7 @@ def compare [wad: path, iwad: binary, header: binary, tics: binary, frame: path,
     palette: ($"0x($dump | first)" | into int)
     shot_plain: ($shot.palette == ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
     first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
-    scratch: (if $keep { $dir } else { null })
+    scratch: (if $run.keep { $dir } else { null })
   }
 }
 
@@ -224,7 +227,7 @@ def main [
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $wad $iwad (header $map) ($script | runs | tics) $frame $tally $keep)
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
 }
 
 # The first tics of a recorded demo.
@@ -239,8 +242,8 @@ def "main demo" [
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
-  let lump = $bytes | lumps | where name == $demo | append {pos: 0, size: 0} | first
-  let lmp = if ($demo | path exists) { open --raw $demo } else if $lump.size > 0 {
+  let lump = $bytes | lumps | where name == $demo | last 1 | get 0?
+  let lmp = if ($demo | path exists) { open --raw $demo | into binary } else if $lump != null {
     $bytes | bytes at $lump.pos..<($lump.pos + $lump.size)
   } else { error make {msg: $"($demo) is neither a file nor a lump of ($wad)"} }
   let header = $lmp | bytes at 0..12
@@ -248,8 +251,10 @@ def "main demo" [
   if $header != (header $map) {
     error make {msg: $"($demo)'s header ($header | encode hex) is not one Bendoom plays, (header $map | encode hex)"}
   }
-  let length = $lmp | bytes at 13.. | chunks 4 | enumerate | where ($it.item | bytes at 0..0) == 0x[80] | get index | first
+  let length = $lmp | bytes at 13.. | chunks 4 | enumerate | where ($it.item | bytes at 0..0) == 0x[80] | get index.0?
+  if $length == null { error make {msg: $"($demo) has no end marker, 0x80"} }
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
-  | merge (compare $wad ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic)) $frame $tally $keep)
+  | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
+    {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
 }
