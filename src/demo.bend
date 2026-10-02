@@ -60,14 +60,13 @@ def Demo.cmds(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
 def Demo.play(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
   Demo.cmds(List.drop(&2, U32, bytes, 13n))
 
-# The episode and map a demo's header names, E0M0 for a file too short
-# to have one.
-def Demo.map(bytes: List<&2, U32>) -> U32 & U32:
-  match bytes:
-    case version <> skill <> episode <> map <> rest:
-      (episode, map)
-    case _:
-      (0, 0)
+# The episode and map a demo's header names, its third and fourth bytes,
+# 0 for a file too short to have them.
+def Demo.episode(bytes: List<&2, U32>) -> U32:
+  Maybe.default(&2, U32, List.get(&2, U32, bytes, 2n), 0)
+
+def Demo.map(bytes: List<&2, U32>) -> U32:
+  Maybe.default(&2, U32, List.get(&2, U32, bytes, 3n), 0)
 
 def Demo.read.chunk(bytes: List<&2, U32>, kept: List<&2, U32>) -> List<&2, U32>:
   List.append(&2, U32, kept, bytes)
