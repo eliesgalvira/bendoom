@@ -2306,7 +2306,7 @@ def State.thing.put(+id: U32, th: H.Thing, s: State) -> State:
     mrnd, reborn, secrets}
 
 def State.thing.moved.at(m: Maybe<&2, H.Thing>, +x: U32, +y: U32, player: Player, +level: L.Level,
-  +things: H.Things, sidetex: V.Vec, thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
+  +things: H.Things, sidetex: V.Vec, thinkers: Thinkers, rnd: U32, clock: U32, ended: Sim.Exit, usedown: Bool,
   sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, secrets: V.Vec) -> State:
   match m:
     case None{}:

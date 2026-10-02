@@ -878,13 +878,13 @@ def Play.World.start(map: L.Level.Name, p: Array<U32> & G.Gfx & L.Level) -> Play
   (mem, gl) = p
   Play.World.start.gl(map, mem, gl)
 
-def Play.World.of(play: Play, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
-  (mem, gl) = p
-  Play.World.of.gl(play, mem, gl)
-
 def Play.World.of.gl(+play: Play, mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
   (+gfx, +level) = gl
   World{Play.enter(level, play), mem, gfx, P.Project.tables(level), level}
+
+def Play.World.of(play: Play, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+  (mem, gl) = p
+  Play.World.of.gl(play, mem, gl)
 
 # A map, its graphics and the frame's array from the WAD BENDOOM_IWAD
 # names.
