@@ -15,7 +15,7 @@ import ./src/game.bend as M
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     record : Result<&1, &1, U32 & String, String> <- IO.get_env("RECORD")
     demo : Maybe<D.Demo.Rec> <- D.Demo.open(record)
     now : Nat <- IO.now()

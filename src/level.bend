@@ -1,4 +1,4 @@
-# The map: E1M1's lumps read into trees, its things as recorded, and
+# A map's lumps read into trees, its things as recorded, and
 # Doom's tables. Data, so the sim and the renderer take it by copy. Each
 # lump is one tree of its 16-bit words, record after record, indexed by
 # record number times the words kept of a record, plus the field. The
@@ -530,10 +530,14 @@ def Level.map.drop(lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
     case Some{k}:
       List.drop(&2, W.Wad.Lump, lumps, k)
 
-# The lumps from the E1M1 marker on, so Freedoom's first map loads the
-# same way.
-def Level.map(+lumps: List<&2, W.Wad.Lump>) -> List<&2, W.Wad.Lump>:
-  Level.map.drop(lumps, W.Wad.index("E1M1", lumps))
+# The marker lump that starts a map's lumps, as G_DoLoadLevel names it:
+# ExMy.
+def Level.marker(+episode: U32, +map: U32) -> String:
+  "E" ++ U32.show(episode) ++ "M" ++ U32.show(map)
+
+# The lumps from the map's marker on, none for a marker the WAD lacks.
+def Level.map(+episode: U32, +map: U32, +lumps: List<&2, W.Wad.Lump>) -> List<&2, W.Wad.Lump>:
+  Level.map.drop(lumps, W.Wad.index(Level.marker(episode, map), lumps))
 
 # The offsets of the given fields in every record of a lump.
 def Level.fields(ps: U32 & U32, +stride: U32, fields: List<&2, U32>) -> List<&2, U32>:
@@ -674,8 +678,8 @@ def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, List<&2, U3
   Level.flats(map, Level.vecs(lists), B.Bytes.each(~String, ~B.Bytes.name,
     Level.fields(W.Wad.find(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
 
-# The level from the WAD's bytes and directory.
-def Level.load(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Level:
+# Map ExMy of the WAD from its bytes and directory.
+def Level.load(+episode: U32, +map: U32, p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Level:
   (a, +lumps) = p
-  +map = Level.map(lumps)
-  Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(map), a))
+  +found = Level.map(episode, map, lumps)
+  Level.names(found, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(found), a))
