@@ -26,7 +26,7 @@ import ../src/game.bend as M
 import ../tools/script.bend as T
 
 def Bench.input(+walk: Bool) -> K.Input:
-  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}, False{}, False{}, False{}, False{}}, 0}
+  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}, False{}, K.Keys.numbers.none()}, 0}
 
 def Bench.rate(+t0: Nat, +t1: Nat) -> String:
   Nat.show(Nat.div(U32.to_nat(600000), Nat.sub(t1, t0))) ++ " frames a second (600 frames in "
