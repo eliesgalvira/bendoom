@@ -62,26 +62,29 @@ def Message.gotshotgun() -> U32:
 def Message.pd_bluek() -> U32:
   17
 
-def Message.gotyelwcard() -> U32:
+def Message.gotchaingun() -> U32:
   18
 
-def Message.gotredcard() -> U32:
+def Message.gotyelwcard() -> U32:
   19
 
-def Message.gotinvis() -> U32:
+def Message.gotredcard() -> U32:
   20
 
-def Message.gotsuit() -> U32:
+def Message.gotinvis() -> U32:
   21
 
-def Message.gotmap() -> U32:
+def Message.gotsuit() -> U32:
   22
 
-def Message.gotvisor() -> U32:
+def Message.gotmap() -> U32:
   23
 
-def Message.gotrockbox() -> U32:
+def Message.gotvisor() -> U32:
   24
+
+def Message.gotrockbox() -> U32:
+  25
 
 # d_englsh.h's English strings for the pickups Inventory.grant names
 # and for the blue locked door. GOTMEDINEED is not among them: P_GiveBody
@@ -124,18 +127,20 @@ def Message.text(n: U32) -> String:
     case 17:
       "You need a blue key to open this door"
     case 18:
-      "Picked up a yellow keycard."
+      "You got the chaingun!"
     case 19:
-      "Picked up a red keycard."
+      "Picked up a yellow keycard."
     case 20:
-      "Partial Invisibility"
+      "Picked up a red keycard."
     case 21:
-      "Radiation Shielding Suit"
+      "Partial Invisibility"
     case 22:
-      "Computer Area Map"
+      "Radiation Shielding Suit"
     case 23:
-      "Light Amplification Visor"
+      "Computer Area Map"
     case 24:
+      "Light Amplification Visor"
+    case 25:
       "Picked up a box of rockets."
     case _:
       ""

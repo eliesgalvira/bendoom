@@ -216,8 +216,7 @@ def Player.dead(+p: Player) -> Bool:
   I.Inventory.dead(Player.inv(p))
 
 # Doom's weaponinfo[player->readyweapon]: the weapon in the player's
-# hands, which the status bar counts ammo for. The pistol until a weapon
-# can be chosen.
+# hands, which the status bar counts ammo for.
 def Player.ready(+p: Player) -> H.Thing.Weapon:
   H.Thing.weapon(I.Inventory.ready(Player.inv(p)))
 
@@ -3497,6 +3496,11 @@ def Sim.gunshot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s
 type Sim.Entering is Data:
   Entering{next: Maybe<&2, U32>, sets: Maybe<&2, U32>, psp: Psprite, s: State}
 
+# Whether the inventory holds a shot of the weapon. Melee weapons need
+# none.
+def Sim.ammo.enough(+weapon: H.Thing.Weapon, +inv: I.Inventory) -> Bool:
+  Bool.or(U32.is_eq(H.Thing.Weapon.ammo(weapon), 4), U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), inv)))
+
 # Doom's A_Raise: the sprite rises, and at the top the weapon's ready
 # state is set.
 def Sim.raise(psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
@@ -3532,13 +3536,36 @@ def Sim.fire.shot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> 
   Sim.gunshot.with(~enter, U32.is_zero(Player.refire(p)), Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p),
     Sim.shootz(Player.z(p), Sim.height()), H.Things.you(ts), Player.angle(p)), s)
 
-# Doom's A_FirePistol: the shot is heard, a bullet is spent, the muzzle
-# flash is set, and the bullet flies where the autoaim points, straight
-# on the first shot of a press and spread on the rest.
+# Doom's A_FirePistol once its shot is heard: a bullet is spent, the
+# muzzle flash is set, and the bullet flies where the autoaim points,
+# straight on the first shot of a press and spread on the rest.
+def Sim.fire.bullet.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
+  Entering{None{}, Some{flash}, psp, Sim.fire.shot.with(~enter, Sim.spent(ammo, s))}
+
 def Sim.fire.pistol.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-  Entering{None{}, Some{flash}, psp,
-    Sim.fire.shot.with(~enter, Sim.spent(ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))}
+  Sim.fire.bullet.with(~enter, flash, psp, ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s))
+
+def Sim.fire.cgun.loaded.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, loaded: Bool, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
+  match loaded:
+    case True{}:
+      Sim.fire.bullet.with(~enter, flash, psp, ammo, s)
+    case False{}:
+      Entering{None{}, None{}, psp, s}
+
+# The flash A_FireCGun sets: as far past the weapon's flash row as the
+# attack row firing is past its first.
+def Sim.fire.cgun.flash(+psp: Psprite, +weapon: H.Thing.Weapon) -> U32:
+  Psprite{state, tics, sx, sy} = psp
+  H.Weapon{up, ready, down, ammo, +atk, flash} = weapon
+  (flash + Maybe.default(&2, U32, state, atk) - atk : U32)
+
+# Doom's A_FireCGun: the pistol's shot, heard even with no bullet left,
+# where it stops.
+def Sim.fire.cgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +psp: Psprite, +weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+  +heard = Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)
+  Sim.fire.cgun.loaded.with(~enter, Sim.ammo.enough(weapon, Player.inv(State.player(heard))),
+    Sim.fire.cgun.flash(psp, weapon), psp, H.Thing.Weapon.ammo(weapon), heard)
 
 def Sim.fire.pellets.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, fuel: Nat, +slope: U32, s: State) -> State:
   match fuel:
@@ -3613,15 +3640,19 @@ def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> 
   Entering{None{}, None{}, psp, Sim.melee.turn(saw, target,
     Sim.melee.sound(saw, Bool.not(Maybe.is_none(&2, U32, target)), hurt))}
 
-# Whether the ready weapon has a shot left. Melee weapons need none.
-def Sim.ammo.enough(+weapon: H.Thing.Weapon, +s: State) -> Bool:
-  Bool.or(U32.is_eq(H.Thing.Weapon.ammo(weapon), 4),
-    U32.is_lt(0, I.Inventory.rounds(H.Thing.Weapon.ammo(weapon), Player.inv(State.player(s)))))
+# P_CheckAmmo's choice once out of ammo: the first weapon of its
+# preferences owned and loaded, else the fist. Its plasma rifle, super
+# shotgun and BFG are out of Bendoom's scope.
+def Sim.ammo.prefs() -> List<&2, U32>:
+  [3, 2, 1, 7]
 
-def Sim.ammo.pick(+inv: I.Inventory) -> U32:
-  Bool.pick(U32, Bool.and(I.Inventory.owns(2, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_shell(), inv))), 2,
-    Bool.pick(U32, Bool.and(I.Inventory.owns(1, inv), U32.is_lt(0, I.Inventory.rounds(I.Inventory.am_clip(), inv))), 1,
-      Bool.pick(U32, I.Inventory.owns(7, inv), 7, 0)))
+def Sim.ammo.pick(prefs: List<&2, U32>, +inv: I.Inventory) -> U32:
+  match prefs:
+    case []:
+      0
+    case +weapon <> rest:
+      Bool.pick(U32, Bool.and(I.Inventory.owns(weapon, inv), Sim.ammo.enough(H.Thing.weapon(weapon), inv)), weapon,
+        Sim.ammo.pick(rest, inv))
 
 def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   match enough:
@@ -3631,14 +3662,14 @@ def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: Sta
     case False{}:
       +p = State.player(s)
       +inv = Player.inv(p)
-      +next = Sim.ammo.pick(inv)
+      +next = Sim.ammo.pick(Sim.ammo.prefs(), inv)
       +changed = State.player.put(s, Player.holding(p, I.Inventory.want(next, inv)))
       Entering{Some{H.Thing.Weapon.down(weapon)}, None{}, psp, changed}
 
 # Doom's P_FireWeapon: with a shot left the weapon enters its attack
 # state.
 def Sim.fire(psp: Psprite, +weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
-  Sim.ammo.checked(Sim.ammo.enough(weapon, s), psp, weapon, s)
+  Sim.ammo.checked(Sim.ammo.enough(weapon, Player.inv(State.player(s))), psp, weapon, s)
 
 # Doom's A_WeaponReady's fire check: the attack held fires and leaves
 # the sprite where it is, and a released attack lets the weapon bob.
@@ -3684,7 +3715,7 @@ def Sim.refire.again(again: Bool, psp: Psprite, +weapon: H.Thing.Weapon, +s: Sta
       Sim.fire(psp, weapon, State.firing((Player.refire(State.player(s)) + 1 : U32), s))
     case False{}:
       +reset = State.firing(0, s)
-      Sim.refire.done(Sim.ammo.enough(weapon, reset), psp, weapon, reset)
+      Sim.refire.done(Sim.ammo.enough(weapon, Player.inv(State.player(reset))), psp, weapon, reset)
 
 def Sim.refire(psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   Sim.refire.again(Bool.and(K.Cmd.attack(cmd), Bool.and(
@@ -3729,6 +3760,8 @@ def Sim.psprite.act.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
       Sim.fire.pistol.with(~enter, psp, weapon, s)
     case H.FireShotgun{}:
       Sim.fire.shotgun.with(~enter, psp, weapon, s)
+    case H.FireCGun{}:
+      Sim.fire.cgun.with(~enter, psp, weapon, s)
     case H.Punch{}:
       Sim.melee.hit.with(~enter, False{}, psp, s)
     case H.Saw{}:
@@ -6201,6 +6234,10 @@ def Sim.sector.secret(+s: State) -> State:
   +sector = L.Level.sector_at(State.level(s), Player.x(State.player(s)), Player.y(State.player(s)))
   Sim.sector.secret.count(Bool.and(U32.is_eq(V.Vec.get(State.secrets(s), sector), 1),
     U32.is_eq(Player.z(State.player(s)), L.Level.floor(State.level(s), sector))), sector, s)
+
+# P_PlayerThink's BT_CHANGE: the fist's number takes the chainsaw if
+# owned, unless it is up with berserk on, and a weapon owned and not in
+# hand becomes pending.
 def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: Player) -> Player:
   match chosen:
     case None{}:
@@ -6209,9 +6246,7 @@ def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: Player) -> Player:
       +inv = Player.inv(p)
       +chosen = Bool.pick(U32, Bool.and(U32.is_zero(weapon), Bool.and(I.Inventory.owns(7, inv),
         Bool.not(Bool.and(U32.is_eq(I.Inventory.ready(inv), 7), Bool.not(U32.is_zero(I.Inventory.strength(inv))))))), 7, weapon)
-      +valid = Bool.and(Bool.or(U32.is_eq(chosen, 0), Bool.or(U32.is_eq(chosen, 1),
-        Bool.or(U32.is_eq(chosen, 2), U32.is_eq(chosen, 7)))),
-        Bool.and(I.Inventory.owns(chosen, inv), Bool.not(U32.is_eq(chosen, I.Inventory.ready(inv)))))
+      +valid = Bool.and(I.Inventory.owns(chosen, inv), Bool.not(U32.is_eq(chosen, I.Inventory.ready(inv))))
       Player.holding(p, Bool.pick(I.Inventory, valid, I.Inventory.want(chosen, inv), inv))
 
 def Sim.weapon.select(+cmd: K.Cmd, +s: State) -> State:
