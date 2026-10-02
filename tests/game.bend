@@ -7,10 +7,11 @@
 # many things there are and the random index.
 # First the state the game starts with. Then a game handed a player
 # killed on the spot in the nukage at 1600, 1000: a frame 200 ms on with
-# Space pressed runs 7 tics of dying, and the use asks for the level
-# again, which the next tic answers as G_DoReborn does: a frame 29 ms on
-# runs that tic on the map loaded again from a pistol start, its random
-# index carried on from the death's. The same game is then handed the
+# Space pressed runs 7 tics: on the first the dead player's use asks
+# for the level again, as P_DeathThink reads it, and G_DoReborn answers
+# on the next, so the other six run on the map loaded again from a
+# pistol start, its random index carried on from the death's. The same
+# game is then handed the
 # state a script leaves beside Freedoom's exit switch, 6 tics in. A
 # frame 200 ms on with Space pressed runs 7 tics: the first ends the
 # level and the rest count down the tally's first pause. A held Space
@@ -144,12 +145,6 @@ def killed.at(+s: S.State) -> S.State:
 def killed(level: L.Level) -> S.State:
   killed.at(S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
 
-# A game whose player is dead: a frame with Space pressed asks for the
-# level again, and the next frame's tic answers it.
-def reborn(g: Maybe<M.Game>) -> IO(Maybe<M.Game>):
-  do IO<Maybe<M.Game>>:
-    d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], g)
-    frame("reborn", 229n, [Key{32, False{}}], d)
 
 def warped.at(at: L.Level.Name) -> String:
   L.Name{episode, map} = at
@@ -168,13 +163,14 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", S.State.start(level)))
     IO.print(line("beside", beside))
     IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
-    d : Maybe<M.Game> <- reborn(Some{M.Game{level, gfx, P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}},
+    d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
+      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
-    g1 : Maybe<M.Game> <- frame("space", 429n, [Key{32, True{}}], staged(beside, d))
-    g2 : Maybe<M.Game> <- frame("repeat", 629n, [Key{32, False{}}, Key{32, True{}}], g1)
-    g3 : Maybe<M.Game> <- frame("release", 829n, [Key{32, False{}}], g2)
-    g4 : Maybe<M.Game> <- frame("enter", 829n, [Key{13, True{}}], g3)
-    g5 : Maybe<M.Game> <- frame("esc", 1429n, [Key{27, True{}}], g4)
+    g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
+    g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
+    g3 : Maybe<M.Game> <- frame("release", 800n, [Key{32, False{}}], g2)
+    g4 : Maybe<M.Game> <- frame("enter", 800n, [Key{13, True{}}], g3)
+    g5 : Maybe<M.Game> <- frame("esc", 1400n, [Key{27, True{}}], g4)
     return Unit{}
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -189,8 +185,7 @@ def main() -> IO(Unit):
 #|start tic 0 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|beside tic 6 ended none at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 73
-#|dead space tic 7 ended none at 1600.000000 1000.000000 90.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 64
-#|reborn tic 0 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
+#|dead space tic 6 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 125
 #|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 83
 #|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 83
 #|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
