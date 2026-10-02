@@ -264,7 +264,6 @@
 # monster for an A_Look, its spawn state's tics plus a multiple of ten,
 # ten more when its spawn draw left lastlook at 1.
 import Base
-import ../src/bytes.bend as B
 import ../src/wad.bend as W
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
@@ -305,8 +304,12 @@ def Run.state(r: Run) -> S.State:
   state
 
 # An ended level runs no tic, so nothing new is heard.
-def heard(still: Bool, log: String, +q: S.State) -> Run:
-  Run{log ++ Bool.pick(String, still, "", events(S.State.sounds(q), S.State.clock(q))), q}
+def heard(ended: S.Sim.Exit, log: String, +q: S.State) -> Run:
+  match ended:
+    case S.Unended{}:
+      Run{log ++ events(S.State.sounds(q), S.State.clock(q)), q}
+    case _:
+      Run{log, q}
 
 def play(script: List<&2, K.Cmd>, r: Run) -> Run:
   match script r:
@@ -505,7 +508,7 @@ def ending(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
   +r = ran(n, cmd, s)
   +q = Run.state(r)
   do IO<S.State>:
-    IO.print(Run.log(r) ++ watch(tag, [], q) ++ " ended " ++ Bool.show(S.State.ended(q)) ++ " special "
+    IO.print(Run.log(r) ++ watch(tag, [], q) ++ " ended " ++ S.Sim.Exit.show(S.State.ended(q)) ++ " special "
       ++ U32.show(L.Level.special(S.State.level(q), 407)))
     return q
 
@@ -606,7 +609,7 @@ def south(d: U32, degrees: U32, s: S.State) -> S.State:
   S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
-  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
+  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}, I.Inventory.start()), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
     sounds, mrnd, reborn, secrets}
 
@@ -678,7 +681,8 @@ def patch.record(a: Array<U32>, +pos: U32, i: U32, x: U32, y: U32, kind: U32) ->
   patch.word(patch.word(patch.word(patch.word(patch.word(a, at, x), (at + 2 : U32), y), (at + 4 : U32), 0),
     (at + 6 : U32), kind), (at + 8 : U32), 7)
 
-def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Array<U32> & L.Level:
+def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) ->
+  Result<&1, &1, U32 & String, Array<U32> & L.Level>:
   (+pos, size) = lump
   L.Level.load(1, 1, (patch.record(patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), pos, 82,
     824, 1352, 5), lumps))
@@ -689,9 +693,10 @@ def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Ar
 # --things "3,48,96,216 35,2035,800,528 82,5,824,1352" has them: each
 # spawns as the map's other things do, drawing its random numbers in
 # record order.
-def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
+def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Result<&1, &1, U32 & String, Array<U32> & L.Level>:
   (a, +lumps) = p
-  patch.at(a, lumps, W.Wad.find(L.Level.map(1, 1, lumps), "THINGS"))
+  patch.at(a, lumps, W.Wad.find(Result.default(&1, &1, U32 & String, List<&2, W.Wad.Lump>,
+    L.Level.map(1, 1, lumps), []), "THINGS"))
 
 # The solid things, after 20 idle tics as the oracle's scripts start.
 # Walking south at 25 from 1712 under the tech column at -192, 1600,
@@ -1803,7 +1808,8 @@ def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
     damaged(level)
     faces.cases(level)
     door(level)
-    patched.cases(level, patched(W.Wad.dir(a)))
+    world : Array<U32> & L.Level <- IO.pass(Array<U32> & L.Level, patched(W.Wad.dir(a)))
+    patched.cases(level, world)
     relinks(level)
 
 # Whether a sector pair is rejected, as REJECT's bit for it says.
@@ -1988,9 +1994,8 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    walk(L.Level.load(1, 1, W.Wad.dir(bytes)))
+    world : Array<U32> & L.Level <- L.Level.open(1, 1)
+    walk(world)
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True
@@ -2948,12 +2953,12 @@ def main() -> IO(Unit):
 #|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
 #|sounds drew to 161
 #|-
-#|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
+#|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended none special 11
 #|sound tic 5 DSPOSIT2 from thing 289 vol 64 sep 33
-#|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
+#|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended none special 11
 #|sound tic 21 DSSWTCHN from nobody vol 64 sep 128
-#|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
-#|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
+#|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended normal special 0
+#|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended normal special 0
 #|sounds drew to 87
 #|-
 #|states tic 0 2:45/4294967295 6:6/2 87:24/1 24:10/3 121:18/1 144:12/2 172:51/5

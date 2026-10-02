@@ -1,15 +1,19 @@
-# 06: Launch at any map, and the exits chain the episode
+# 06: Launch at any map, and the exits chain the episode — review fixes
 
 **Tier:** 1
 
-**What to build:** the game starts at the map named by a `-warp <episode> <map>` launch option, as Chocolate Doom's, or at E1M1 by default, and from a demo's header when replaying one. The level's end becomes a kind (none, normal, secret). After the tally the next map loads by vanilla's `G_DoCompleted` and `G_WorldDone` rules for episode 1: E1M1 to E1M8 in order, E1M3's secret exit to E1M9, E1M9 to E1M4, and E1M8 to the finale (until ticket 21, the game may hold on the tally after E1M8). The player crosses a level change as vanilla's `G_PlayerFinishLevel` leaves them: health, armour, weapons, ammo and backpack kept, keys, powers and palette effects cleared. Dying restarts the current map from a pistol start. Delete the path that restarts E1M1 after the tally. Document `-warp` in the README.
+The chain landed on episode-1 (merge 096ffaa): `-warp`, exit kinds, vanilla's next-map rule, `G_PlayerFinishLevel`'s carry, the death reload and each map's song. Its review against Chocolate Doom 3.1.1's source confirmed the next-map rule, the carry, the reload and the status bar's arms rule. What follows is what the review left.
 
-**Blocked by:** 02
+**Blocked by:** None (can start immediately)
 
 **Status:** ready-for-agent
 
-- [ ] `-warp 1 5` starts on E1M5, and its start view matches Chocolate Doom's `-warp 1 5`.
-- [ ] A scripted run takes E1M1's exit; after the tally, E1M2's first frame matches Chocolate Doom's, with the carried inventory on the status bar.
-- [ ] The exit-kind rules are checked against vanilla's next-map logic for every E1 map, including E1M3's secret exit (the secret exit line itself is ticket 13; test the rule at its seam) and E1M9's return to E1M4.
-- [ ] Dying on E1M2 restarts E1M2 with a pistol start, matching vanilla.
-- [ ] The laws about the exit still check; restate them for exit kinds if they must change.
+- [ ] `-warp` applies `G_InitNew`'s clamps: on DOOM1.WAD (shareware) an episode above 1 becomes 1, and the map is held to 1–9, so `-warp 2 1` and `-warp 1 0` play E1M1 as in Chocolate Doom instead of failing. The clamps depend on the WAD's game mode (Freedoom is "ultimate"); `tests/game.bend` pins `-WARP 2` as E2M1 today, which vanilla does not do on shareware.
+- [ ] A committed test tells carrying from resetting: `tests/tally.bend` reaches E1M2 with pistol-start values, the same as after a death. Pin a run that carries something (the oracle run carried a shotgun, 8 shells and 100% armour to E1M2 with 0 differing pixels at tics 5 and 30; that evidence was not committed).
+- [ ] Rerun the death check on E1M2 after ticket 03 lands: it showed 5 differing pixels at (163–165, 83–84), attributed to the missing red keycard.
+- [ ] `Play.next` takes the exit kind (`S.Sim.Exit`) instead of a Bool, so `Play.ended`'s two identical arms and LAWS.bend's `Exit.kind(secret: Bool)` helper go; consider `Unended | Ended{secret}` if it merges the duplicated `Normal`/`Secret` arms in `tic_counts`, `tic_keeps_geometry` and `tic_keeps_free`.
+- [ ] `Play.back`'s episode 2–4 cases (`2→6, 3→7, 4→3`) are beyond this milestone; keep episode 1's rule unless Freedoom's maps need the others.
+- [ ] `Play.wants` and `Play.enter` both match `Play`, and `enter`'s `Playing` arm cannot run; match once.
+- [ ] `Inventory.finished` names its masks (`16711680`, `4278190080`) and shares `Inventory.start`'s powers literal; the face slot holding weapons owned at `ST_Start` gets a name that says so.
+- [ ] `nix/tests.nix` has a narrating comment in `buildPhase` that repeats `docs/bend.md`; delete it. The `docs/bend.md` note says "32 MB stack" while `BUN_JSC_maxPerThreadStackUsage` is 16 MB (32 MB is the ulimit), and its "about 20000 on bun" depth is stale. `tools/frame.bend`'s header has an unwrapped line.
+- [ ] `State.carried` feeds one value to both use-down and attack-down; vanilla's `WI_checkForAccelerate` tracks them apart (matters once the rocket launcher lands).

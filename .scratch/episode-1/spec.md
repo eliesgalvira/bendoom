@@ -86,7 +86,7 @@ The work lands in tiers. Each tier is a coherent build to play, and the overnigh
 
 ### The end of the episode
 
-47. As a player, I want the closing text of episode one to type out over vanilla's background after E1M8's tally, so that I read the story's end.
+47. As a player, I want the closing text of episode one to type out over vanilla's background when E1M8 ends, so that I read the story's end.
 48. As a player, I want the shareware's end picture to follow the text and stay until I quit, so that the episode ends as vanilla ends it.
 
 ### Recording and films
@@ -114,7 +114,7 @@ The work lands in tiers. Each tier is a coherent build to play, and the overnigh
 
 - **Prefactor first.** The line-special dispatch moves out of the sim's main module into a module of its own, before any special ticket starts, so that parallel tickets for doors, floors, teleporters and lights stop colliding in one 6,300-line file. Movers (doors, lifts, floors, stairs, donut) follow vanilla's thinkers in `p_doors.c`, `p_plats.c`, `p_floor.c` and `p_spec.c`.
 - **Sector state belongs to the sim.** A sector's floor and ceiling heights, floor and ceiling flats, light level, special and tag become sim state, which the renderer reads. Today the special lives in the level geometry, which the sim restores every tic, so a special that changes a flat or a sector's special would be silently undone. The laws about the tic's rest and kept geometry are re-proved over the new state.
-- **Exits have kinds.** The level's end is a kind (none, normal, secret), not a flag. The tally leads to the next map by vanilla's `G_DoCompleted` and `G_WorldDone` rules for episode 1: E1M3's secret exit to E1M9, E1M9 to E1M4, E1M8 to the finale. A level change carries the player as vanilla's `G_PlayerFinishLevel` does. The path that restarts E1M1 after the tally is deleted.
+- **Exits have kinds.** The level's end is a kind (none, normal, secret), not a flag. The tally leads to the next map by vanilla's `G_DoCompleted` and `G_WorldDone` rules for episode 1: E1M3's secret exit to E1M9, E1M9 to E1M4, E1M8 straight to the finale, with no tally (`G_DoCompleted`'s `ga_victory` for map 8). A level change carries the player as vanilla's `G_PlayerFinishLevel` does. The path that restarts E1M1 after the tally is deleted.
 - **Map choice.** The game takes the starting episode and map at launch as Chocolate Doom's `-warp` does, and from a demo's header when replaying one. Skill stays Hurt Me Plenty, or the demo header's skill when replaying, applied to spawn flags as vanilla applies it. Menus and skill selection are out of scope.
 - **Intermission for the episode.** Par times, the "you are here" spots, map names and the next-map logic come from vanilla's tables for episode 1, replacing the fixed E1M1 values. The intermission plays D_INTER.
 - **Things.** Every thing type that appears in DOOM1.WAD's maps gets vanilla's `mobjinfo` row and states, enough to spawn and draw with vanilla's random draws, before the mechanics behind them. Unknown types stay dropped, as now, for Freedoom maps outside this scope.
