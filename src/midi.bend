@@ -457,7 +457,7 @@ def Midi.file.of(midi: Bool, mus: Bool, +bytes: List<&2, U32>) -> Midi.File:
       File{0, [Bad{"neither MUS nor a MIDI lump under 96 KiB"}]}
 
 # I_OPL_RegisterSong reads a lump from "MThd" under 96 KiB as MIDI and
-# converts any other under 96 KiB as MUS. The render takes as MUS only a
+# converts any other under 96 KiB as MUS. The deck takes as MUS only a
 # lump from "MUS" 0x1A with a whole header, 16 bytes.
 def Midi.file(+bytes: List<&2, U32>) -> Midi.File:
   +tag = Midi.be(4n, bytes)
@@ -506,9 +506,9 @@ def Midi.spans(ts: List<&2, Midi.Track>) -> Midi.Span:
     case +t <> rest:
       Midi.spans.both(Midi.span(t), Midi.spans(rest))
 
-# ScheduleTrack's microseconds are 64 bits wide and the render's are a
-# U32, so a callback past 2^31 microseconds is refused rather than
-# wrapped: a pass of 35 minutes, and two within the count.
+# ScheduleTrack's microseconds are 64 bits wide and the deck's are a
+# U32 from the song's start, so a callback past 2^31 microseconds is
+# refused rather than wrapped: a pass of 35 minutes.
 def Midi.fits(+ticks: U32, +tempo: U32, +division: U32) -> Bool:
   U32.is_le(ticks, (2147483647 / ((tempo / U32.max(division, 1)) + 1 : U32) : U32))
 
@@ -517,7 +517,7 @@ def Midi.fault.long(fits: Bool) -> Maybe<&2, String>:
     case True{}:
       None{}
     case False{}:
-      Some{"a song whose ticks at its fastest tempo pass the 2^31 microseconds the render counts"}
+      Some{"a song whose ticks at its fastest tempo pass the 2^31 microseconds the deck counts"}
 
 def Midi.span.why(s: Midi.Span, +division: U32) -> Maybe<&2, String>:
   Span{why, +ticks, +tempo} = s
@@ -528,7 +528,7 @@ def Midi.fault.file(f: Midi.File) -> Maybe<&2, String>:
   Midi.span.why(Midi.spans(tracks), division)
 
 # Why Chocolate Doom would not play the lump, if it would not: the first
-# track that fails, else a song too long for the render's U32
+# track that fails, else a song too long for the deck's U32
 # microseconds.
 def Midi.fault(+bytes: List<&2, U32>) -> Maybe<&2, String>:
   Midi.fault.file(Midi.file(bytes))

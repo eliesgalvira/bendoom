@@ -15,8 +15,22 @@ function holdAudio() {
   };
 }
 
+// FNV-1a over 32-bit words, as src/fnv.bend hashes them.
+function fnv(words) {
+  return words.reduce((h, w) => Math.imul(h ^ w, 16777619) >>> 0, 2166136261);
+}
+
+// DOOM1.WAD's E1M1 song as Chocolate Doom plays it: the hash of its
+// first 1024 frames other than silence, each a word with the left sample
+// in its low half, from a capture (tools/listen.nu --keep):
+//   open --raw capture.raw | chunks 4 | each { into int --endian little } | where $it != 0 | first 1024
+//     | reduce --fold 2166136261 {|x, h| (($h | bits xor $x) * 16777619) mod 4294967296 }
+// Silence is left out on both sides, so a buffer the browser found empty
+// cannot shift the frames compared.
+const firstNotes = 3238671547;
+
 async function main() {
-  const [directory, music] = process.argv.slice(2);
+  const [directory] = process.argv.slice(2);
   const root = path.resolve(directory);
   const server = http.createServer((request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
@@ -95,12 +109,32 @@ async function main() {
     assert.equal(queued.state, 'suspended');
     assert.equal(queued.read, 0);
     assert(queued.pcm.length > 0 && queued.pcm.length <= 8192);
-    const expected = fs.readFileSync(path.join(music, 'first.raw'));
-    queued.pcm.forEach((sample, index) => assert.equal(sample, expected.readInt16LE(index * 2) / 32768,
-      'music sample ' + index + ' matches the native render'));
+    assert(queued.pcm.every(sample => sample === 0), "the chip's first buffer is silent");
+    await game.evaluate(async () => {
+      const device = [...Module.bendAudio.values()][0];
+      window.notes = [];
+      const source = `class Notes extends AudioWorkletProcessor {
+        process(inputs) {
+          if (inputs[0].length === 2) this.port.postMessage([inputs[0][0].slice(), inputs[0][1].slice()]);
+          return true;
+        }
+      } registerProcessor('notes', Notes);`;
+      const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+      await device.context.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      const node = new AudioWorkletNode(device.context, 'notes', { outputChannelCount: [2] });
+      node.port.onmessage = ({ data: [left, right] }) => left.forEach((l, i) => {
+        const word = ((Math.round(l * 32768) & 65535) | (Math.round(right[i] * 32768) & 65535) << 16) >>> 0;
+        if (word !== 0 && notes.length < 1024) notes.push(word);
+      });
+      device.node.connect(node);
+      node.connect(device.context.destination);
+    });
     await game.evaluate(() => { window.allowAudio = true; });
     await game.locator('#sound').click();
     await game.waitForFunction(() => [...Module.bendAudio.values()][0].context.state === 'running');
+    await game.waitForFunction(() => notes.length === 1024, null, { timeout: 20000 });
+    assert.equal(fnv(await game.evaluate(() => notes)), firstNotes, "the song's first notes are Chocolate Doom's");
     const before = await game.evaluate(() => document.getElementById('bend').toDataURL());
     await game.keyboard.down('w');
     await game.waitForTimeout(1000);
@@ -116,7 +150,7 @@ async function main() {
     await game.waitForFunction(() => document.getElementById('status').textContent === 'Game closed.');
     assert.equal(await game.evaluate(() => Module.bendAudio.size), 0);
     assert.deepEqual(errors, []);
-    console.log('PASS game: assets, exact music samples, audio activation, controls, focus loss and exit');
+    console.log('PASS game: assets, the song from the WAD, audio activation, controls, focus loss and exit');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

@@ -1,4 +1,4 @@
-{ lib, runCommand, bend, emscripten, nodejs, playwright-driver, chromium, web, music }:
+{ lib, runCommand, bend, emscripten, nodejs, playwright-driver, chromium, web }:
 
 let
   inherit (lib.meta) getExe;
@@ -20,6 +20,6 @@ runCommand "bendoom-web-check" {
   emcc -std=gnu11 -O2 -pthread -mtail-call audio.c \
     -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=2 -sINITIAL_MEMORY=1073741824 \
     -sENVIRONMENT=web,worker -sEXIT_RUNTIME=1 -o site/audio-test.js
-  node ${../tools/web-check.cjs} site ${music}
+  node ${../tools/web-check.cjs} site
   touch $out
 ''
