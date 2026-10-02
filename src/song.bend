@@ -7,7 +7,6 @@
 # microseconds from its last start, where the heap is empty, so a song
 # that loops for hours never wraps it.
 import Base
-import ./bytes.bend as B
 import ./wad.bend as W
 import ./fixed.bend as F
 import ./opl.bend as O
@@ -413,46 +412,28 @@ def Song.Deck.take(+want: U32, d: Song.Deck) -> Song.Deck & List<&2, U32>:
   Deck{songs, name, +env, song} = d
   Song.Deck.took(songs, name, env, Song.take(want, env, song))
 
-def Song.read(a: Array<U32>, at: U32 & U32) -> Array<U32> & List<&2, U32>:
-  (pos, size) = at
-  B.Bytes.list(a, pos, size)
+def Song.lumps(names: List<&2, String>, songs: List<&2, List<&2, U32>>) -> List<&2, Song.Lump>:
+  match names songs:
+    case name <> ns bytes <> ss:
+      Lump{name, M.Midi.file(bytes)} <> Song.lumps(ns, ss)
+    case _ _:
+      []
 
-def Song.lumps.cons(+name: String, rest: List<&2, Song.Lump>, p: Array<U32> & List<&2, U32>) ->
-  Array<U32> & List<&2, Song.Lump>:
-  (a, bytes) = p
-  (a, Lump{name, M.Midi.file(bytes)} <> rest)
-
-def Song.lumps.on(+dir: List<&2, W.Wad.Lump>, +name: String, q: Array<U32> & List<&2, Song.Lump>) ->
-  Array<U32> & List<&2, Song.Lump>:
-  (a, rest) = q
-  Song.lumps.cons(name, rest, Song.read(a, W.Wad.find(dir, name)))
-
-def Song.lumps(+dir: List<&2, W.Wad.Lump>, names: List<&2, String>, a: Array<U32>) ->
-  Array<U32> & List<&2, Song.Lump>:
-  match names:
-    case []:
-      (a, [])
-    case +name <> rest:
-      Song.lumps.on(dir, name, Song.lumps(dir, rest, a))
-
-def Song.Deck.open(genmidi: List<&2, U32>, p: Array<U32> & List<&2, Song.Lump>) -> Song.Deck:
-  (a, songs) = p
+def Song.Deck.open(genmidi: List<&2, U32>, songs: List<&2, Song.Lump>) -> Song.Deck:
   +roms = O.Opl.roms()
   Deck{songs, "", Env{roms, P.Player.tabs(genmidi), Song.none()}, Song.silence(roms)}
 
-def Song.Deck.read(names: List<&2, String>, +dir: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, U32>) ->
-  Song.Deck:
-  (a, genmidi) = p
-  Song.Deck.open(genmidi, Song.lumps(dir, names, a))
-
-def Song.Deck.of(names: List<&2, String>, p: Array<U32> & List<&2, W.Wad.Lump>) -> Song.Deck:
-  (a, +dir) = p
-  Song.Deck.read(names, dir, Song.read(a, W.Wad.find(dir, "GENMIDI")))
+def Song.Deck.of(names: List<&2, String>, lumps: List<&2, List<&2, U32>>) -> Song.Deck:
+  match lumps:
+    case []:
+      Song.Deck.open([], [])
+    case genmidi <> songs:
+      Song.Deck.open(genmidi, Song.lumps(names, songs))
 
 # The named songs of the WAD BENDOOM_IWAD names, with its GENMIDI,
 # playing none yet.
-def Song.Deck.load(names: List<&2, String>) -> IO(Song.Deck):
+def Song.Deck.load(+names: List<&2, String>) -> IO(Song.Deck):
   do IO<Song.Deck>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    return Song.Deck.of(names, W.Wad.dir(bytes))
+    lumps : List<&2, List<&2, U32>> <- W.Wad.read(path, "GENMIDI" <> names)
+    return Song.Deck.of(names, lumps)
