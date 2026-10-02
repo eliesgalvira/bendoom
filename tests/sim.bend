@@ -1740,7 +1740,7 @@ def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
 
 def weapon.strong(+s: S.State) -> S.State:
   +p = S.State.player(s)
-  S.State.player.put(s, S.Player.holding(p, I.Inventory.strong(S.Player.inv(p))))
+  S.State.player.put(s, S.Player.holding(p, I.Inventory.power(I.Inventory.pw_strength(), 1, S.Player.inv(p))))
 
 def weapon.health(m: Maybe<&2, H.Thing>) -> U32:
   match m:
@@ -1755,7 +1755,7 @@ def weapon.got(m: Maybe<&2, I.Inventory>) -> I.Inventory:
 def weapon.carrying(+strong: Bool, +s: S.State) -> S.State:
   +p = S.State.player(s)
   +inv = weapon.got(I.Inventory.weapon(I.Inventory.chainsaw(), 7, False{}, 0, I.Inventory.start()))
-  S.State.player.put(s, S.Player.holding(p, Bool.pick(I.Inventory, strong, I.Inventory.strong(inv), inv)))
+  S.State.player.put(s, S.Player.holding(p, Bool.pick(I.Inventory, strong, I.Inventory.power(I.Inventory.pw_strength(), 1, inv), inv)))
 
 def weapon.melee(tag: String, +id: U32, +s: S.State) -> IO(S.State):
   +p = S.State.player(s)
@@ -2001,7 +2001,7 @@ def main() -> IO(Unit):
 #|free at start True
 #|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0
 #|things at start 209 random 59
-#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0 4294967294:0 4294967293:0
+#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0 4294967294:0 4294967293:0 6:0 13:0 14:0 34:0 46:0 58:0 2024:0 2025:0 2026:0 2045:0 3003:0
 #|first 2 3 6 8 9 10 11 12 13 14 15 16
 #|links 209 of 209 things, solid 108 of 108, wrong 0, unlinked 0
 #|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1 ambush True
