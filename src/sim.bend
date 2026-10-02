@@ -267,12 +267,14 @@ def Player.onground(+p: Player) -> Bool:
 # (docs/bend.md): the index of the face w_faces draws, the tics that
 # face has left, the priority of whatever put it there, the health
 # ST_Ticker saw on the tic before, the count of tics fire has been held,
-# the weapons owned when the grin last looked, and A_WeaponReady's
-# attackdown. The two counts that start below zero hold the word C's
-# -1 is, so their arithmetic carries
-# over unchanged. M_Random's index shares the vector rather than a field
-# of its own, for the same budget: the state has no word to spare, and
-# ST_Ticker draws from it for the face's glance.
+# the weapons owned when the grin last looked, A_WeaponReady's
+# attackdown, and the weapons owned at ST_Start, whose arms numbers
+# STlib_updateMultIcon draws without restoring the background under
+# them. The two counts that start below zero hold the word C's -1 is,
+# so their arithmetic carries over unchanged. M_Random's index shares
+# the vector rather than a field of its own, for the same budget: the
+# state has no word to spare, and ST_Ticker draws from it for the
+# face's glance.
 def Sim.face.index() -> U32:
   0
 
@@ -297,12 +299,26 @@ def Sim.face.mrnd() -> U32:
 def Sim.face.attackdown() -> U32:
   7
 
+def Sim.face.armed() -> U32:
+  8
+
 # ST_initData at a fresh game, with M_Random's index where the caller
 # says: the face index, its count and the priority are what the program
 # started with, the health seen last is -1, the weapons owned are the
 # ones G_PlayerReborn hands out, and attackdown starts true there.
 def Sim.Face.start(+mrnd: U32) -> V.Vec:
-  V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd, 1], 8)
+  V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd, 1,
+    I.Inventory.weapons(I.Inventory.start())], 9)
+
+# ST_initData at a later level's start: the face index and the health
+# seen last start again, both weapon sets are the ones owned now, and
+# M_Random's index and attackdown are where the caller says. The face's
+# count, its priority and the fire count are statics ST_initData leaves
+# as the last level did.
+def Sim.Face.restart(+weapons: U32, attackdown: Bool, +mrnd: U32, f: V.Vec) -> V.Vec:
+  V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(f, Sim.face.index(), 0), Sim.face.oldhealth(),
+    4294967295), Sim.face.weapons(), weapons), Sim.face.mrnd(), mrnd), Sim.face.attackdown(),
+    Bool.to_u32(attackdown)), Sim.face.armed(), weapons)
 
 def Sim.Face.index(+f: V.Vec) -> U32:
   V.Vec.get(f, Sim.face.index())
@@ -315,6 +331,10 @@ def Sim.Face.mrnd(+f: V.Vec) -> U32:
 
 def Sim.Face.attackdown(+f: V.Vec) -> Bool:
   Bool.not(U32.is_zero(V.Vec.get(f, Sim.face.attackdown())))
+
+# The weapons whose arms numbers stand as ST_Start drew them.
+def Sim.Face.armed(+f: V.Vec) -> U32:
+  V.Vec.get(f, Sim.face.armed())
 
 # The vector once a sound has drawn its pitch from M_Random, and as it
 # was where that sound drew none.
@@ -572,20 +592,20 @@ def Psprites.light(ps: Psprites) -> U32:
 def Player.extralight(+p: Player) -> U32:
   Psprites.light(Player.psprites(p))
 
-def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32) -> Player:
+def Player.at.fin(+x: U32, +y: U32, angle: U32, +floor: U32, ceil: U32, inv: I.Inventory) -> Player:
   Player{x, y, floor, angle, 0, 0, 0, floor, ceil, Sim.viewheight(), 0,
-    (floor + Sim.viewheight() : U32), [], I.Inventory.start(), Psprites.none(), Sim.Hurt.start()}
+    (floor + Sim.viewheight() : U32), [], inv, Psprites.none(), Sim.Hurt.start()}
 
-def Player.at(+level: L.Level, s: L.Level.Start) -> Player:
+def Player.at(+level: L.Level, s: L.Level.Start, inv: I.Inventory) -> Player:
   L.Start{+x, +y, angle} = s
   +sector = L.Level.sector_at(level, x, y)
-  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector))
+  Player.at.fin(x, y, angle, L.Level.floor(level, sector), L.Level.ceil(level, sector), inv)
 
 # The player at the level's start, on its floor, its eye at rest, with
 # the inventory Doom's G_PlayerReborn gives and no weapon showing yet:
 # the state brings the pistol up, as P_SetupPsprites does.
 def Player.start(+level: L.Level) -> Player:
-  Player.at(level, L.Level.start_of(level))
+  Player.at(level, L.Level.start_of(level), I.Inventory.start())
 
 # Lines and boxes
 # ---------------
@@ -2163,11 +2183,27 @@ type Thinker is Data:
 type Thinkers is Data:
   Thinkers{ran: List<&2, Thinker>, due: List<&2, Thinker>}
 
+# How the level has ended: not yet, by G_ExitLevel, or by
+# G_SecretExitLevel, whose secretexit G_DoCompleted reads.
+type Sim.Exit is Data:
+  Unended{}
+  Normal{}
+  Secret{}
+
+def Sim.Exit.show(e: Sim.Exit) -> String:
+  match e:
+    case Unended{}:
+      "none"
+    case Normal{}:
+      "normal"
+    case Secret{}:
+      "secret"
+
 # Everything a tic changes, in one value: the player, the level (its
 # sectors' words and its lines' specials), the things alive and their
 # links, the sides' texture numbers (top, bottom and middle a side, as
 # the graphics number them), the thinkers, the random table's index, the
-# clock (Doom's leveltime), whether the level has ended, whether use was
+# clock (Doom's leveltime), how the level has ended, whether use was
 # down on the last tic, the sounds the last tic started and stopped, in
 # order, everything ST_Ticker and M_Random keep outside the playsim
 # (M_Random's index, the random numbers no demo depends on, and the
@@ -2177,7 +2213,7 @@ type Thinkers is Data:
 # a fresh state comes from the map as loaded.
 type State is Data:
   State{player: Player, level: L.Level, things: H.Things, sidetex: V.Vec,
-    thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
+    thinkers: Thinkers, rnd: U32, clock: U32, ended: Sim.Exit, usedown: Bool,
     sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, secrets: V.Vec}
 
 def State.player(s: State) -> Player:
@@ -2218,7 +2254,7 @@ def State.clock(s: State) -> U32:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   clock
 
-def State.ended(s: State) -> Bool:
+def State.ended(s: State) -> Sim.Exit:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   ended
 
@@ -2270,7 +2306,7 @@ def State.thing.put(+id: U32, th: H.Thing, s: State) -> State:
     mrnd, reborn, secrets}
 
 def State.thing.moved.at(m: Maybe<&2, H.Thing>, +x: U32, +y: U32, player: Player, +level: L.Level,
-  +things: H.Things, sidetex: V.Vec, thinkers: Thinkers, rnd: U32, clock: U32, ended: Bool, usedown: Bool,
+  +things: H.Things, sidetex: V.Vec, thinkers: Thinkers, rnd: U32, clock: U32, ended: Sim.Exit, usedown: Bool,
   sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, secrets: V.Vec) -> State:
   match m:
     case None{}:
@@ -4731,23 +4767,47 @@ def Sim.secrets(+level: L.Level) -> V.Vec:
   Sim.secrets.go(U32.to_nat(L.Level.nsectors(level)), 0, level, V.Vec.of_list([], L.Level.nsectors(level)))
 
 # The state a level starts in, from the map as loaded, with the player
-# at rest at a place, the things spawned with the random numbers they
-# draw, and then the lights in sector order. Use counts as down, as
-# Doom's G_PlayerReborn leaves it, so a key held since before the level
-# does nothing. M_Random's index stands at 64: G_InitNew clears it, and
-# the melt that wipes the level in draws once a screen column, 320.
-def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> State:
+# and its inventory at rest at a place, the things spawned with the
+# random numbers they draw from an index, then the lights in sector
+# order, and the status bar's own state and whether use is down as the
+# caller says.
+def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn, inv: I.Inventory, face: V.Vec,
+  usedown: Bool) -> State:
   H.Spawn{things, rnd, you} = spawn
   Sim.psprites.start(Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
     State.populated(things, L.Level.nthings(level),
-      State{Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
-        rnd, 0, False{}, True{}, [], Sim.Face.start(64), False{}, Sim.secrets(level)})))
+      State{Player.at(level, place, inv), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), Thinkers{[], []},
+        rnd, 0, Unended{}, usedown, [], face, False{}, Sim.secrets(level)})))
 
+# A new game at a place: G_InitNew clears the random indices, and
+# G_PlayerReborn hands out the pistol start with use down, so a key held
+# since before the level does nothing. M_Random's index stands at 64,
+# since the melt that wipes the level in draws once a screen column, 320.
 def State.at(+level: L.Level, place: L.Level.Start) -> State:
-  State.at.spawned(level, place, H.Thing.spawn(level))
+  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(), Sim.Face.start(64), True{})
 
 def State.start(+level: L.Level) -> State:
   State.at(level, L.Level.start_of(level))
+
+# G_DoLoadLevel after a level that came before, which neither random
+# index restarts from: the map from its start with the player and use
+# as the caller hands them, and ST_Start's bar, whose melt draws M_Random
+# 320 times more.
+def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, +mrnd: U32, face: V.Vec) -> State:
+  State.at.spawned(level, L.Level.start_of(level), H.Thing.spawn(level, rnd), inv,
+    Sim.Face.restart(I.Inventory.weapons(inv), usedown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
+
+# G_DoReborn's reload: the dead player's map again from a pistol start,
+# as G_PlayerReborn leaves the player.
+def State.reloaded(+level: L.Level, +dead: State) -> State:
+  State.restarted(level, State.rnd(dead), I.Inventory.start(), True{}, State.mrnd(dead), State.face(dead))
+
+# G_DoWorldDone's load: the next map, entered with the inventory
+# G_PlayerFinishLevel leaves, M_Random's index where the tally left it,
+# and use and attack down as WI_checkForAccelerate last saw them.
+def State.carried(+level: L.Level, +mrnd: U32, +down: Bool, +after: State) -> State:
+  State.restarted(level, State.rnd(after), I.Inventory.finished(Player.inv(State.player(after))), down, mrnd,
+    State.face(after))
 
 # Doors
 # -----
@@ -4911,10 +4971,11 @@ def Sim.once(line: U32, s: State) -> State:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
-# Doom's G_ExitLevel: the level ends, and the tic it ends on runs on.
-def State.end(s: State) -> State:
+# Doom's G_ExitLevel and G_SecretExitLevel: the level ends the way
+# given, and the tic it ends on runs on.
+def State.end(how: Sim.Exit, s: State) -> State:
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}
+  State{player, level, things, sidetex, thinkers, rnd, clock, how, usedown, sounds, mrnd, reborn, secrets}
 
 # A switch that works once: when its tag starts a mover, its texture is
 # swapped and its special cleared.
@@ -5016,7 +5077,7 @@ def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: State) -> State
     case 62:
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
     case 11:
-      State.end(Sim.once(i, Sim.switch(False{}, i, s)))
+      State.end(Normal{}, Sim.once(i, Sim.switch(False{}, i, s)))
     case _:
       s
 
@@ -6326,12 +6387,12 @@ def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +
 
 def Sim.tic(+cmd: K.Cmd, s: State) -> State:
   match s:
-    case State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}
-    case State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, reborn, secrets}:
+    case State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, Unended{}, +usedown, sounds, mrnd, reborn, secrets}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       Sim.tic.live(cmd, level, geo, clock, usedown, Player.dead(player),
-        {State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn, secrets} : State})
+        {State{player, level, things, sidetex, thinkers, rnd, clock, Unended{}, usedown, [], mrnd, reborn, secrets} : State})
+    case ended:
+      ended
 
 # A tic for each command of the list, in order: a demo.
 def Sim.replay(script: List<&2, K.Cmd>, s: State) -> State:

@@ -3,7 +3,6 @@
 let
   inherit (lib.fileset) toSource unions difference;
   inherit (lib.lists) optionals singleton;
-  inherit (lib.strings) optionalString;
   inherit (lib.trivial) readFile;
 in
 llvmPackages_19.stdenv.mkDerivation {
@@ -30,10 +29,10 @@ llvmPackages_19.stdenv.mkDerivation {
   buildPhase = /* bash */ ''
     runHook preBuild
     export HOME=$TMPDIR
-    ${optionalString llvmPackages_19.stdenv.hostPlatform.isAarch64 /* bash */ ''
-      ulimit -S -s 32768
-      export BUN_JSC_maxPerThreadStackUsage=16777216
-    ''}
+    # The JS lane recurses deeper than bun's default stack once a test
+    # loads a second map, as tests/tally.bend loads E1M2.
+    ulimit -S -s 32768
+    export BUN_JSC_maxPerThreadStackUsage=16777216
     ${readFile ./compile.sh}
     for t in tests/*.bend; do
       name=$(basename $t .bend)

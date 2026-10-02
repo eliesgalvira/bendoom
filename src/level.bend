@@ -21,6 +21,10 @@ type Level.Blockmap is Data:
 type Level.Start is Data:
   Start{x: U32, y: U32, angle: U32}
 
+# A map by its episode and number, Doom's gameepisode and gamemap.
+type Level.Name is Data:
+  Name{episode: U32, map: U32}
+
 # The THINGS lump's five words a record (x and y in map units, the angle
 # in degrees, the DoomEd type and the options), and how many records.
 type Level.Things is Data:
