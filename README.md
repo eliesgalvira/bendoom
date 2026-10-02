@@ -71,7 +71,7 @@ If your Nix installation does not enable flakes, add
 | Run | Hold Shift |
 | Fire | Ctrl |
 | Open doors / press switches | Space |
-| Select fist / pistol / shotgun | 1 / 2 / 3, if owned |
+| Select fist / pistol / shotgun / chaingun | 1 / 2 / 3 / 4, if owned |
 | Restart after dying | Space |
 | Quit | Esc, or close the window |
 
