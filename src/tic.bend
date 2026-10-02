@@ -1024,6 +1024,9 @@ def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: S.State) -> S.
 def Sim.player.counted(+s: S.State) -> S.State:
   S.State.player.put(s, Sim.counters(S.State.player(s)))
 
+# P_PlayerThink's BT_CHANGE: the fist's number takes the chainsaw if
+# owned, unless it is up with berserk on, and a weapon owned and not in
+# hand becomes pending.
 def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: S.Player) -> S.Player:
   match chosen:
     case None{}:
@@ -1032,9 +1035,7 @@ def Sim.weapon.selected(chosen: Maybe<&2, U32>, +p: S.Player) -> S.Player:
       +inv = S.Player.inv(p)
       +chosen = Bool.pick(U32, Bool.and(U32.is_zero(weapon), Bool.and(I.Inventory.owns(7, inv),
         Bool.not(Bool.and(U32.is_eq(I.Inventory.ready(inv), 7), Bool.not(U32.is_zero(I.Inventory.strength(inv))))))), 7, weapon)
-      +valid = Bool.and(Bool.or(U32.is_eq(chosen, 0), Bool.or(U32.is_eq(chosen, 1),
-        Bool.or(U32.is_eq(chosen, 2), U32.is_eq(chosen, 7)))),
-        Bool.and(I.Inventory.owns(chosen, inv), Bool.not(U32.is_eq(chosen, I.Inventory.ready(inv)))))
+      +valid = Bool.and(I.Inventory.owns(chosen, inv), Bool.not(U32.is_eq(chosen, I.Inventory.ready(inv))))
       S.Player.holding(p, Bool.pick(I.Inventory, valid, I.Inventory.want(chosen, inv), inv))
 
 def Sim.weapon.select(+cmd: K.Cmd, +s: S.State) -> S.State:
