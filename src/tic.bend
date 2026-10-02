@@ -19,23 +19,47 @@ import ./special.bend as Sp
 # -----------------
 
 # The state a level starts in, from the map as loaded, with the player
-# at rest at a place, the things spawned with the random numbers they
-# draw, and then the lights in sector order. Use counts as down, as
-# Doom's G_PlayerReborn leaves it, so a key held since before the level
-# does nothing. M_Random's index stands at 64: G_InitNew clears it, and
-# the melt that wipes the level in draws once a screen column, 320.
-def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn) -> S.State:
+# and its inventory at rest at a place, the things spawned with the
+# random numbers they draw from an index, then the lights in sector
+# order, and the status bar's own state and whether use is down as the
+# caller says.
+def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn, inv: I.Inventory, face: V.Vec,
+  usedown: Bool) -> S.State:
   H.Spawn{things, rnd, you} = spawn
   S.Sim.psprites.start(Sp.Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
     S.State.populated(things, L.Level.nthings(level),
-      S.State{S.Player.at(level, place), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), S.Thinkers{[], []},
-        rnd, 0, False{}, True{}, [], S.Sim.Face.start(64), False{}, S.Sim.secrets(level)})))
+      S.State{S.Player.at(level, place, inv), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), S.Thinkers{[], []},
+        rnd, 0, S.Unended{}, usedown, [], face, False{}, S.Sim.secrets(level)})))
 
+# A new game at a place: G_InitNew clears the random indices, and
+# G_PlayerReborn hands out the pistol start with use down, so a key held
+# since before the level does nothing. M_Random's index stands at 64,
+# since the melt that wipes the level in draws once a screen column, 320.
 def State.at(+level: L.Level, place: L.Level.Start) -> S.State:
-  State.at.spawned(level, place, H.Thing.spawn(level))
+  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(), S.Sim.Face.start(64), True{})
 
 def State.start(+level: L.Level) -> S.State:
   State.at(level, L.Level.start_of(level))
+
+# G_DoLoadLevel after a level that came before, which neither random
+# index restarts from: the map from its start with the player and use
+# as the caller hands them, and ST_Start's bar, whose melt draws M_Random
+# 320 times more.
+def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, +mrnd: U32, face: V.Vec) -> S.State:
+  State.at.spawned(level, L.Level.start_of(level), H.Thing.spawn(level, rnd), inv,
+    S.Sim.Face.restart(I.Inventory.weapons(inv), usedown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
+
+# G_DoReborn's reload: the dead player's map again from a pistol start,
+# as G_PlayerReborn leaves the player.
+def State.reloaded(+level: L.Level, +dead: S.State) -> S.State:
+  State.restarted(level, S.State.rnd(dead), I.Inventory.start(), True{}, S.State.mrnd(dead), S.State.face(dead))
+
+# G_DoWorldDone's load: the next map, entered with the inventory
+# G_PlayerFinishLevel leaves, M_Random's index where the tally left it,
+# and use and attack down as WI_checkForAccelerate last saw them.
+def State.carried(+level: L.Level, +mrnd: U32, +down: Bool, +after: S.State) -> S.State:
+  State.restarted(level, S.State.rnd(after), I.Inventory.finished(S.Player.inv(S.State.player(after))), down, mrnd,
+    S.State.face(after))
 
 # Chasing
 # -------
@@ -1108,12 +1132,12 @@ def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +
 
 def Sim.tic(+cmd: K.Cmd, s: S.State) -> S.State:
   match s:
-    case S.State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}:
-      S.State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}
-    case S.State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, False{}, +usedown, sounds, mrnd, reborn, secrets}:
+    case S.State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, S.Unended{}, +usedown, sounds, mrnd, reborn, secrets}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       Sim.tic.live(cmd, level, geo, clock, usedown, S.Player.dead(player),
-        {S.State{player, level, things, sidetex, thinkers, rnd, clock, False{}, usedown, [], mrnd, reborn, secrets} : S.State})
+        {S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, [], mrnd, reborn, secrets} : S.State})
+    case ended:
+      ended
 
 # A tic for each command of the list, in order: a demo.
 def Sim.replay(script: List<&2, K.Cmd>, s: S.State) -> S.State:

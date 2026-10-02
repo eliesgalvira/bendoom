@@ -2,7 +2,7 @@
 
 **Tier:** 3
 
-**What to build:** after E1M8's tally, vanilla's finale for episode 1 runs: the E1 text types out at vanilla's speed over vanilla's background flat with D_VICTOR playing, then the shareware's end picture follows and stays until the player quits, as vanilla's `f_finale.c` does for DOOM1.WAD.
+**What to build:** when E1M8 ends, vanilla's finale for episode 1 runs: the E1 text types out at vanilla's speed over vanilla's background flat with D_VICTOR playing, then the shareware's end picture follows and stays until the player quits, as vanilla's `f_finale.c` does for DOOM1.WAD.
 
 **Blocked by:** 04 (song changes), 07
 

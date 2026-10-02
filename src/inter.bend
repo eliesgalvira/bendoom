@@ -72,6 +72,11 @@ def Inter.mrnd(i: Inter) -> U32:
   Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
   mrnd
 
+# Whether a key that accelerates was down on the last tic.
+def Inter.down(i: Inter) -> Bool:
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  down
+
 def Inter.anims(i: Inter) -> List<&2, Inter.Anim>:
   Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
   anims
@@ -571,9 +576,8 @@ def Inter.finished.of(+gfx: G.Gfx, p: Array<U32> & U32) -> Array<U32>:
 def Inter.finished(+gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Inter.finished.of(gfx, Inter.word(gfx, "WILV00", 2, Inter.centre(gfx, "WILV00", 2, mem)))
 
-# WI_drawEL: "Entering" at the top, and the name of the level to come,
-# which is E1M2's, under it. Bendoom starts E1M1 again there, since it
-# has no second map.
+# WI_drawEL: "Entering" at the top, and the name of the level to come
+# under it, drawn as E1M2's whatever the map.
 def Inter.entering.of(+gfx: G.Gfx, p: Array<U32> & U32) -> Array<U32>:
   (mem, +h) = p
   Inter.centre(gfx, "WILV01", (2 + 5 * h / 4 : U32), mem)
@@ -679,8 +683,8 @@ def Inter.lnode(names: List<&2, String>, +gfx: G.Gfx, +x: U32, +y: U32, mem: Arr
       Inter.lnode.first.of(gfx, name, rest, x, y, Inter.fits(gfx, name, x, y, mem))
 
 # wi_stuff.c's lnodes for episode 1: where E1M1 and E1M2 stand on the
-# map. The seven levels after them have places of their own, which
-# Bendoom never shows, since its tally always leaves for E1M2.
+# map. The seven levels after them have places of their own, not drawn
+# yet.
 def Inter.lnodes() -> List<&2, G.Gfx.Spot>:
   [G.Spot{185, 164}, G.Spot{148, 143}]
 
@@ -721,71 +725,114 @@ def Inter.frame(+gfx: G.Gfx, +wi: Inter, mem: Array<U32>) -> Array<U32>:
 # The play
 # --------
 
-# The game's two modes, Doom's GS_LEVEL and GS_INTERMISSION: the level
-# playing, or the tally the exit leads to. The level's state is done
-# with once the tally starts, since the level that follows is built from
-# the map as loaded.
+# The game's two modes, Doom's GS_LEVEL and GS_INTERMISSION: a map's
+# level playing, or the tally an exit leads to, beside the level as it
+# ended, whose player crosses into the map named next.
 type Play is Data:
-  Playing{state: S.State}
-  Showing{inter: Inter}
+  Playing{state: S.State, map: L.Level.Name}
+  Showing{inter: Inter, after: S.State, next: L.Level.Name}
 
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
 
-# The level as loaded, at its start: Doom's G_DoLoadLevel, shared by
-# death and intermission restarts.
-def Play.start(+level: L.Level) -> Play:
-  Playing{Tic.State.start(level)}
+# A new game on a map: G_InitNew, then G_DoLoadLevel.
+def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
+  Playing{Tic.State.start(level), map}
 
-def Play.restarted(reborn: Bool, +level: L.Level, state: S.State) -> Play:
+# The map G_DoCompleted returns to from map 9 of each episode.
+def Play.back(+episode: U32) -> U32:
+  match episode:
+    case 2:
+      6
+    case 3:
+      7
+    case 4:
+      3
+    case _:
+      4
+
+def Play.next.kind(secret: Bool, +episode: U32, +map: U32) -> L.Level.Name:
+  match secret:
+    case True{}:
+      L.Name{episode, 9}
+    case False{}:
+      L.Name{episode, Bool.pick(U32, U32.is_eq(map, 9), Play.back(episode), (map + 1 : U32))}
+
+def Play.next.if(finale: Bool, secret: Bool, +episode: U32, +map: U32) -> Maybe<&2, L.Level.Name>:
+  match finale:
+    case True{}:
+      None{}
+    case False{}:
+      Some{Play.next.kind(secret, episode, map)}
+
+# G_DoCompleted's next map after an exit, secret or not: none after map
+# 8, whose exit of either kind ends the episode; map 9 after a secret
+# exit; after map 9, the map its episode goes back to; else the map
+# after.
+def Play.next(secret: Bool, at: L.Level.Name) -> Maybe<&2, L.Level.Name>:
+  L.Name{+episode, +map} = at
+  Play.next.if(U32.is_eq(map, 8), secret, episode, map)
+
+# G_DoCompleted on the tic a level ends: an exit to another map hands
+# the tally its counts, the totals and the time. Vanilla follows map 8
+# with the episode's finale and no tally; until the finale is drawn,
+# its level stands still where it ended.
+def Play.completed(next: Maybe<&2, L.Level.Name>, map: L.Level.Name, +after: S.State) -> Play:
+  match next:
+    case None{}:
+      Playing{after, map}
+    case Some{name}:
+      Showing{Inter.start(S.Sim.tally(after), S.State.mrnd(after), S.State.usedown(after)), after, name}
+
+def Play.ended(how: S.Sim.Exit, +map: L.Level.Name, after: S.State) -> Play:
+  match how:
+    case S.Unended{}:
+      Playing{after, map}
+    case S.Normal{}:
+      Play.completed(Play.next(False{}, map), map, after)
+    case S.Secret{}:
+      Play.completed(Play.next(True{}, map), map, after)
+
+def Play.after(map: L.Level.Name, +after: S.State) -> Play:
+  Play.ended(S.State.ended(after), map, after)
+
+# G_DoReborn ahead of the tic: a death that asked for the level again
+# has the map as loaded reloaded.
+def Play.reborn(reborn: Bool, +level: L.Level, state: S.State) -> S.State:
   match reborn:
     case True{}:
-      Play.start(level)
+      Tic.State.reloaded(level, state)
     case False{}:
-      Playing{state}
+      state
 
-def Play.ready(+level: L.Level, play: Play) -> Play:
-  match play:
-    case Playing{+state}:
-      Play.restarted(S.State.reborn(state), level, state)
-    case Showing{wi}:
-      Showing{wi}
-
-# G_DoCompleted: the tic that ends the level hands the tally its counts,
-# the totals and the time.
-def Play.ended(ended: Bool, +after: S.State) -> Play:
-  match ended:
-    case False{}:
-      Playing{after}
-    case True{}:
-      Showing{Inter.start(S.Sim.tally(after), S.State.mrnd(after), S.State.usedown(after))}
-
-def Play.after(+after: S.State) -> Play:
-  Play.ended(S.State.ended(after), after)
+# The sounds a level's tic started; none once it has ended, since an
+# ended level runs no tic.
+def Play.sounds(before: S.Sim.Exit, +after: S.State) -> List<&2, Sn.Sound.Event>:
+  match before:
+    case S.Unended{}:
+      S.State.sounds(after)
+    case _:
+      []
 
 # Whether the tally is accelerated this tic: WI_checkForAccelerate reads
-# attack and use from the command, and the game's window adds Enter,
-# which it has held since milestone 4 as the key that starts the level
-# again.
+# attack and use from the command, and the game's window adds Space and
+# Enter.
 def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
   Bool.or(held, K.Cmd.use(cmd))
 
-def Play.step.showing(over: Bool, +level: L.Level, +cmd: K.Cmd, +press: Bool, +wi: Inter) -> Play.Step:
-  match over:
-    case True{}:
-      Step{Play.after(Tic.Sim.tic(cmd, Tic.State.start(level))), []}
-    case False{}:
-      +after = Inter.tic(press, wi)
-      Step{Showing{after}, Inter.sound(press, wi, after)}
-
+# A tic of the play on the map as loaded: the level's tic while it
+# runs, then the tally's. Held is a key outside the command that
+# accelerates the tally, which the level pays no heed.
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
-    case Playing{state}:
-      +after = Tic.Sim.tic(cmd, state)
-      Step{Play.after(after), S.State.sounds(after)}
-    case Showing{+wi}:
+    case Playing{+state, map}:
+      +ended = S.State.ended(state)
+      +after = Tic.Sim.tic(cmd, Play.reborn(S.State.reborn(state), level, state))
+      Step{Play.after(map, after), Play.sounds(ended, after)}
+    case Showing{+wi, after, next}:
       +press = Play.pressed(held, cmd)
-      Play.step.showing(Inter.over(wi), level, cmd, press, wi)
+      +ticked = Inter.tic(press, wi)
+      Step{Showing{ticked, after, next}, Inter.sound(press, wi, ticked)}
 
 def Play.Step.play(step: Play.Step) -> Play:
   Step{play, sounds} = step
@@ -795,41 +842,126 @@ def Play.Step.sounds(step: Play.Step) -> List<&2, Sn.Sound.Event>:
   Step{play, sounds} = step
   sounds
 
-# A tic of the play: the level's tic while it runs, then the tally's,
-# and, on the tic after the tally is done, the first tic of a level
-# built from the map as loaded, where Doom's G_DoWorldDone loads the
-# next. Held is a key outside the command that accelerates the tally,
-# which the level pays no heed.
-def Play.tic(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play:
-  Play.Step.play(Play.step(level, cmd, held, play))
+def Play.wants.if(over: Bool, next: L.Level.Name) -> Maybe<&2, L.Level.Name>:
+  match over:
+    case True{}:
+      Some{next}
+    case False{}:
+      None{}
 
-# A tic for each command of a list, with a key held throughout: a frame
-# of the game's loop.
-def Play.tics(script: List<&2, K.Cmd>, +held: Bool, +level: L.Level, play: Play) -> Play:
-  match script:
+# The map G_WorldDone asks for once the tally's last screen is over,
+# which loads before the next tic.
+def Play.wants(play: Play) -> Maybe<&2, L.Level.Name>:
+  match play:
+    case Playing{state, map}:
+      None{}
+    case Showing{+wi, after, next}:
+      Play.wants.if(Inter.over(wi), next)
+
+# G_DoWorldDone on the map the tally asked for, as loaded.
+def Play.enter(+level: L.Level, play: Play) -> Play:
+  match play:
+    case Playing{state, map}:
+      Playing{state, map}
+    case Showing{+wi, after, next}:
+      Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next}
+
+# A play and what it is drawn from: the frame's array, the graphics, the
+# tables and the map as loaded.
+type Play.World is Type:
+  World{play: Play, mem: Array<U32>, gfx: G.Gfx, tables: P.Project.Tables, level: L.Level}
+
+def Play.World.start.gl(map: L.Level.Name, mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
+  (+gfx, +level) = gl
+  World{Play.start(level, map), mem, gfx, P.Project.tables(level), level}
+
+# A new game on a map, in the world opened for it.
+def Play.World.start(map: L.Level.Name, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+  (mem, gl) = p
+  Play.World.start.gl(map, mem, gl)
+
+def Play.World.of.gl(+play: Play, mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
+  (+gfx, +level) = gl
+  World{Play.enter(level, play), mem, gfx, P.Project.tables(level), level}
+
+def Play.World.of(play: Play, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+  (mem, gl) = p
+  Play.World.of.gl(play, mem, gl)
+
+# A map, its graphics and the frame's array from the WAD BENDOOM_IWAD
+# names.
+def Play.open(at: L.Level.Name) -> IO(Array<U32> & G.Gfx & L.Level):
+  L.Name{+episode, +map} = at
+  G.Gfx.open(episode, map)
+
+def Play.load.if(wanted: Maybe<&2, L.Level.Name>, play: Play, mem: Array<U32>, gfx: G.Gfx,
+  tables: P.Project.Tables, level: L.Level) -> IO(Play.World):
+  match wanted:
+    case None{}:
+      IO.pure(Play.World, World{play, mem, gfx, tables, level})
+    case Some{at}:
+      IO.bind(Array<U32> & G.Gfx & L.Level, Play.World, Play.open(at),
+        opened => IO.pure(Play.World, Play.World.of(play, opened)))
+
+# The world before a tic: the map the play asks for, if it asks for one,
+# opened, and the play entered on it.
+def Play.load(w: Play.World) -> IO(Play.World):
+  World{+play, mem, gfx, tables, level} = w
+  Play.load.if(Play.wants(play), play, mem, gfx, tables, level)
+
+# A tic of the play in its world.
+def Play.World.step(+cmd: K.Cmd, +held: Bool, w: Play.World) -> Play.Step & Play.World:
+  World{play, mem, gfx, tables, +level} = w
+  +step = Play.step(level, cmd, held, play)
+  (step, World{Play.Step.play(step), mem, gfx, tables, level})
+
+# A play in its world after some tics, and the sounds they started, in
+# order.
+type Play.Run is Type:
+  Ran{world: Play.World, sounds: List<&2, Sn.Sound.Event>}
+
+def Play.heard(sounds: List<&2, Sn.Sound.Event>, p: Play.Step & Play.World) -> Play.Run:
+  (step, world) = p
+  Ran{world, List.append(&2, Sn.Sound.Event, sounds, Play.Step.sounds(step))}
+
+# A tic for each command, with a key held throughout, each after the
+# map the play asks for, if it asks for one, has loaded.
+def Play.run(cmds: List<&2, K.Cmd>, +held: Bool, run: Play.Run) -> IO(Play.Run):
+  match cmds:
     case []:
-      play
-    case cmd <> rest:
-      Play.tics(rest, held, level, Play.tic(level, cmd, held, play))
-
-# A tic for each command of a list, the press from the commands alone,
-# as a demo's tics drive the tally.
-def Play.replay(script: List<&2, K.Cmd>, +level: L.Level, play: Play) -> Play:
-  Play.tics(script, False{}, level, play)
+      IO.pure(Play.Run, run)
+    case +cmd <> rest:
+      Ran{world, sounds} = run
+      IO.bind(Play.World, Play.Run, Play.load(world),
+        loaded => Play.run(rest, held, Play.heard(sounds, Play.World.step(cmd, held, loaded))))
 
 # Whether the level is still running, which the demo is recorded for.
 def Play.playing(play: Play) -> Bool:
   match play:
-    case Playing{state}:
+    case Playing{state, map}:
       True{}
-    case Showing{inter}:
+    case Showing{inter, after, next}:
       False{}
+
+# The scene's song, as S_Start and WI_Start name it: the map's own,
+# mus_e1m1 plus the episode's nine maps before it and the map's place,
+# which is D_ before the map's name, or D_INTER through the tally.
+def Play.song(play: Play) -> String:
+  match play:
+    case Playing{state, L.Name{episode, map}}:
+      "D_" ++ L.Level.marker(episode, map)
+    case Showing{inter, after, next}:
+      "D_INTER"
+
+# The songs a scene of the episode can name.
+def Play.songs() -> List<&2, String>:
+  ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER"]
 
 # The frame the play shows: the level from the player's eye, or the
 # tally, both in the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
-    case Playing{+state}:
+    case Playing{+state, map}:
       R.Render.frame(tables, gfx, state, messages, mem)
-    case Showing{+wi}:
+    case Showing{+wi, after, next}:
       (Inter.frame(gfx, wi, mem), 0)

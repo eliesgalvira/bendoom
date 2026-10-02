@@ -1,5 +1,4 @@
 export BENDOOM_IWAD="${BENDOOM_IWAD-$iwad}"
-export BENDOOM_MUSIC="${BENDOOM_MUSIC-$music}"
 export BENDOOM_SOUNDS="${BENDOOM_SOUNDS-$sounds}"
 
 if [ "${RECORD+x}" ]; then

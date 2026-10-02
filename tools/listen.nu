@@ -8,11 +8,26 @@
 # snd_dmxoption. It also turns off the ENDOOM screen, which would wait
 # for a key after a demo's end.
 #
-# The music: an isolated E1M1 music capture with sound effects disabled. The capture holds the given length of audio after the first
-# note, at least two passes: Freedoom's song is about 130.6 s a pass,
-# the shareware one 96.0 s. The report gives the capture's frames, the
-# lead (the frames before the first sample other than zero) and the
-# frames whose left and right differ.
+# The music: E1M1's song alone, with sound effects off, or with --song
+# another song in its place: a copy of the IWAD whose directory points
+# D_E1M1 at that song's lump. The capture holds the given length of audio
+# after the first note, at least two passes: Freedoom's E1M1 song is
+# about 130.6 s a pass, the shareware one 96.0 s. The report gives the
+# capture's frames, the lead (the frames before the first sample other
+# than zero) and the frames whose left and right differ.
+#
+# The game: a Bendoom binary's own sound, recorded as it runs on a
+# private Xvfb with a private PulseAudio null sink for its sound card,
+# which drains at the real rate and plays nowhere. ALSA's file plugin
+# between the two keeps every frame the game writes, as float, and
+# ffmpeg makes 16-bit samples of it, which is exact, since each float is
+# a 16-bit sample over 32768. A frame the device found no sample for is
+# silence in the capture, as it is in the speaker. The game plays the
+# music alone unless --sounds keeps BENDOOM_SOUNDS. It runs until the
+# capture holds the length asked after the first note, or until it
+# quits, as the window bench does; the report adds what it printed. Keys
+# can be pressed in its window, one a second from the first note. The
+# desktop's sound and windows play no part.
 #
 # The sounds: a command script from a place, as tools/oracle.nu takes
 # them, played as a demo with no music, or over the song with --music.
@@ -46,12 +61,16 @@
 # them apart. Chocolate Doom writes the song to $TMPDIR/doom.mid, so
 # runs side by side each get their own.
 #
-# Needs chocolate-doom (in the dev shell):
+# Needs chocolate-doom, Xvfb, PulseAudio and ffmpeg (in the dev shell).
+# A kept capture stays in a scratch directory under $TMPDIR, which `nix
+# develop -c` removes as it exits, so set TMPDIR to one that outlives it:
 #
 #   tools/listen.nu
 #   tools/listen.nu --wad doom1.wad --length 200sec --keep
+#   tools/listen.nu --wad doom1.wad --song D_E1M2 --keep
+#   tools/listen.nu game --binary ./doom --wad doom1.wad --song D_E1M2 --keep
+#   SCRIPT="35,50,0,0,0" tools/listen.nu game --binary ./window --sounds
 #   tools/listen.nu compare a/capture.raw b/capture.raw
-#   tools/listen.nu render a/capture.raw
 #   tools/listen.nu sounds -480 192 180 "20,0,0,0,0 1,0,0,0,1 30,0,0,0,0" --keep
 #   tools/listen.nu sounds -480 192 180 "80,0,0,0,0" --music --keep
 #   tools/listen.nu sounds -480 192 180 "20,0,0,0,0 1,0,0,0,1 59,0,0,0,0" --music --against a/capture.raw
@@ -81,7 +100,7 @@ def heard []: record -> binary {
   if $spec != {format: S16LE, channels: "2", freq: "44100"} {
     error make {msg: $"the disk driver wrote ($spec.format), ($spec.channels) channels at ($spec.freq) Hz"}
   }
-  open --raw $run.capture
+  open --raw $run.capture | into binary
 }
 
 # A run's report, with the capture's path if the scratch directory is
@@ -96,15 +115,31 @@ def lead []: binary -> any {
   $in | chunks 4 | enumerate | where ($it.item | into int) != 0 | first 1 | get index.0?
 }
 
+# The IWAD, copied into a directory under its own name, with D_E1M1's
+# directory entry pointing at another song's lump if one is named.
+def iwad [dir: path, song: any]: path -> path {
+  let wad = $in | path expand
+  let copy = $dir | path join ($wad | path basename)
+  if $song == null { return $wad }
+  let bytes = open --raw $wad
+  let all = $bytes | lumps | enumerate | flatten
+  let entry = ($bytes | bytes at 8..11 | into int --endian little) + ($all | where name == D_E1M1 | first | get index) * 16
+  let lump = $all | where name == $song | first
+  [($bytes | bytes at 0..<$entry) ($lump.pos | le 4) ($lump.size | le 4) ($bytes | bytes at ($entry + 8)..)]
+    | bytes collect | save $copy
+  $copy
+}
+
 def main [
   --wad: path                   # the IWAD (default $env.BENDOOM_IWAD)
+  --song: string                # a song to play in D_E1M1's place
   --length: duration = 270sec   # audio to record after the first note
   --keep                        # keep the scratch directory and the capture
 ]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
-  let wad = $wad | default $env.BENDOOM_IWAD | path expand
   let frames = $length / 1sec * 44100 | into int
   let run = scratch
+  let wad = $wad | default $env.BENDOOM_IWAD | iwad $run.dir $song
   let game = job spawn {
     cd $run.dir
     with-env $run.sdl {
@@ -112,24 +147,118 @@ def main [
     }
   }
   mut first: any = null
-  try {
+  let failed = try {
     loop {
       sleep 1sec
       if $game not-in (job list | get id) { error make {msg: "Chocolate Doom stopped"} }
       let bytes = if ($run.capture | path exists) { ls $run.capture | get 0.size | into int } else { 0 }
-      if $first == null and $bytes > 0 { $first = open --raw $run.capture | lead }
+      if $first == null and $bytes > 0 { $first = open --raw $run.capture | into binary | lead }
       if $first == null and $bytes > 10 * 44100 * 4 { error make {msg: "no note in the capture's first 10 s"} }
       if $first != null and $bytes >= ($first + $frames) * 4 { break }
     }
-  } finally {
-    job kill $game
-  }
+  } catch {|e| $e.msg }
+  job kill $game
+  if $failed != null { error make {msg: $failed} }
   let audio = $run | heard
   {
     frames: (($audio | bytes length) // 4)
     lead: ($audio | lead)
     sides_differ: ($audio | chunks 4 | where {|f| ($f | bytes at 0..1) != ($f | bytes at 2..3) } | length)
   } | kept $run $keep
+}
+
+# Waits until a closure holds, a tenth of a second at a time.
+def wait-for [tries: int, ready: closure, message: string] {
+  for _ in 0..<$tries { if (do $ready) { return }; sleep 100ms }
+  error make {msg: $message}
+}
+
+def "main game" [
+  --binary: path = ./doom       # the game, built natively: bend doom.bend -o doom
+  --wad: path                   # the IWAD (default $env.BENDOOM_IWAD)
+  --song: string                # a song to play in D_E1M1's place
+  --length: duration = 270sec   # audio to record after the first note
+  --sounds                      # keep BENDOOM_SOUNDS, so the sounds play over the song
+  --keys: string = ""           # keys a space apart, each held a fifth of a second, one a second from the first note
+  --keep                        # keep the scratch directory and the capture
+]: nothing -> record {
+  hide-env --ignore-errors LD_LIBRARY_PATH WAYLAND_DISPLAY
+  if not $sounds { hide-env --ignore-errors BENDOOM_SOUNDS }
+  let binary = $binary | path expand
+  let frames = $length / 1sec * 44100 | into int
+  let dir = mktemp --directory
+  let float = $dir | path join capture.f32
+  let socket = $dir | path join native
+  let display_file = $dir | path join display
+  let wad = $wad | default $env.BENDOOM_IWAD | iwad $dir $song
+  [
+    $'pcm.!default { type file; slave.pcm "sink"; file "($float)"; format "raw" }'
+    $'pcm.sink { type pulse; server "unix:($socket)" }'
+  ] | str join (char newline) | save ($dir | path join alsa.conf)
+  mkdir ($dir | path join pulse)
+  let failed = try {
+    job spawn --description $dir {
+      ^Xvfb -displayfd 1 -screen 0 1280x960x24 o> $display_file e> ($dir | path join xvfb.log)
+    } | ignore
+    job spawn --description $dir {
+      $env.DBUS_SESSION_BUS_ADDRESS = "disabled:"
+      with-env {HOME: $dir, XDG_RUNTIME_DIR: ($dir | path join pulse), PULSE_RUNTIME_PATH: ($dir | path join pulse),
+        PULSE_STATE_PATH: ($dir | path join pulse)} {
+        (^pulseaudio -n --daemonize=no --use-pid-file=no --exit-idle-time=-1 --log-target=stderr
+          -L "module-null-sink sink_name=capture rate=44100 channels=2"
+          -L $"module-native-protocol-unix socket=($socket) auth-anonymous=1") e> ($dir | path join pulse.log)
+      }
+    } | ignore
+    wait-for 100 { ($display_file | path exists) and ((open --raw $display_file | str trim) != "") } "Xvfb did not start"
+    wait-for 100 { $socket | path exists } "PulseAudio did not start"
+    let display = $":(open --raw $display_file | str trim)"
+    let game = job spawn --description $dir {
+      with-env {DISPLAY: $display, ALSA_CONFIG_PATH: ($dir | path join alsa.conf), PULSE_SERVER: $"unix:($socket)",
+        BENDOOM_IWAD: $wad} {
+        ^$binary --threads 1 | complete | to json | save ($dir | path join game.json)
+      }
+    }
+    mut first: any = null
+    mut keys = $keys | split row ' ' | where $it != ''
+    loop {
+      sleep 1sec
+      if $game not-in (job list | get id) { break }
+      let bytes = if ($float | path exists) { ls $float | get 0.size | into int } else { 0 }
+      if $first != null and ($keys | is-not-empty) {
+        let key = $keys | first
+        with-env {DISPLAY: $display} {
+          let window = ^xdotool search --name '^Bendoom$' | lines | first
+          ^xdotool keydown --window $window $key
+          sleep 200ms
+          ^xdotool keyup --window $window $key
+        }
+        $keys = $keys | skip 1
+      }
+      if $first == null and $bytes > 0 {
+        $first = open --raw $float | into binary | chunks 8 | enumerate | where $it.item != 0x[0000000000000000] | first 1 | get index.0?
+      }
+      if $first == null and $bytes > 10 * 44100 * 8 { error make {msg: "no note in the capture's first 10 s"} }
+      if $first != null and $bytes >= ($first + $frames) * 8 {
+        with-env {DISPLAY: $display} {
+          let window = ^xdotool search --name '^Bendoom$' | lines | first
+          ^xdotool windowfocus --sync $window
+          ^xdotool key --window $window Escape
+        }
+        wait-for 100 { $game not-in (job list | get id) } "the game did not quit"
+        break
+      }
+    }
+  } catch {|e| $e.msg }
+  for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+  if $failed != null { error make {msg: $failed} }
+  let ran = open ($dir | path join game.json)
+  if $ran.exit_code != 0 { error make {msg: $"the game left with ($ran.exit_code): ($ran.stderr)"} }
+  let capture = $dir | path join capture.raw
+  ^ffmpeg -loglevel error -f f32le -ar 44100 -ac 2 -i $float -f s16le $capture
+  rm $float
+  let audio = open --raw $capture | into binary
+  let report = {frames: (($audio | bytes length) // 4), lead: ($audio | lead), printed: ($ran.stdout | str trim)}
+  if $keep { $report | insert capture $capture } else { rm --recursive $dir; $report }
 }
 
 # A capture's 16-bit samples, left and right in turn.
@@ -161,31 +290,11 @@ def differences [a: binary, b: binary]: nothing -> list<record<at: int, by: int>
 # Two captures from their first notes, over the shorter: how many
 # samples differ and by how much at most, both sides counted.
 def "main compare" [a: path, b: path]: nothing -> record {
-  let a = open --raw $a | from-lead
-  let b = open --raw $b | from-lead
+  let a = open --raw $a | into binary | from-lead
+  let b = open --raw $b | into binary | from-lead
   let d = differences $a $b
   {frames: ([($a | bytes length) ($b | bytes length)] | math min | $in // 4), differing: ($d | length),
     largest: ($d | get by | append 0 | math max)}
-}
-
-# music.bend's two passes against a capture: the render starts with the
-# idle buffer, as the capture does, and both are compared from their
-# first frame over the render's frames. The report gives each pass's
-# frames, how many left and right samples differ, by how much at most,
-# and the first frame that differs. Build it first with
-# bend music.bend -o music.
-def "main render" [capture: path, --binary: path = ./music]: nothing -> record {
-  hide-env --ignore-errors LD_LIBRARY_PATH
-  let binary = $binary | path expand
-  let dir = mktemp --directory
-  do { cd $dir; with-env {BENDOOM_IDLE: 1} { ^$binary --threads 1 } }
-  let first = ^basenc --base16 -d ($dir | path join first.hex) | into binary
-  let second = ^basenc --base16 -d ($dir | path join second.hex) | into binary
-  rm --recursive $dir
-  let d = differences (bytes build $first $second) (open --raw $capture)
-  {first_pass: (($first | bytes length) // 4), second_pass: (($second | bytes length) // 4),
-    left: ($d | where at mod 2 == 0 | length), right: ($d | where at mod 2 == 1 | length),
-    largest: ($d | get by | append 0 | math max), differs_from: ($d | get at.0? | if $in != null { $in // 2 })}
 }
 
 # The frames the device asks for at a time with sound effects on:
@@ -235,6 +344,7 @@ def "main sounds" [
   angle: int            # its facing in degrees, a multiple of 45
   script: string        # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path           # the IWAD (default $env.BENDOOM_IWAD)
+  --map: string = "E1M1" # the map, by its marker
   --things: string = "" # records to rewrite, each "record,type,x,y", facing 0
   --music               # play the song under the sounds
   --against: path       # a capture of the song alone, the reference under --music
@@ -245,8 +355,8 @@ def "main sounds" [
   let runs = $script | runs
   let run = scratch
   let name = $wad | path basename
-  open --raw $wad | placed $x $y $angle $things | save ($run.dir | path join $name)
-  $runs | demo | save ($run.dir | path join script.lmp)
+  open --raw $wad | placed $map $x $y $angle $things | save ($run.dir | path join $name)
+  $runs | tics | demo (header $map) | save ($run.dir | path join script.lmp)
   let limit = ($runs | get tics | math sum) // 35 + 60
   let game = do { cd $run.dir; with-env $run.sdl {
     ^timeout $limit chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig chocolate-doom.cfg ...(if $music { [] } else { [-nomusic] }) e> stderr | complete

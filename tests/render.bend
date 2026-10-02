@@ -627,7 +627,7 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     arithmetic()
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     start(world)
 
 #|clip [10..40, 50..60]

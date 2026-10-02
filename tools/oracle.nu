@@ -1,24 +1,32 @@
 #!/usr/bin/env nu
-# Diffs a frame of ours against vanilla's after the same commands from
-# the same place. Writes a copy of the IWAD whose E1M1 has player 1
-# start at x, y facing angle, the records --things names rewritten and
-# its other things as they are, and the command script as a vanilla
-# demo (tools/demo.nu), then a tic whose buttons press pause
-# (BT_SPECIAL with BTS_PAUSE), then a minute of idle tics. Chocolate
-# Doom plays the demo in real time in a scratch directory, at screen
-# size 10, on a headless X server of its own; a paused game runs no
-# playsim tic but keeps reading the demo, so the tail holds the frame of
-# the script's last tic for a minute, and one paletted screenshot is
-# taken inside it. A shot counts once it shows the pause graphic. It is
-# compared with the frame tools/frame.bend dumps from the same copy
-# after the same script, over all 200 rows but for the pause graphic and
-# the box the marine's face covers: the status bar's ticker runs on
-# while the playsim is paused, so the face keeps changing under the
-# screenshot. The report counts that box separately, as `face`, which is
-# 0 only where the face holds still under the pause, as the dead one
-# does. The default script idles 20 tics, past the pistol's rise.
+# Diffs a frame of ours against vanilla's at the same tic of the same
+# demo. Chocolate Doom plays the demo, followed by a tic whose buttons
+# press pause (BT_SPECIAL with BTS_PAUSE) and a minute of idle tics, in
+# real time in a scratch directory, at screen size 10, on a headless X
+# server of its own; a paused game runs no playsim tic but keeps reading
+# the demo, so the tail holds the frame of the demo's last tic for a
+# minute, and one paletted screenshot is taken inside it. A shot counts
+# once it shows the pause graphic. It is compared with the frame
+# tools/frame.bend dumps after the same demo on the same IWAD, over all
+# 200 rows but for the pause graphic and the box the marine's face
+# covers: the status bar's ticker runs on while the playsim is paused,
+# so the face keeps changing under the screenshot. The report counts
+# that box separately, as `face`, which is 0 only where the face holds
+# still under the pause, as the dead one does.
 #
-# --tally compares the tally the exit leads to instead. Its script takes
+# The demo is a command script from a place, or the first tics of a
+# recorded one. A script is runs a space apart, each
+# "count,forward,side,turn,buttons" (tools/demo.nu), played on --map
+# (E1M1 when not given) from a copy of the IWAD whose player 1 starts
+# at x, y facing angle; the default script idles 20 tics, past the
+# pistol's rise. `demo` takes a demo lump of the IWAD, such as DEMO1, or
+# a .lmp file, and plays its first tics on the map its header names.
+# Bendoom plays Hurt Me Plenty with player 1 alone and no options, and
+# a header that asks for anything else is refused. Either way --things
+# rewrites the map's records it names in the copy and leaves its other
+# things as they are.
+#
+# --tally compares the tally the exit leads to instead. Its demo takes
 # the exit and then idles long enough for WI_updateStats to settle,
 # after which the screen stands still until a press, so no pause tic is
 # written: its buttons byte carries BT_ATTACK, which
@@ -29,14 +37,16 @@
 # shot is taken, and not the bar's face, which the tally covers.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
-# frame dump built. A script is runs a space apart, each
-# "count,forward,side,turn,buttons" (tools/demo.nu):
+# frame dump built:
 #
 #   bend tools/frame.bend -o frame
 #   tools/oracle.nu -416 256 0
 #   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
-#   tools/oracle.nu -224 1340 90 "5,0,0,0,0 1,0,0,0,2 1,0,0,64,0 25,25,0,0,0 8,0,0,0,0 1,0,0,16,0 1,0,0,0,2 250,0,0,0,0" --tally
+#   tools/oracle.nu -363 1316 180 "1,0,0,16,0 5,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --tally
+#   tools/oracle.nu -224 -624 90 --map E1M5 --wad doom1.wad
+#   tools/oracle.nu demo DEMO3 300 --wad doom1.wad
+#   tools/oracle.nu demo run.lmp 1000
 
 source demo.nu
 
@@ -168,45 +178,83 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $shot | first
 }
 
+# Our frame and vanilla's after the tics of a demo on the IWAD copy
+# given, and where they differ. The run is the flags both commands take.
+def compare [
+  iwad: binary, header: binary, tics: binary
+  run: record<wad: path, frame: path, tally: bool, keep: bool>
+]: nothing -> record {
+  hide-env --ignore-errors LD_LIBRARY_PATH
+  let count = ($tics | bytes length) // 4
+  let told = if $run.tally { finished $iwad } else { patch-pixels $iwad M_PAUSE 126 4 }
+  let dir = mktemp --directory
+  let name = $run.wad | path basename
+  let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
+  let tail = if $run.tally { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
+  let shot = vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
+  $tics | demo $header | save ($dir | path join ours.lmp)
+  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
+  let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
+  let face = face-box $iwad
+  let masked = if $run.tally { anim-boxes $iwad } else { ($told | get at) ++ $face }
+  let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
+  let differing = $off | where $it not-in $masked
+  let playpal = $iwad | lumps | where name == "PLAYPAL" | last | get pos
+  if not $run.keep { rm --recursive $dir }
+  {
+    differing: ($differing | length)
+    face: ($off | where $it in $face | length)
+    masked: ($masked | uniq | where $it < 200 * 320 | length)
+    palette: ($"0x($dump | first)" | into int)
+    shot_plain: ($shot.palette == ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
+    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
+    scratch: (if $run.keep { $dir } else { null })
+  }
+}
+
 def main [
   x: int                                   # the start's x, in map units
   y: int                                   # the start's y
   angle: int                               # its facing in degrees, a multiple of 45
   script: string = "20,0,0,0,0"            # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
+  --map: string = "E1M1"                   # the map, by its marker
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --tally                                  # the script takes the exit: compare the tally it leads to
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
-  hide-env --ignore-errors LD_LIBRARY_PATH
+  let wad = $wad | default $env.BENDOOM_IWAD
+  let iwad = open --raw $wad | placed $map $x $y $angle $things
+  {map: $map, place: $"($x) ($y) ($angle)", script: $script}
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
+}
+
+# The first tics of a recorded demo.
+def "main demo" [
+  demo: string                             # a demo lump of the IWAD, such as DEMO1, or a .lmp file
+  tic: int                                 # the tics to play: the frame compared is the one after them
+  --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
+  --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
+  --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
+  --tally                                  # the tics take the exit: compare the tally they lead to
+  --keep                                   # keep the scratch directory
+]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
-  let runs = $script | runs
-  let tics = $runs | get tics | math sum
-  let told = if $tally { finished $bytes } else { patch-pixels $bytes M_PAUSE 126 4 }
-  let dir = mktemp --directory
-  let name = $wad | path basename
-  let tail = if $tally { [{tics: 2100, bytes: 0x[00 00 00 00]}] } else {
-    [{tics: 1, bytes: 0x[00 00 00 81]} {tics: 2100, bytes: 0x[00 00 00 00]}] }
-  let shot = vanilla ($bytes | placed $x $y $angle $things) $name ($runs | append $tail | demo) $tics $told $dir
-  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), FRAME: $"($x) ($y) ($angle)", SCRIPT: $script} { ^$frame } | lines
-  let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let face = face-box $bytes
-  let masked = if $tally { anim-boxes $bytes } else { ($told | get at) ++ $face }
-  let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
-  let differing = $off | where $it not-in $masked
-  let playpal = $bytes | lumps | where name == "PLAYPAL" | last | get pos
-  if not $keep { rm --recursive $dir }
-  {
-    place: $"($x) ($y) ($angle)"
-    script: $script
-    differing: ($differing | length)
-    face: ($off | where $it in $face | length)
-    masked: ($masked | uniq | where $it < 200 * 320 | length)
-    palette: ($"0x($dump | first)" | into int)
-    shot_plain: ($shot.palette == ($bytes | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
-    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
-    scratch: (if $keep { $dir } else { null })
+  let lump = $bytes | lumps | where name == $demo | last 1 | get 0?
+  let lmp = if ($demo | path exists) { open --raw $demo | into binary } else if $lump != null {
+    $bytes | bytes at $lump.pos..<($lump.pos + $lump.size)
+  } else { error make {msg: $"($demo) is neither a file nor a lump of ($wad)"} }
+  let header = $lmp | bytes at 0..12
+  let map = $header | header-map
+  if $header != (header $map) {
+    error make {msg: $"($demo)'s header ($header | encode hex) is not one Bendoom plays, (header $map | encode hex)"}
   }
+  let length = $lmp | bytes at 13.. | chunks 4 | enumerate | where ($it.item | bytes at 0..0) == 0x[80] | get index.0?
+  if $length == null { error make {msg: $"($demo) has no end marker, 0x80"} }
+  if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
+  {demo: $demo, map: $map, tic: $tic}
+  | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
+    {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
 }
