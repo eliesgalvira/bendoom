@@ -1,9 +1,11 @@
-# E1M1 as tables, for working out expected values before the code answers:
-# the lump directory, the map's lines, sides, sectors, vertices and
-# things, the sector under a point, the events of its song, the WAD's
-# sounds, and the pixels a patch draws.
+# A WAD as tables, for working out expected values before the code
+# answers: the lump directory, a map's lines, sides, sectors, vertices
+# and things, the sector under a point, the events of its song, the
+# WAD's sounds, and the pixels a patch draws. --map names the map, E1M1
+# when not given.
 #
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | linedefs | where special != 0'
+#   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | things --map E1M5 | where type == 1'
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | song-events | song-counts'
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | sound-lumps'
 
@@ -22,10 +24,10 @@ def lumps []: binary -> table<name: string, pos: int, size: int> {
   }
 }
 
-# The lump of a name after the E1M1 marker.
-def map-lump [name: string]: binary -> record<name: string, pos: int, size: int> {
+# The lump of a name after a map's marker.
+def map-lump [map: string, name: string]: binary -> record<name: string, pos: int, size: int> {
   let all = $in | lumps | enumerate | flatten
-  let marker = $all | where name == "E1M1" | first | get index
+  let marker = $all | where name == $map | first | get index
   $all | where index > $marker and name == $name | first | select name pos size
 }
 
@@ -38,52 +40,52 @@ def name8 [at: int]: binary -> string {
   $in | bytes at $at..($at + 7) | decode utf-8 | str trim --char (char nul)
 }
 
-def linedefs []: binary -> table {
+def linedefs [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | map-lump LINEDEFS
+  let l = $wad | map-lump $map LINEDEFS
   0..<($l.size // 14) | each {|i| let at = $l.pos + $i * 14
     {i: $i, v1: ($wad | word $at), v2: ($wad | word ($at + 2)), flags: ($wad | word ($at + 4)), special: ($wad | word ($at + 6)),
       tag: ($wad | word ($at + 8)), front: ($wad | word ($at + 10)), back: ($wad | word ($at + 12))} }
 }
 
-def sidedefs []: binary -> table {
+def sidedefs [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | map-lump SIDEDEFS
+  let l = $wad | map-lump $map SIDEDEFS
   0..<($l.size // 30) | each {|i| let at = $l.pos + $i * 30
     {i: $i, xoff: ($wad | word $at --signed), yoff: ($wad | word ($at + 2) --signed), top: ($wad | name8 ($at + 4)),
       bottom: ($wad | name8 ($at + 12)), mid: ($wad | name8 ($at + 20)), sector: ($wad | word ($at + 28))} }
 }
 
-def sectordefs []: binary -> table {
+def sectordefs [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | map-lump SECTORS
+  let l = $wad | map-lump $map SECTORS
   0..<($l.size // 26) | each {|i| let at = $l.pos + $i * 26
     {i: $i, floor: ($wad | word $at --signed), ceil: ($wad | word ($at + 2) --signed), floorpic: ($wad | name8 ($at + 4)),
       ceilpic: ($wad | name8 ($at + 12)), light: ($wad | word ($at + 20)), special: ($wad | word ($at + 22)), tag: ($wad | word ($at + 24))} }
 }
 
-def vertexes []: binary -> table {
+def vertexes [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | map-lump VERTEXES
+  let l = $wad | map-lump $map VERTEXES
   0..<($l.size // 4) | each {|i| {i: $i, x: ($wad | word ($l.pos + $i * 4) --signed), y: ($wad | word ($l.pos + $i * 4 + 2) --signed)} }
 }
 
-def things []: binary -> table {
+def things [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | map-lump THINGS
+  let l = $wad | map-lump $map THINGS
   0..<($l.size // 10) | each {|i| let at = $l.pos + $i * 10
     {i: $i, x: ($wad | word $at --signed), y: ($wad | word ($at + 2) --signed), angle: ($wad | word ($at + 4)),
       type: ($wad | word ($at + 6)), options: ($wad | word ($at + 8))} }
 }
 
 # The map's BSP and what a subsector stands in, for sector-at.
-def bsp []: binary -> record {
+def bsp [--map: string = "E1M1"]: binary -> record {
   let wad = $in
-  let n = $wad | map-lump NODES
-  let ss = $wad | map-lump SSECTORS
-  let sg = $wad | map-lump SEGS
-  let lines = $wad | linedefs
-  let sides = $wad | sidedefs
+  let n = $wad | map-lump $map NODES
+  let ss = $wad | map-lump $map SSECTORS
+  let sg = $wad | map-lump $map SEGS
+  let lines = $wad | linedefs --map $map
+  let sides = $wad | sidedefs --map $map
   {
     nodes: (0..<($n.size // 28) | each {|i| let at = $n.pos + $i * 28
       {x: ($wad | word $at --signed), y: ($wad | word ($at + 2) --signed), dx: ($wad | word ($at + 4) --signed),
@@ -262,10 +264,10 @@ def midi-events []: binary -> table {
   $out
 }
 
-# E1M1's song as the events Chocolate Doom's player reads, a row each.
-def song-events []: binary -> table {
+# A map's song as the events Chocolate Doom's player reads, a row each.
+def song-events [--map: string = "E1M1"]: binary -> table {
   let wad = $in
-  let l = $wad | lumps | where name == "D_E1M1" | first
+  let l = $wad | lumps | where name == $"D_($map)" | first
   let song = $wad | bytes at $l.pos..<($l.pos + $l.size)
   if ($song | bytes at 0..3) == 0x[4D55531A] { $song | mus-events } else { $song | midi-events }
 }

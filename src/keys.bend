@@ -51,19 +51,14 @@ def Keys.set(on: Bool, down: Bool, old: Bool) -> Bool:
     case False{}:
       old
 
-# A number key's place among the number keys, from 0 for the key 1, if
-# the code is one of vanilla's eight weapon keys.
-def Keys.number.of(number: Bool, +place: U32) -> Maybe<&2, Nat>:
-  match number:
-    case True{}:
-      Some{U32.to_nat(place)}
-    case False{}:
-      None{}
+# A key's place among the number keys, from 0 for the key 1. Any other
+# code takes place 8, past vanilla's eight weapon keys and every key
+# read.
+def Keys.number(+code: U32) -> Nat:
+  U32.to_nat(U32.min((code - 49 : U32), 8))
 
-def Keys.number(+code: U32) -> Maybe<&2, Nat>:
-  Keys.number.of(U32.is_lt((code - 49 : U32), 8), (code - 49 : U32))
-
-def Keys.numbers.at(ns: List<&2, Bool>, place: Nat, down: Bool) -> List<&2, Bool>:
+# The number keys after a press of the key at a place.
+def Keys.numbers(ns: List<&2, Bool>, place: Nat, down: Bool) -> List<&2, Bool>:
   match ns:
     case []:
       []
@@ -72,15 +67,7 @@ def Keys.numbers.at(ns: List<&2, Bool>, place: Nat, down: Bool) -> List<&2, Bool
         case 0n:
           down <> rest
         case 1n+p:
-          held <> Keys.numbers.at(rest, p, down)
-
-# The number keys after a press of the key at a place, if any.
-def Keys.numbers(ns: List<&2, Bool>, place: Maybe<&2, Nat>, down: Bool) -> List<&2, Bool>:
-  match place:
-    case None{}:
-      ns
-    case Some{p}:
-      Keys.numbers.at(ns, p, down)
+          held <> Keys.numbers(rest, p, down)
 
 # The runtime's key codes: arrows 63232 up, 63233 down, 63234 left,
 # 63235 right; letters lower case; Shift 65592 and 65596; Space 32;
@@ -120,14 +107,14 @@ def Keys.turn(run: Bool, slow: Bool) -> U32:
 # wins, as BT_CHANGE, 4, with the weapon's number, the key's less one,
 # three bits up, so each key past the first is 8 more. P_PlayerThink
 # drops a change to a weapon not owned.
-def Keys.change(ns: List<&2, Bool>, +buttons: U32) -> U32:
+def Keys.change(ns: List<&2, Bool>, +change: U32) -> U32:
   match ns:
     case []:
       0
     case True{} <> rest:
-      buttons
+      change
     case False{} <> rest:
-      Keys.change(rest, (buttons + 8 : U32))
+      Keys.change(rest, (change + 8 : U32))
 
 # The command for held keys, with the tics the turn keys have been
 # held, this one included: the first five turn slowly. Opposite keys
