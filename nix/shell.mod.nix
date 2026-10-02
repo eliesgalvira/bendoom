@@ -17,6 +17,8 @@
           pkgs.chocolate-doom
           pkgs.xorg.xorgserver
           pkgs.xdotool
+          pkgs.pulseaudio
+          pkgs.ffmpeg-headless
         ];
 
         buildInputs = optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libx11 pkgs.alsa-lib ];
