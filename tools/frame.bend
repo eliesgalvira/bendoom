@@ -1,24 +1,22 @@
-# A frame as hex rows: E1M1 from the WAD named by BENDOOM_IWAD, the
-# player put at rest on the floor at the place FRAME names, the commands
-# SCRIPT names replayed through the play (tools/script.bend has both
-# forms; unset for none), and the frame drawn as the game draws it,
-# printed as 200 lines of 320 palette indices, two hex digits each. A
-# script that takes the exit leaves the tally showing, and the commands
-# after it are the tally's tics, their use the press that accelerates
-# it. tools/oracle.nu diffs the frame against Chocolate Doom's after the
-# same commands from the same place.
+# A frame as hex rows: the map the header of the demo file DEMO names,
+# from the WAD named by BENDOOM_IWAD, the demo's tics replayed through
+# the play from player 1's start, and the frame drawn as the game draws
+# it, printed as a line of the palette's index and then 200 lines of 320
+# palette indices, two hex digits each. A demo that takes the exit
+# leaves the tally showing, and its tics after the exit are the tally's,
+# their use the press that accelerates it. tools/oracle.nu writes the
+# demo and diffs the frame against Chocolate Doom's after the same one.
 #
 #   bend tools/frame.bend -o frame
-#   FRAME="-416 256 0" SCRIPT="20,0,0,0,0 34,50,0,0,0" ./frame
+#   DEMO=script.lmp ./frame
 import Base
 import ../src/bytes.bend as B
 import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
-import ../src/sim.bend as S
 import ../src/inter.bend as I
 import ../src/project.bend as P
-import ./script.bend as T
+import ../src/demo.bend as D
 
 def Frame.line(p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
   (mem, xs) = p
@@ -44,22 +42,26 @@ def Frame.palette(p: Array<U32> & U32) -> Array<U32> & String:
   (mem, palette) = p
   (mem, B.Bytes.hex([palette]))
 
-def Frame.draw(place: L.Level.Start, script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) ->
-  IO(Unit):
+def Frame.draw(script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   do IO<Unit>:
     rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(P.Project.tables(level), gfx,
-      I.Play.replay(script, level, I.Playing{S.State.at(level, place)}), False{}, mem)))
+      I.Play.replay(script, level, I.Play.start(level)), False{}, mem)))
     Frame.rows(200n, 0, rest)
 
-def Frame.start(place: L.Level.Start, script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+def Frame.start(script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
-  Frame.draw(place, script, mem, gl)
+  Frame.draw(script, mem, gl)
+
+def Frame.load(script: List<&2, K.Cmd>, map: U32 & U32) -> IO(Unit):
+  (episode, number) = map
+  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, G.Gfx.open(episode, number), w => Frame.start(script, w))
+
+def Frame.demo(+demo: List<&2, U32>) -> IO(Unit):
+  Frame.load(D.Demo.play(demo), D.Demo.map(demo))
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    spot : String <- IO.try(String, IO.get_env("FRAME"))
-    script : Result<&1, &1, U32 & String, String> <- IO.get_env("SCRIPT")
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
-    Frame.start(T.Script.place(String.split(spot, ' ')), List.concat(&2, K.Cmd,
-      T.Script.runs(String.split(Result.default(&1, &1, U32 & String, String, script, ""), ' '))), world)
+    path : String <- IO.try(String, IO.get_env("DEMO"))
+    demo : List<&2, U32> <- D.Demo.read(path)
+    Frame.demo(demo)
