@@ -276,11 +276,22 @@ def weapon_taken() -> IO(Unit):
     offered("chainsaw", Fx.Closed.offer(I.Inventory.start(), 2005))
     offered("chainsaw owned", Fx.Closed.offer(Fx.Closed.inv([Fx.Weapons{131}]), 2005))
 
+# P_GiveAmmo's switch once a type that was empty is given: with the fist
+# up, a clip brings up the chaingun when owned and else the pistol; with
+# the pistol up, shells bring up the shotgun when owned.
+def ammo_switch() -> IO(Unit):
+  do IO<Unit>:
+    offered("clip to the pistol", Fx.Closed.offer(Fx.Closed.inv([Fx.Ammo{[0, 0, 0, 0]}, Fx.Selection{0, 255}]), 2007))
+    offered("clip to the chaingun",
+      Fx.Closed.offer(Fx.Closed.inv([Fx.Ammo{[0, 0, 0, 0]}, Fx.Weapons{11}, Fx.Selection{0, 255}]), 2007))
+    offered("shells to the shotgun", Fx.Closed.offer(Fx.Closed.inv([Fx.Weapons{7}]), 2008))
+
 # The heads-up line, as its message and the tics it has left. d_englsh.h's
 # string for each pickup type the two E1M1s hold, numbered by Bendoom's
 # Message: the health bonus 3, the stimpack 5, the medikit 6, green
-# armour 1, blue armour 2, the blue card 7, the chainsaw 15 and the
-# berserk pack 8, then PD_BLUEK, 17, for the blue door that refuses; and
+# armour 1, blue armour 2, the blue card 7, the chainsaw 15, the berserk
+# pack 8 and the chaingun 18, then PD_BLUEK, 17, for the blue door that
+# refuses; and
 # hu_stuff.c's four seconds, HU_MSGTIMEOUT 140 tics. A pickup takes the
 # line on its own tic with 140 tics left; a pickup the grant refuses
 # (the stimpack at 100, green armour over 150 of blue) says nothing and
@@ -297,6 +308,7 @@ def pickup_messages() -> IO(Unit):
     shown(Fx.Closed.said(I.Inventory.start(), 5))
     shown(Fx.Closed.said(I.Inventory.start(), 2005))
     shown(Fx.Closed.said(I.Inventory.start(), 2023))
+    shown(Fx.Closed.said(I.Inventory.start(), 2002))
     shown(Fx.Closed.said(I.Inventory.start(), 2011))
     shown(Fx.Closed.said(Fx.Closed.inv([Fx.Armour{150, 2}]), 2018))
     shown(Fx.Closed.said(Fx.Closed.inv([Fx.Said{3, 90}]), 2011))
@@ -418,6 +430,7 @@ def main() -> IO(Unit):
     backpack_first()
     backpack_later()
     weapon_taken()
+    ammo_switch()
     pickup_messages()
     line_geometry()
     defs()
@@ -502,6 +515,9 @@ def main() -> IO(Unit):
 #|plasma rifle alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 40 0 caps 200 50 300 50 backpack False weapons 35 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 5
 #|chainsaw alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 7
 #|chainsaw owned alive 1, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 131 powers 0 0 0 0 0 0 items 0 flash 0 ready 1 pending 255
+#|clip to the pistol alive, inventory health 100 armour 0 type 0 cards 0 ammo 10 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 ready 0 pending 1
+#|clip to the chaingun alive, inventory health 100 armour 0 type 0 cards 0 ammo 10 0 0 0 caps 200 50 300 50 backpack False weapons 11 powers 0 0 0 0 0 0 items 0 flash 6 ready 0 pending 3
+#|shells to the shotgun alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 7 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 2
 #|line 3 140
 #|line 5 140
 #|line 6 140
@@ -510,6 +526,7 @@ def main() -> IO(Unit):
 #|line 7 140
 #|line 15 140
 #|line 8 140
+#|line 18 140
 #|line 0 0
 #|line 0 0
 #|line 3 89

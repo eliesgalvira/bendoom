@@ -59,9 +59,14 @@
 # tic 64; the stride has it far left. Then the dead view: 650 tics stood
 # in the nukage of sector 173 while monsters attack leave the eye
 # 6 units over the floor, the pistol off the bottom
-# of the screen and the bar at no health. Every frame holds the things
-# E1M1 spawns on Hurt Me Plenty, monsters among them, each in its state
-# on that tic.
+# of the screen and the bar at no health. Then the chaingun the oracle
+# places ahead of the start, taken and raised: its first flash, 2 tics
+# into a held attack, its second at 6, the zombieman it shoots once a
+# shot at 4, 8 and 12, each line with its health and state row, ten
+# shots spent and the zombieman dead after a burst of 40, the chaingun up again after the key 2 and then the key 4, and the
+# fist up once a held attack has spent every bullet. Every frame holds
+# the things E1M1 spawns on Hurt Me Plenty, monsters among them, each in
+# its state on that tic.
 # Every frame carries the status bar the inventory of its state fills,
 # so the bar at the start, after the rocket is taken, after the green
 # armour and after the blue key are the frames named for those pickups,
@@ -205,6 +210,7 @@ import ../src/render.bend as R
 import ../src/fnv.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
+import ../src/things.bend as Th
 import ./fixtures/route.bend as Rt
 import ./fixtures/combat.bend as C
 import ./fixtures/closed.bend as Fx
@@ -369,6 +375,33 @@ def full(s: S.State) -> S.State:
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
     usedown, sounds, mrnd, reborn, secrets}
 
+# The oracle's chaingun scripts: from the start, with the chaingun put
+# 64 ahead in record 40, a net game's, and a zombieman 316 ahead in
+# record 89, a nightmare one's, the oracle's 20 idle tics, a 12-tic
+# walk that takes the chaingun, 30 tics for it to come up, then runs.
+def chaingun(+level: L.Level, runs: List<&2, List<&2, K.Cmd>>) -> S.State:
+  after(List.concat(&2, List<&2, K.Cmd>, [[idle(20n), walk(12n), idle(30n)], runs]),
+    at(C.Combat.placed(C.Combat.placed(level, 40, (65536 - 352 : U32), 256, 2002), 89, (65536 - 100 : U32), 256,
+      3004), west(416), east(256), 0))
+
+# Ctrl held for some tics.
+def held(n: Nat) -> List<&2, K.Cmd>:
+  List.replicate(K.Cmd, n, K.Cmd.demo(0, 0, 0, 1))
+
+def signed(+x: U32) -> String:
+  Bool.pick(String, U32.is_lt(x, 2147483648), U32.show(x), "-" ++ U32.show((0 - x : U32)))
+
+def zombie(m: Maybe<&2, Th.Thing>) -> String:
+  match m:
+    case None{}:
+      " gone"
+    case Some{+th}:
+      " health " ++ signed(Th.Thing.health(th)) ++ " state " ++ U32.show(Th.Thing.state(th))
+
+# A chaingun frame named with the zombieman's health and state row.
+def shot(tag: String, +tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, mem: Array<U32>) -> IO(Array<U32>):
+  frame(tag ++ zombie(S.State.thing(89, s)), tables, gfx, s, mem)
+
 def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   +tables = P.Project.tables(level)
@@ -472,8 +505,17 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     w16 : Array<U32> <- frame("shotgun guy firing 61", tables, gfx, after([idle(61n)],
       at(level, east(144), east(1888), 0)), w15)
     g1 : Array<U32> <- frame("corpse crushed by door", tables, gfx, C.Combat.crushed(level), w16)
+    k1 : Array<U32> <- frame("chaingun flash 64", tables, gfx, chaingun(level, [held(2n)]), g1)
+    k2 : Array<U32> <- frame("chaingun second flash 68", tables, gfx, chaingun(level, [held(6n)]), k1)
+    z1 : Array<U32> <- shot("zombieman shot 66", tables, gfx, chaingun(level, [held(4n)]), k2)
+    z2 : Array<U32> <- shot("zombieman shot 70", tables, gfx, chaingun(level, [held(8n)]), z1)
+    z3 : Array<U32> <- shot("zombieman shot 74", tables, gfx, chaingun(level, [held(12n)]), z2)
+    k4 : Array<U32> <- frame("chaingun burst 112", tables, gfx, chaingun(level, [held(40n), idle(10n)]), z3)
+    k5 : Array<U32> <- frame("chaingun selected again 144", tables, gfx, chaingun(level,
+      [[K.Cmd.demo(0, 0, 0, 12)], idle(40n), [K.Cmd.demo(0, 0, 0, 28)], idle(40n)]), k4)
+    k6 : Array<U32> <- frame("chaingun dry 392", tables, gfx, chaingun(level, [held(290n), idle(40n)]), k5)
     n1 : Array<U32> <- said("said armour", tables, gfx, after([idle(20n), walk(12n)],
-      at(level, east(1631), east(1008), 90)), g1)
+      at(level, east(1631), east(1008), 90)), k6)
     n2 : Array<U32> <- said("said key", tables, gfx, strafed(4294967280, 13n,
       at(level, east(2246), east(592), 180)), n1)
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
@@ -653,9 +695,9 @@ def main() -> IO(Unit):
 #|stimpack and medikit refused hash 1432617097 pixels 110 108 2 107 96 59 covered True palette 0
 #|rocket before hash 470823295 pixels 105 109 105 77 96 72 covered True palette 0
 #|rocket after hash 3313621550 pixels 106 109 105 77 96 72 covered True palette 10
-#|rocket refused hash 1341841577 pixels 106 109 105 77 160 72 covered True palette 0
+#|rocket refused hash 1289909939 pixels 106 109 105 77 160 72 covered True palette 0
 #|chainsaw after hash 1752609615 pixels 5 5 137 141 96 79 covered True palette 10
-#|chainsaw refused hash 2891739476 pixels 5 5 137 141 160 64 covered True palette 0
+#|chainsaw refused hash 550033454 pixels 5 5 137 141 160 64 covered True palette 0
 #|pistol rising 8 hash 1914842866 pixels 1 1 7 5 96 59 covered True palette 0
 #|pistol bob low 48 hash 3833298116 pixels 1 79 1 245 96 59 covered True palette 0
 #|pistol bob right 64 hash 1365740933 pixels 2 5 111 6 96 59 covered True palette 0
@@ -675,6 +717,14 @@ def main() -> IO(Unit):
 #|zombieman firing 53 hash 1045804030 pixels 8 6 111 1 96 64 covered True palette 0
 #|shotgun guy firing 61 hash 2580103865 pixels 8 7 5 7 96 79 covered True palette 5
 #|corpse crushed by door hash 1079062495 pixels 7 75 106 79 96 64 covered True palette 0
+#|chaingun flash 64 hash 565982293 pixels 45 111 165 79 96 79 covered True palette 0
+#|chaingun second flash 68 hash 1537532435 pixels 79 108 165 238 96 79 covered True palette 0
+#|zombieman shot 66 health 10 state 90 hash 3393595600 pixels 13 111 165 79 96 79 covered True palette 0
+#|zombieman shot 70 health 0 state 124 hash 730897183 pixels 79 111 165 15 96 79 covered True palette 0
+#|zombieman shot 74 health 0 state 125 hash 307614466 pixels 1 5 165 238 96 79 covered True palette 0
+#|chaingun burst 112 hash 641416534 pixels 1 6 164 79 96 59 covered True palette 0
+#|chaingun selected again 144 hash 3199432768 pixels 13 6 164 79 96 59 covered True palette 0
+#|chaingun dry 392 hash 3672038471 pixels 1 6 164 79 96 59 covered True palette 0
 #|said armour message 1 "Picked up the armor." tics 140 pixels 730 0,47 1,45 2,45 3,45
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
