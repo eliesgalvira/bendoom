@@ -941,6 +941,20 @@ def Play.playing(play: Play) -> Bool:
     case Showing{inter, after, next}:
       False{}
 
+# The scene's song, as S_Start and WI_Start name it: the map's own,
+# mus_e1m1 plus the episode's nine maps before it and the map's place,
+# which is D_ before the map's name, or D_INTER through the tally.
+def Play.song(play: Play) -> String:
+  match play:
+    case Playing{state, L.Name{episode, map}}:
+      "D_" ++ L.Level.marker(episode, map)
+    case Showing{inter, after, next}:
+      "D_INTER"
+
+# The songs a scene of the episode can name.
+def Play.songs() -> List<&2, String>:
+  ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER"]
+
 # The frame the play shows: the level from the player's eye, or the
 # tally, both in the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:

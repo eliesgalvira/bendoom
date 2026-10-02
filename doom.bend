@@ -1,12 +1,12 @@
 # Bendoom. The WAD named by BENDOOM_IWAD loads, a map shows in a window
 # from the player's eye, and the keyboard walks the player at Doom's 35
 # tics a second whatever the frame rate; Esc or Close quits. The map is
-# E1M1, or the one -warp names as Chocolate Doom's does. E1M1's song
-# plays from the render in the directory named by BENDOOM_MUSIC, which
-# the package's launcher defaults to its own IWAD's. RECORD names a demo
-# to record, as vanilla's -record does, until the level ends or the game
-# quits; film.bend makes a video of it. This binary writes the demo as
-# hex text, and the launcher makes the .lmp of it.
+# E1M1, or the one -warp names as Chocolate Doom's does. The scene's
+# song plays from the same WAD, synthesized as Chocolate Doom's OPL
+# music plays it. RECORD names a demo to record, as vanilla's -record
+# does, until the level ends or the game quits; film.bend makes a video
+# of it. This binary writes the demo as hex text, and the launcher makes
+# the .lmp of it.
 import Base
 import ./src/level.bend as L
 import ./src/gfx.bend as G
