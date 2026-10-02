@@ -239,7 +239,7 @@ def Closed.floored(id: U32, +kind: U32, x: U32, y: U32, +z: U32) -> H.Thing:
 # A change to an inventory: its health, its armour points and type, its
 # cards as bits in card_t order, its ammo in ammotype_t order (bullets,
 # shells, cells, rockets), the backpack with the caps it doubles, 400
-# 100 600 100, the weapons owned, the strength counter, the tally or the
+# 100 600 100, the weapons owned, a power's counter, the tally or the
 # flash.
 type Closed.Edit is Data:
   Health{n: U32}
@@ -249,7 +249,7 @@ type Closed.Edit is Data:
   Backpack{}
   Weapons{bits: U32}
   Selection{ready: U32, pending: U32}
-  Strength{n: U32}
+  Power{power: U32, n: U32}
   Items{n: U32}
   Flash{n: U32}
   Said{n: U32, tics: U32}
@@ -281,9 +281,9 @@ def Closed.edit(inv: I.Inventory, e: Closed.Edit) -> I.Inventory:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus,
         ((line .&. 65535 : U32) .|. (ready << 16n : U32) .|. (pending << 24n : U32) : U32), kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
-      bonus, line, kills, secrets} Strength{n}:
+      bonus, line, kills, secrets} Power{power, n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-        V.Vec.set(powers, I.Inventory.pw_strength(), n), items, bonus, line, kills, secrets}
+        V.Vec.set(powers, power, n), items, bonus, line, kills, secrets}
     case I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items,
       bonus, line, kills, secrets} Items{n}:
       I.Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, n, bonus, line, kills, secrets}
