@@ -2,8 +2,8 @@
 # P_RemoveMobj, P_ZMovement and the state half of P_MobjThinker for the
 # things Bendoom spawns: the definitions of the DoomEd types either E1M1
 # places, less the starts and the spectre, which Hurt Me Plenty never
-# spawns, the state rows their spawn states lead to and the pistol's
-# with its entry in d_items.c's weaponinfo and the bullet puff's, the
+# spawns, the state rows their spawn states lead to and the weapons'
+# with their entries in d_items.c's weaponinfo and the bullet puff's, the
 # map's THINGS records made the level's first things, the state half of
 # a thing's tic, whose actions the sim runs, its rise by its vertical
 # momentum under gravity, what a blow and a death leave on it, and the
@@ -186,17 +186,18 @@ def Thing.null() -> U32:
   4294967295
 
 # What a state row does as it is entered, Doom's action pointers: a
-# weapon's A_Raise, A_WeaponReady, A_Lower, A_FirePistol and A_ReFire, a
-# mobj's A_Pain, A_Scream (A_PlayerScream on the player's own rows),
-# A_XScream, A_Fall, A_Explode, A_Look, A_Chase, A_FaceTarget,
-# A_PosAttack and A_SPosAttack, or nothing. A row of one kind never
-# holds the other's.
+# weapon's A_Raise, A_WeaponReady, A_FirePistol, A_FireShotgun,
+# A_FireCGun, A_Punch, A_Saw, A_ReFire and A_Lower, a mobj's A_Pain,
+# A_Scream (A_PlayerScream on the player's own rows), A_XScream,
+# A_Fall, A_Explode, A_Look, A_Chase, A_FaceTarget, A_PosAttack and
+# A_SPosAttack, or nothing. A row of one kind never holds the other's.
 type Thing.Action is Data:
   Null{}
   Raise{}
   WeaponReady{}
   FirePistol{}
   FireShotgun{}
+  FireCGun{}
   Punch{}
   Saw{}
   ReFire{}
@@ -233,11 +234,14 @@ type Thing.Row is Data:
 # spawns in, then the pistol's fire states, its muzzle flash's, the
 # state that puts the flash's light out, the bullet puff's, then the
 # monsters' eight run states each, where A_Chase hunts the player, their
-# pain, death and gib rows, the barrel's explosion, the blood, and last
-# the three attack rows each of the zombieman and the shotgun guy. A monster's second pain row leads back to its see state.
-# Only S_LIGHTDONE, row 84, has 0 tics, and it is a player sprite's; it
-# carries A_Light0 in vanilla and here only puts the light out by being
-# the last row before S_NULL.
+# pain, death and gib rows, the barrel's explosion, the blood, the
+# attack rows of the zombieman, the shotgun guy, the imp and the demon,
+# the imp's fireball, and last the shotgun's, the fist's, the
+# chainsaw's and the chaingun's states. A monster's second pain row
+# leads back to its see state. Only player sprites' rows have 0 tics:
+# the A_ReFire that ends the chainsaw's and the chaingun's attacks, and
+# S_LIGHTDONE, row 84, which carries A_Light0 in vanilla and here only
+# puts the light out by being the last row before S_NULL.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}, 0}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}, 0},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}, 0}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}, 0},
@@ -356,7 +360,11 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"SAWG", 2, False{}, 4, 224, WeaponReady{}, 0}, Row{"SAWG", 3, False{}, 4, 223, WeaponReady{}, 0},
     Row{"SAWG", 2, False{}, 1, 225, Lower{}, 0}, Row{"SAWG", 2, False{}, 1, 226, Raise{}, 0},
     Row{"SAWG", 0, False{}, 4, 228, Saw{}, 0}, Row{"SAWG", 1, False{}, 4, 229, Saw{}, 0},
-    Row{"SAWG", 1, False{}, 0, 223, ReFire{}, 0}]
+    Row{"SAWG", 1, False{}, 0, 223, ReFire{}, 0},
+    Row{"CHGG", 0, False{}, 1, 230, WeaponReady{}, 0}, Row{"CHGG", 0, False{}, 1, 231, Lower{}, 0},
+    Row{"CHGG", 0, False{}, 1, 232, Raise{}, 0}, Row{"CHGG", 0, False{}, 4, 234, FireCGun{}, 0},
+    Row{"CHGG", 1, False{}, 4, 235, FireCGun{}, 0}, Row{"CHGG", 1, False{}, 0, 230, ReFire{}, 0},
+    Row{"CHGF", 0, True{}, 5, 84, Null{}, 1}, Row{"CHGF", 1, True{}, 5, 84, Null{}, 2}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -404,16 +412,17 @@ def Thing.fist() -> Thing.Weapon:
 def Thing.saw() -> Thing.Weapon:
   Weapon{226, 223, 225, 4, 227, 0}
 
+def Thing.chaingun() -> Thing.Weapon:
+  Weapon{232, 230, 231, 0, 233, 236}
+
+# weaponinfo by weapontype_t, from wp_fist. The launcher, the plasma
+# rifle and the BFG fire nothing yet and hold the pistol's row.
+def Thing.weapons() -> List<&2, Thing.Weapon>:
+  [Thing.fist(), Thing.pistol(), Thing.shotgun(), Thing.chaingun(), Thing.pistol(), Thing.pistol(), Thing.pistol(),
+    Thing.saw()]
+
 def Thing.weapon(+weapon: U32) -> Thing.Weapon:
-  match weapon:
-    case 0:
-      Thing.fist()
-    case 2:
-      Thing.shotgun()
-    case 7:
-      Thing.saw()
-    case _:
-      Thing.pistol()
+  Maybe.default(&2, Thing.Weapon, List.get(&2, Thing.Weapon, Thing.weapons(), U32.to_nat(weapon)), Thing.pistol())
 
 def Thing.Weapon.down(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
@@ -434,6 +443,10 @@ def Thing.Weapon.ammo(w: Thing.Weapon) -> U32:
 def Thing.Weapon.atk(w: Thing.Weapon) -> U32:
   Weapon{up, ready, down, ammo, atk, flash} = w
   atk
+
+def Thing.Weapon.flash(w: Thing.Weapon) -> U32:
+  Weapon{up, ready, down, ammo, atk, flash} = w
+  flash
 
 # The player mobj's rows in Doom's mobjinfo: the state it stands in,
 # the one it flinches in and the one its death begins with. Its spawn

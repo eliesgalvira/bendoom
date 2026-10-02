@@ -16,7 +16,7 @@ def cmds(cs: List<&2, K.Cmd>) -> String:
   List.show(~&2, ~K.Cmd, ~cmd, cs)
 
 def keys(up: Bool, left: Bool, right: Bool, sleft: Bool, sright: Bool, run: Bool, use: Bool) -> K.Keys:
-  K.Keys{up, False{}, left, right, sleft, sright, run, use, False{}, False{}, False{}, False{}}
+  K.Keys{up, False{}, left, right, sleft, sright, run, use, False{}, K.Keys.numbers.none()}
 
 def main() -> IO(Unit):
   do IO<Unit>:

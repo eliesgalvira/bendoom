@@ -11,9 +11,10 @@
 # forward byte would be, ends the read, and so does a tic cut short.
 # The buttons are G_BuildTiccmd's from held keys: Ctrl is BT_ATTACK, 1;
 # Space BT_USE, 2; the lowest held number key i + 1 is BT_CHANGE, 4, with
-# i << BT_WEAPONSHIFT, so 1 is 4, 2 is 4 + 8 = 12, 3 is 4 + 16 = 20, 2
-# with 3 is 12 and 1 with 3 is 4; Ctrl with Space is 3, and with 3 too,
-# 23. The byte is written and read back whole.
+# i << BT_WEAPONSHIFT, so 1 is 4, 2 is 4 + 8 = 12, 3 is 4 + 16 = 20, 4
+# is 4 + 24 = 28, 2 with 3 is 12, 1 with 3 is 4 and 3 with 4 is 20; Ctrl
+# with Space is 3, and with 3 too, 23. The byte is written and read
+# back whole.
 import Base
 import ../src/keys.bend as K
 import ../src/demo.bend as D
@@ -43,8 +44,8 @@ def turns(n: Nat, turn: U32) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd{0, 0, turn, 0})
 
 # The command of held button keys, no other key down.
-def held(use: Bool, fire: Bool, one: Bool, two: Bool, three: Bool) -> K.Cmd:
-  K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, use, fire, one, two, three}, 0)
+def held(use: Bool, fire: Bool, numbers: List<&2, Bool>) -> K.Cmd:
+  K.Keys.cmd(K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, use, fire, numbers}, 0)
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -54,12 +55,13 @@ def main() -> IO(Unit):
       <> turns(2n, (0 - 640 : U32)), 0)))
     IO.print(recorded("slow", D.Demo.tics(turns(4n, 320), 0)))
     IO.print(recorded("run", D.Demo.tics(turns(2n, (0 - 1280 : U32)), 0)))
-    IO.print(recorded("fire", D.Demo.tics([held(False{}, True{}, False{}, False{}, False{})], 0)))
-    IO.print(recorded("change", D.Demo.tics([held(False{}, False{}, True{}, False{}, False{}),
-      held(False{}, False{}, False{}, True{}, False{}), held(False{}, False{}, False{}, False{}, True{}),
-      held(False{}, False{}, False{}, True{}, True{}), held(False{}, False{}, True{}, False{}, True{})], 0)))
-    IO.print(recorded("use and fire", D.Demo.tics([held(True{}, True{}, False{}, False{}, False{}),
-      held(True{}, True{}, False{}, False{}, True{})], 0)))
+    IO.print(recorded("fire", D.Demo.tics([held(False{}, True{}, K.Keys.numbers.none())], 0)))
+    IO.print(recorded("change", D.Demo.tics([held(False{}, False{}, [True{}, False{}, False{}, False{}]),
+      held(False{}, False{}, [False{}, True{}, False{}, False{}]), held(False{}, False{}, [False{}, False{}, True{}, False{}]),
+      held(False{}, False{}, [False{}, True{}, True{}, False{}]), held(False{}, False{}, [True{}, False{}, True{}, False{}]),
+      held(False{}, False{}, [False{}, False{}, False{}, True{}]), held(False{}, False{}, [False{}, False{}, True{}, True{}])], 0)))
+    IO.print(recorded("use and fire", D.Demo.tics([held(True{}, True{}, K.Keys.numbers.none()),
+      held(True{}, True{}, [False{}, False{}, True{}, False{}])], 0)))
     IO.print("marker" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 128, 0, 0, 0, 25, 0, 0, 0])))
     IO.print("cut" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 25, 0, 0])))
 
@@ -69,7 +71,7 @@ def main() -> IO(Unit):
 #|slow 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 | carry 0 | read 0,0,256,0 0,0,512,0 0,0,256,0 0,0,256,0
 #|run 0 0 251 0 0 0 251 0 | carry 0 | read 0,0,-1280,0 0,0,-1280,0
 #|fire 0 0 0 1 | carry 0 | read 0,0,0,1
-#|change 0 0 0 4 0 0 0 12 0 0 0 20 0 0 0 12 0 0 0 4 | carry 0 | read 0,0,0,4 0,0,0,12 0,0,0,20 0,0,0,12 0,0,0,4
+#|change 0 0 0 4 0 0 0 12 0 0 0 20 0 0 0 12 0 0 0 4 0 0 0 28 0 0 0 20 | carry 0 | read 0,0,0,4 0,0,0,12 0,0,0,20 0,0,0,12 0,0,0,4 0,0,0,28 0,0,0,20
 #|use and fire 0 0 0 3 0 0 0 23 | carry 0 | read 0,0,0,3 0,0,0,23
 #|marker 50,0,0,0
 #|cut 50,0,0,0
