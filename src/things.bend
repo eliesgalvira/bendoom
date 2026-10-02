@@ -836,9 +836,9 @@ def Thing.spawn.done(s: Thing.Spawn) -> Thing.Spawn:
   Spawn{List.reverse(&2, Thing, things), rnd, you}
 
 # The level's first things, in the order of their records, and the
-# random index once they have spawned, from 0.
-def Thing.spawn(+level: L.Level) -> Thing.Spawn:
-  Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], 0, Thing.you()}))
+# random index once they have spawned, from the one given.
+def Thing.spawn(+level: L.Level, rnd: U32) -> Thing.Spawn:
+  Thing.spawn.done(Thing.spawn.go(U32.to_nat(L.Level.nthings(level)), level, 0, Spawn{[], rnd, Thing.you()}))
 
 def Thing.Spawn.things(s: Thing.Spawn) -> List<&2, Thing>:
   Spawn{things, rnd, you} = s
@@ -863,7 +863,7 @@ def Thing.totals.go(things: List<&2, Thing>, t: Thing.Totals) -> Thing.Totals:
       Thing.totals.go(rest, Thing.totals.one(Thing.Def.flags(Thing.info(kind)), t))
 
 def Thing.totals(+level: L.Level) -> Thing.Totals:
-  Thing.totals.go(Thing.Spawn.things(Thing.spawn(level)), Totals{0, 0})
+  Thing.totals.go(Thing.Spawn.things(Thing.spawn(level, 0)), Totals{0, 0})
 
 # The population
 # --------------

@@ -400,6 +400,17 @@ def Player.key_off.go(vs: List<&2, U32>, +ch: U32, +key: U32, +all: Bool, +p: Pl
 def Player.key_off(+ch: U32, +key: U32, +all: Bool, +p: Player) -> Player:
   Player.key_off.go(Player.alloced(p), ch, key, all, p)
 
+def Player.stop.go(n: Nat, +ch: U32, +p: Player) -> Player:
+  match n:
+    case 0n:
+      p
+    case 1n+m:
+      Player.stop.go(m, (ch + 1 : U32), Player.key_off(ch, 0, True{}, p))
+
+# I_OPL_StopSong's AllNotesOff on each of the sixteen channels in turn.
+def Player.stop(+p: Player) -> Player:
+  Player.stop.go(16n, 0, p)
+
 # Channels
 # --------
 

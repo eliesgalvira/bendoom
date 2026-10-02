@@ -26,7 +26,7 @@ def recording [root: path, shell: string] {
     }
     [
       'set -eu'
-      'iwad=unused; music=unused; sounds=unused'
+      'iwad=unused; sounds=unused'
       ('run_game() { ' + $game + '; }')
       ('decode_recording() { ' + $decoder + '; }')
       $shared

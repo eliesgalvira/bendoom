@@ -20,6 +20,16 @@ def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
     V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616, 0, 0}
 
+# What crosses into the next level: G_PlayerFinishLevel takes the keys,
+# the powers and the pickup flash, P_SetupLevel zeroes the counts, and
+# P_SpawnPlayer clears the message and brings the ready weapon up again.
+# Health, armour, ammo, caps, backpack and weapons are kept.
+def Inventory.finished(inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills,
+    secrets} = inv
+  Inventory{health, armour, armourtype, 0, ammo, caps, backpack, weapons, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0,
+    0, ((line .&. 16711680 : U32) .|. 4278190080 : U32), 0, 0}
+
 def Inventory.items(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
     kills, secrets} = inv

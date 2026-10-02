@@ -8,6 +8,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] `tools/oracle.nu --tally` reports zero differing pixels after the exits of at least E1M1, E1M2, E1M5 and E1M8, and after E1M3's secret exit if ticket 13 has landed (otherwise test the secret path at its seam and note it).
+- [ ] `tools/oracle.nu --tally` reports zero differing pixels after the exits of at least E1M1, E1M2, E1M5 and E1M7 (vanilla shows no tally after E1M8), and after E1M3's secret exit if ticket 13 has landed (otherwise test the secret path at its seam and note it).
 - [ ] The map screen after the tally (the "entering" screen) matches vanilla for at least two maps.
 - [ ] The tally's counts, sounds and timing stay as they are for E1M1.
+
+**Note from ticket 06:** the play now carries the map it is on and the next one, for the tally to read. `didsecret` is not carried yet: `G_WorldDone` sets it after a secret exit and `G_PlayerReborn` clears it, and the map screen after E1M9 needs it. The tally's M_Random index does not yet count the melt into the tally or the tally's sound pitch draws.

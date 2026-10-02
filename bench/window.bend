@@ -11,13 +11,14 @@
 # the one below walks from the start to the first door and uses it, so
 # the frames watch it open, wait and close under the lights. The
 # frame-rate bar's scene, the blue key's room, is milestone 5's ticket
-# 12's script; milestone 8's ticket 08 gives the device a sink that
-# drains at the real rate and plays nowhere.
-# Build natively and run it where a window can open:
+# 12's script. Build natively and run it where a window can open, or on
+# a private display and sound card that drains at the real rate and
+# plays nowhere:
 #
 #   bend bench/window.bend -o window
 #   ./window; WALK=1 ./window
 #   SCRIPT="35,50,0,0,0 40,0,0,0,0 1,0,0,14,0 50,50,0,0,0 1,0,0,32,0 10,50,0,0,0 1,0,0,18,0 12,50,0,0,0 10,0,0,0,0 1,0,0,0,1" ./window
+#   WALK=1 tools/listen.nu game --binary ./window --sounds
 import Base
 import ../src/level.bend as L
 import ../src/gfx.bend as G
@@ -42,7 +43,7 @@ def Bench.dry(dry: Maybe<U32>) -> String:
 def Bench.run(+t0: Nat, input: K.Input, script: List<&2, K.Cmd>, world: Array<U32> & G.Gfx & L.Level) ->
   IO(Unit):
   do IO<Unit>:
-    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, world)
+    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, L.Name{1, 1}, world)
     t1 : Nat <- IO.now()
     IO.print(Bench.rate(t0, t1) ++ Bench.dry(dry))
 

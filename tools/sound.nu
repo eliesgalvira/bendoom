@@ -43,15 +43,15 @@ def point-to-angle [t: record, x: int, y: int]: nothing -> int {
   ($angle + $two32) mod $two32
 }
 
-# The middle of the box of a sector's lines, in map units.
-def soundorg [sector: int]: binary -> record<x: float, y: float> {
+# The middle of the box of a sector's lines, in map units, on --map
+# (E1M1 when not given).
+def soundorg [sector: int, --map: string = "E1M1"]: binary -> record<x: float, y: float> {
   let wad = $in
-  let sides = $wad | sidedefs
-  let lines = $wad | linedefs | where {|l|
+  let sides = $wad | sidedefs --map $map
+  let lines = $wad | linedefs --map $map | where {|l|
     ($sides | get $l.front | get sector) == $sector or ($l.back != 65535 and ($sides | get $l.back | get sector) == $sector) }
-  let v = $wad | map-lump VERTEXES
-  let ends = $lines | each {|l| [$l.v1 $l.v2] } | flatten | each {|i|
-    {x: ($wad | word ($v.pos + $i * 4) --signed), y: ($wad | word ($v.pos + $i * 4 + 2) --signed)} }
+  let v = $wad | vertexes --map $map
+  let ends = $lines | each {|l| [$l.v1 $l.v2] } | flatten | each {|i| $v | get $i }
   let half = {|a, b| let sum = (fixed ($a | into float)) + (fixed ($b | into float))
     (if $sum < 0 { 0 - ((0 - $sum) // 2) } else { $sum // 2 }) / 65536 }
   {x: (do $half ($ends.x | math min) ($ends.x | math max)), y: (do $half ($ends.y | math min) ($ends.y | math max))}
