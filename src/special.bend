@@ -748,8 +748,7 @@ def Sim.sector.hurt(due: Bool, +s: S.State) -> S.State:
 # 7 is nukage, which takes 5 health every 32 tics of the level's clock
 # while the player's feet are at that sector's floor. It is the only
 # special either map carries that hurts, so the switch is the one test.
-# Neither map spawns a radiation suit on this skill, so the suit's
-# protection has no code.
+# The radiation suit's protection is not here yet.
 def Sim.sector(+level: L.Level, +clock: U32, +s: S.State) -> S.State:
   +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
   Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(S.State.level(s), sector), 7),

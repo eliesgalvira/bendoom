@@ -14,6 +14,7 @@ import ../src/fixed.bend as F
 import ../src/vec.bend as V
 import ../src/level.bend as L
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
@@ -154,7 +155,7 @@ def berserk() -> IO(Unit):
     offered("berserk at 1", Fx.Closed.offer(Fx.Closed.inv([Fx.Health{1}]), 2023))
     offered("berserk at 100", Fx.Closed.offer(I.Inventory.start(), 2023))
     offered("berserk at 150", Fx.Closed.offer(Fx.Closed.inv([Fx.Health{150}]), 2023))
-    offered("berserk over 40", Fx.Closed.offer(Fx.Closed.inv([Fx.Strength{40}]), 2023))
+    offered("berserk over 40", Fx.Closed.offer(Fx.Closed.inv([Fx.Power{I.Inventory.pw_strength(), 40}]), 2023))
 
 # The armour bonus is always taken and counted: no armour makes 1 point
 # of green armour's type, 199 points of blue make 200 and stay blue, and
@@ -200,6 +201,34 @@ def strength_counts() -> IO(Unit):
     offered("berserk tic 1", Fx.Closed.walk(1n, 524288, I.Inventory.start(), 2023))
     offered("berserk tic 2", Fx.Closed.walk(2n, 524288, I.Inventory.start(), 2023))
     offered("berserk tic 3", Fx.Closed.walk(3n, 524288, I.Inventory.start(), 2023))
+
+# The other cards and the powers. A new card is it_yellowcard's bit 2
+# or it_redcard's 4, its flash P_GiveCard's 6 and the pickup's 6, and
+# no item; a card held is taken all the same for the pickup's 6 alone.
+# Partial invisibility (pw_invisibility, the third power), the radiation
+# suit (pw_ironfeet, the fourth) and the visor (pw_infrared, the sixth)
+# are always taken and set INVISTICS 2100, IRONTICS 2100 and INFRATICS
+# 4200 over what ran; P_PlayerThink takes one off each a tic before the
+# mobj moves, so three tics leave 2098, 2098 and 4198 and the flash 4.
+# The computer map (pw_allmap, the fifth) sets 1 and stays when already
+# had. All but the suit count as items. Each sound is sfx_itemup (32)
+# for a card and sfx_getpow (93) for a power.
+def cards_and_powers() -> IO(Unit):
+  do IO<Unit>:
+    offered("yellow card", Fx.Closed.offer(I.Inventory.start(), 6))
+    offered("red card", Fx.Closed.offer(I.Inventory.start(), 13))
+    offered("red card held", Fx.Closed.offer(Fx.Closed.inv([Fx.Cards{4}]), 13))
+    offered("invisibility", Fx.Closed.offer(I.Inventory.start(), 2024))
+    offered("invisibility over 40", Fx.Closed.offer(Fx.Closed.inv([Fx.Power{2, 40}]), 2024))
+    offered("invisibility tic 3", Fx.Closed.walk(3n, 524288, I.Inventory.start(), 2024))
+    offered("radiation suit", Fx.Closed.offer(I.Inventory.start(), 2025))
+    offered("radiation suit tic 3", Fx.Closed.walk(3n, 524288, I.Inventory.start(), 2025))
+    offered("computer map", Fx.Closed.offer(I.Inventory.start(), 2026))
+    offered("computer map held", Fx.Closed.offer(Fx.Closed.inv([Fx.Power{4, 1}]), 2026))
+    offered("visor", Fx.Closed.offer(I.Inventory.start(), 2045))
+    offered("visor tic 3", Fx.Closed.walk(3n, 524288, I.Inventory.start(), 2045))
+    IO.print("sounds" ++ ids([I.Inventory.sound(6), I.Inventory.sound(13), I.Inventory.sound(2024),
+      I.Inventory.sound(2025), I.Inventory.sound(2026), I.Inventory.sound(2045)]))
 
 # P_GiveAmmo's clipammo on Hurt Me Plenty, which doubles nothing, from
 # G_PlayerReborn's inventory, in ammotype_t order (bullets, shells,
@@ -287,16 +316,19 @@ def ammo_switch() -> IO(Unit):
     offered("shells to the shotgun", Fx.Closed.offer(Fx.Closed.inv([Fx.Weapons{7}]), 2008))
 
 # The heads-up line, as its message and the tics it has left. d_englsh.h's
-# string for each pickup type the two E1M1s hold, numbered by Bendoom's
-# Message: the health bonus 3, the stimpack 5, the medikit 6, green
-# armour 1, blue armour 2, the blue card 7, the chainsaw 15, the berserk
-# pack 8 and the chaingun 18, then PD_BLUEK, 17, for the blue door that
-# refuses; and hu_stuff.c's four seconds, HU_MSGTIMEOUT 140 tics. A
-# pickup takes the line on its own tic with 140 tics left; a pickup the
-# grant refuses (the stimpack at 100, green armour over 150 of blue)
-# says nothing and leaves the line as it was, none or a line of 90 tics
-# now 89; the counter falls by one a tic and the line goes out at zero.
-# The door held open by the blue card says nothing.
+# string for each pickup type, numbered by Bendoom's Message: the health
+# bonus 3, the stimpack 5, the medikit 6, green armour 1, blue armour 2,
+# the blue card 7, the chainsaw 15, the berserk pack 8 and the chaingun
+# 18, then PD_BLUEK, 17, for the blue door that refuses; and hu_stuff.c's
+# four seconds, HU_MSGTIMEOUT 140 tics. A pickup takes the line on its own
+# tic with 140 tics left; a pickup the grant refuses (the stimpack at
+# 100, green armour over 150 of blue) says nothing and leaves the line
+# as it was, none or a line of 90 tics now 89; the counter falls by one
+# a tic and the line goes out at zero. The door held open by the blue
+# card says nothing. Then the yellow card 19 and the red card 20, a red
+# card held saying nothing, as p_inter.c sets the string only for a card
+# not held; partial invisibility 21, the suit 22, the computer map 23
+# and none for one already had, the visor 24 and the box of rockets 25.
 def pickup_messages() -> IO(Unit):
   do IO<Unit>:
     shown(Fx.Closed.said(I.Inventory.start(), 2014))
@@ -317,6 +349,15 @@ def pickup_messages() -> IO(Unit):
     shown(Fx.Closed.line(Fx.Closed.used(0n, Fx.Closed.locked(I.Inventory.start()))))
     shown(Fx.Closed.line(Fx.Closed.used(0n,
       Fx.Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start())))))
+    shown(Fx.Closed.said(I.Inventory.start(), 6))
+    shown(Fx.Closed.said(I.Inventory.start(), 13))
+    shown(Fx.Closed.said(Fx.Closed.inv([Fx.Cards{4}]), 13))
+    shown(Fx.Closed.said(I.Inventory.start(), 2024))
+    shown(Fx.Closed.said(I.Inventory.start(), 2025))
+    shown(Fx.Closed.said(I.Inventory.start(), 2026))
+    shown(Fx.Closed.said(Fx.Closed.inv([Fx.Power{4, 1}]), 2026))
+    shown(Fx.Closed.said(I.Inventory.start(), 2045))
+    shown(Fx.Closed.said(I.Inventory.start(), 2046))
 
 def wall() -> L.Level.Line:
   L.Line{0, 0, 0, 8388608, 0, 0, 65535}
@@ -383,6 +424,36 @@ def spawn_phase(+s: S.State) -> IO(Unit):
     things("spawn", Fx.Closed.things(s))
     IO.print("spawn random " ++ U32.show(S.State.rnd(s)))
 
+# The literal level with player 1's start at (32, 64), a teleport
+# destination (record 1) at (16, 32) and a tall red torch (record 2) at
+# (16, 96), in the west room. The player draws entry 1. The destination
+# draws entry 2, 109, for lastlook 1, and stands in vanilla's S_NULL,
+# row 238, whose -1 tics draw nothing more; its flags 24, MF_NOSECTOR and
+# MF_NOBLOCKMAP, keep it out of its sector's list, which the renderer
+# reads, and out of the blockmap. The torch, radius 16 and solid (flags
+# 2), draws entry 3, 220, for lastlook 0 and entry 4, 222, for its
+# first state S_REDTORCH, row 244: 1 + 222 mod 4 = 3 tics. The index is
+# 4, and only the torch is shown and in the cell.
+def unseen() -> S.State:
+  Tic.State.at(Fx.Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 14, 7, 16, 96, 0, 46, 7], 15), 3),
+    L.Start{2097152, 4194304, 0})
+
+def shown_ids(ths: List<&2, H.Thing>) -> List<&2, U32>:
+  match ths:
+    case []:
+      []
+    case th <> rest:
+      H.Thing.id(th) <> shown_ids(rest)
+
+def spawn_unseen(+s: S.State) -> IO(Unit):
+  +ts = S.State.things(s)
+  +bm = L.Level.blockmap_of(S.State.level(s))
+  +cell = H.Things.linked(ts, bm, [L.Level.cell_of(bm, 1048576, 2097152)])
+  do IO<Unit>:
+    things("unseen", Fx.Closed.things(s))
+    IO.print("unseen random " ++ U32.show(S.State.rnd(s)) ++ " shown" ++ ids(shown_ids(H.Things.shown(ts)))
+      ++ " cell 1 " ++ Bool.show(S.Sim.member(cell, 1)) ++ " cell 2 " ++ Bool.show(S.Sim.member(cell, 2)))
+
 def cycle(+tag: String, n: Nat) -> IO(Unit):
   things(tag, Fx.Closed.things(Fx.Closed.idled(n, Fx.Closed.stocked())))
 
@@ -424,6 +495,7 @@ def main() -> IO(Unit):
     blue_armour()
     bonus_counted_once()
     strength_counts()
+    cards_and_powers()
     ammo_amounts()
     ammo_caps()
     backpack_first()
@@ -434,6 +506,7 @@ def main() -> IO(Unit):
     line_geometry()
     defs()
     spawn_phase(Fx.Closed.stocked())
+    spawn_unseen(unseen())
     bonus_cycle()
 
 #|blue door none 0 yellow 0 card 131072 skull 131072
@@ -480,6 +553,19 @@ def main() -> IO(Unit):
 #|berserk tic 1 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 1 0 0 0 0 items 1 flash 6 ready 1 pending 0
 #|berserk tic 2 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 2 0 0 0 0 items 1 flash 5 ready 1 pending 0
 #|berserk tic 3 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 3 0 0 0 0 items 1 flash 4 ready 1 pending 0
+#|yellow card alive, inventory health 100 armour 0 type 0 cards 2 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 12 ready 1 pending 255
+#|red card alive, inventory health 100 armour 0 type 0 cards 4 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 12 ready 1 pending 255
+#|red card held alive, inventory health 100 armour 0 type 0 cards 4 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 255
+#|invisibility alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 2100 0 0 0 items 1 flash 6 ready 1 pending 255
+#|invisibility over 40 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 2100 0 0 0 items 1 flash 6 ready 1 pending 255
+#|invisibility tic 3 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 2098 0 0 0 items 1 flash 4 ready 1 pending 255
+#|radiation suit alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 2100 0 0 items 0 flash 6 ready 1 pending 255
+#|radiation suit tic 3 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 2098 0 0 items 0 flash 4 ready 1 pending 255
+#|computer map alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 1 0 items 1 flash 6 ready 1 pending 255
+#|computer map held alive 1, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 1 0 items 0 flash 0 ready 1 pending 255
+#|visor alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 4200 items 1 flash 6 ready 1 pending 255
+#|visor tic 3 alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 4198 items 1 flash 4 ready 1 pending 255
+#|sounds 32 32 93 93 93 93
 #|clip alive, inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 255
 #|shells alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 4 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 255
 #|cell alive, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 20 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 6 ready 1 pending 255
@@ -534,6 +620,15 @@ def main() -> IO(Unit):
 #|line 3 0
 #|line 17 140
 #|line 0 0
+#|line 19 140
+#|line 20 140
+#|line 0 0
+#|line 21 140
+#|line 22 140
+#|line 23 140
+#|line 0 0
+#|line 24 140
+#|line 25 140
 #|wall at 8 touches True crosses True
 #|wall at 40 touches False crosses False
 #|wall at 24 barrel crosses False tree crosses True
@@ -545,6 +640,9 @@ def main() -> IO(Unit):
 #|spawn thing 1 type 2014 at 1048576 2097152 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 12 tics 5 momz 0 hurt 1000 4294967295 8 0 0 0 8388609 1048576 1 0 0 1310720
 #|spawn thing 2 type 2018 at 1048576 6291456 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 6 tics 2 momz 0 hurt 1000 4294967295 8 0 0 0 1 1048576 2 0 0 1310720
 #|spawn random 5
+#|unseen thing 1 type 14 at 1048576 2097152 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 238 tics 4294967295 momz 0 hurt 1000 4294967295 8 0 0 0 24 1048576 1 0 0 1310720
+#|unseen thing 2 type 46 at 1048576 6291456 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 244 tics 3 momz 0 hurt 1000 4294967295 8 0 0 0 2 1048576 0 0 0 1048576
+#|unseen random 4 shown 2 cell 1 False cell 2 True
 #|tic 4 thing 1 type 2014 at 1048576 2097152 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 12 tics 1 momz 0 hurt 1000 4294967295 8 0 0 0 8388609 1048576 1 0 0 1310720
 #|tic 4 thing 2 type 2018 at 1048576 6291456 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 7 tics 5 momz 0 hurt 1000 4294967295 8 0 0 0 1 1048576 2 0 0 1310720
 #|tic 5 thing 1 type 2014 at 1048576 2097152 z 0 floor 0 ceiling 8388608 angle 0 sector 0 state 13 tics 6 momz 0 hurt 1000 4294967295 8 0 0 0 8388609 1048576 1 0 0 1310720

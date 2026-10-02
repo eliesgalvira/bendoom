@@ -955,7 +955,7 @@ def Sim.passes(f: Sim.Fit, +z: U32, +height: U32) -> Bool:
     Bool.and(F.Fixed.ge((ceil - z : U32), height), F.Fixed.le((floor - z : U32), Sim.step_up()))))
 
 # P_TryMove's last rule, for a mobj with neither MF_DROPOFF nor
-# MF_FLOAT, which is every monster either E1M1 spawns: it will not stand
+# MF_FLOAT, which is every monster Bendoom spawns: it will not stand
 # where the floor it would leave behind is more than 24 units below the
 # floor it would stand on. The player carries MF_DROPOFF and never
 # meets it.
@@ -1127,8 +1127,8 @@ def Sim.spechit(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32) -> List<
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
 def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, +y: U32) -> H.Things:
-  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), False{}, H.Things.you(things), ox, oy,
-    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), False{}, H.Things.you(things), x, y,
+  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), 0, H.Things.you(things), ox, oy,
+    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), 0, H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
 def Sim.crossed.at(lines: List<&2, U32>, +x: U32, +y: U32) -> List<&2, Sim.Cross>:
@@ -4415,7 +4415,7 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # started.
 def State.entered.you(s: State) -> State:
   State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), False{}, H.Things.you(things),
+  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), 0, H.Things.you(things),
     Player.x(player), Player.y(player), L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex,
     thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, Mobj{H.Things.you(things)})
 
