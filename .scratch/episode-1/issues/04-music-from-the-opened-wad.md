@@ -18,3 +18,12 @@
 ## Open: the film's audio changed on purpose
 
 The deck mixes Chocolate Doom's first buffer (4096 frames) before the first song, as every `-warp` capture has it. The old render started the song at frame 0, so the chip's tremolo, vibrato and envelope clocks ran out of phase with Chocolate Doom's: the old render differs from Chocolate's capture in 7,782,301 samples of its first pass. With that buffer removed in a scratch build, the film's audio of the route demo equals the old film's for the first 2,596,873 frames, everything before the exit, sounds included; past the exit D_INTER now plays. The committed film starts its song 4096 frames later, in phase with Chocolate Doom. Elies decides whether that change stands.
+
+The spec review questioned that lead. How many buffers Chocolate Doom mixes before `S_Start` follows wall-clock startup, not a rule in `i_oplmusic.c`; `tools/listen.nu` itself notes the start frame moves between runs. With sound effects on, `i_sdlsound.c` opens the mixer at `GetSliceSize()`, 1024 frames, and `opl_sdl.c` opens its own 4096-frame device only when sound effects are off. So the 4096 lead and `Song.change`'s rounding to 4096-frame boundaries match the music-only capture, not necessarily the game or the film with sound effects.
+
+## Open: left after review
+
+- The map's song: `Play.song` returned D_E1M1 for every map at merge; ticket 06 was asked to pick `mus_e1m1 + map - 1` from its map state. Check its report.
+- Two WAD readers: `Wad.read` streams lumps beside the Array reader `Gfx.open` uses (the web heap ran out reading the WAD twice). One reader should serve both; ticket 05 reuses the streaming one for sound lumps and is the place to unify them.
+- `Stream.topped`'s `case []:` can never run, since the deck is always a one-element list; a recursive holder type may remove it, if the checker accepts it.
+- `tools/listen.nu` repeats `wait-for` and the Xvfb `-displayfd` launch from `tools/portable-smoke.nu` and `tools/oracle.nu`; a shared Nushell module would hold them.
