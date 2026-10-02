@@ -201,6 +201,12 @@ def arrived(play: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = opened
   arrived.gl(play, gl)
 
+# The tally, and the map it asks to load.
+def asked(tag: String, +play: W.Play) -> IO(W.Play):
+  do IO<W.Play>:
+    IO.print(line(tag, play) ++ " wants " ++ marker(W.Play.wants(play)))
+    return play
+
 def intermission(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     p0 : W.Play <- told("bcnt 0", initial(level))
@@ -208,9 +214,8 @@ def intermission(+level: L.Level) -> IO(Unit):
     p2 : W.Play <- told("jumped", press(level, run(40n, level, initial(level))))
     p3 : W.Play <- told("next", press(level, p2))
     p4 : W.Play <- told("cut short", press(level, run(20n, level, p3)))
-    p5 : W.Play <- told("nine tics on", run(9n, level, p4))
-    p6 : W.Play <- told("ten tics on", run(1n, level, p5))
-    IO.print("wants " ++ marker(W.Play.wants(p5)) ++ " then " ++ marker(W.Play.wants(p6)))
+    p5 : W.Play <- asked("nine tics on", run(9n, level, p4))
+    p6 : W.Play <- asked("ten tics on", run(1n, level, p5))
     opened : Array<U32> & G.Gfx & L.Level <- W.Play.open(L.Name{1, 2})
     arrived(p6, opened)
 
@@ -287,9 +292,8 @@ def main() -> IO(Unit):
 #|jumped count 10 cnt 30 bcnt 42 shown 0 0 0 0 30 anims 0 0 0 0 2 0 0 2 0 0 random 83
 #|next next cnt 140 bcnt 44 shown 0 0 0 0 30 anims - - - - - - - - - - random 93
 #|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 93
-#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93
-#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93
-#|the level again level tic 1 kills 0/29 items 0/49 secrets 0/4 time 1
+#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93 wants none
+#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93 wants E1M2
 #|sound bcnt 36 DSPISTOL from nobody vol 64 sep 128 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 41 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 192 DSSGCOCK from nobody vol 64 sep 128
