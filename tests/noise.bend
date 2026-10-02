@@ -80,7 +80,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    run(L.Level.load(W.Wad.dir(bytes)))
+    run(L.Level.load(1, 1, W.Wad.dir(bytes)))
 
 #|unfired 0
 #|closed door 38
