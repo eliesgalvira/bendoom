@@ -53,12 +53,9 @@ def Frame.start(script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(
   (mem, gl) = w
   Frame.draw(script, mem, gl)
 
-def Frame.load(script: List<&2, K.Cmd>, map: U32 & U32) -> IO(Unit):
-  (episode, number) = map
-  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, G.Gfx.open(episode, number), w => Frame.start(script, w))
-
 def Frame.demo(+demo: List<&2, U32>) -> IO(Unit):
-  Frame.load(D.Demo.play(demo), D.Demo.map(demo))
+  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, G.Gfx.open(D.Demo.episode(demo), D.Demo.map(demo)),
+    w => Frame.start(D.Demo.play(demo), w))
 
 def main() -> IO(Unit):
   do IO<Unit>:
