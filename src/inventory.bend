@@ -349,12 +349,16 @@ def Inventory.room(+t: U32, inv: Inventory) -> Bool:
   Inventory{health, armour, armourtype, cards, +ammo, +caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   Bool.not(U32.is_eq(V.Vec.get(ammo, t), V.Vec.get(caps, t)))
 
+# P_GiveAmmo's switch once a type that was empty is given: bullets
+# bring the fist up to the chaingun if owned, else the pistol, and
+# shells bring the fist or the pistol up to the shotgun if owned.
 def Inventory.ammo.switch(empty: Bool, t: U32, +inv: Inventory) -> Inventory:
   match empty t:
     case False{} _:
       inv
     case True{} 0:
-      Bool.pick(Inventory, U32.is_eq(Inventory.ready(inv), 0), Inventory.want(1, inv), inv)
+      Bool.pick(Inventory, U32.is_eq(Inventory.ready(inv), 0),
+        Inventory.want(Bool.pick(U32, Inventory.owns(3, inv), 3, 1), inv), inv)
     case True{} 1:
       Bool.pick(Inventory, Bool.and(Bool.or(U32.is_eq(Inventory.ready(inv), 0), U32.is_eq(Inventory.ready(inv), 1)),
         Inventory.owns(2, inv)), Inventory.want(2, inv), inv)
@@ -430,7 +434,7 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
     case 2001:
       Inventory.armed(Inventory.shotgun(), 2, Inventory.am_shell(), dropped, Msg.Message.gotshotgun(), inv)
     case 2002:
-      Inventory.armed(Inventory.chaingun(), 3, Inventory.am_clip(), dropped, Msg.Message.none(), inv)
+      Inventory.armed(Inventory.chaingun(), 3, Inventory.am_clip(), dropped, Msg.Message.gotchaingun(), inv)
     case 2003:
       Inventory.armed(Inventory.launcher(), 4, Inventory.am_misl(), dropped, Msg.Message.none(), inv)
     case 2004:
