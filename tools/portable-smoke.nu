@@ -40,7 +40,7 @@ def check-archive [archive: path, audio: string] {
       wait-for 100 { ($display_file | path exists) and ((open --raw $display_file | str trim) != "") } "Xvfb did not start"
       let display = $":(open --raw $display_file | str trim)"
       let game = job spawn --description $dir {
-        hide-env --ignore-errors WAYLAND_DISPLAY BENDOOM_IWAD BENDOOM_MUSIC BENDOOM_SOUNDS ALSA_PLUGIN_DIR
+        hide-env --ignore-errors WAYLAND_DISPLAY BENDOOM_IWAD BENDOOM_SOUNDS ALSA_PLUGIN_DIR
         with-env {DISPLAY: $display} {
           (^bwrap --ro-bind / / --dev-bind /dev /dev --proc /proc --tmpfs /nix
             --bind $dir $dir --die-with-parent

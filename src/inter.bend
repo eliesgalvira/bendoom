@@ -824,6 +824,19 @@ def Play.playing(play: Play) -> Bool:
     case Showing{inter}:
       False{}
 
+# The scene's song, as S_Start and WI_Start name it: the level's own, or
+# D_INTER through the tally.
+def Play.song(play: Play) -> String:
+  match play:
+    case Playing{state}:
+      "D_E1M1"
+    case Showing{inter}:
+      "D_INTER"
+
+# The songs a scene of the episode can name.
+def Play.songs() -> List<&2, String>:
+  ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER"]
+
 # The frame the play shows: the level from the player's eye, or the
 # tally, both in the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:

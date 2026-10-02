@@ -1,5 +1,5 @@
 { lib, stdenv, callPackage, writeShellApplication, coreutils, bend, libx11, alsa-lib, alsa-plugins, iwad
-, music, sounds }:
+, sounds }:
 
 let
   inherit (lib.lists) optionals singleton;
@@ -20,11 +20,10 @@ let
 in
 writeShellApplication {
   name = "bendoom";
-  passthru = { inherit game iwad alsa-plugins; music = music iwad; sounds = sounds iwad; };
+  passthru = { inherit game iwad alsa-plugins; sounds = sounds iwad; };
   runtimeInputs = singleton coreutils;
   text = /* bash */ ''
     iwad=${escapeShellArg iwad}
-    music=${music iwad}
     sounds=${sounds iwad}
     ${optionalString linux /* bash */ ''
       export ALSA_PLUGIN_DIR=''${ALSA_PLUGIN_DIR-${alsa-plugins}}

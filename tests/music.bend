@@ -1,23 +1,30 @@
-# E1M1's song from the WAD, as the render reads and plays it. First the
+# E1M1's song from the WAD, as the deck reads and plays it. First the
 # song as the reader hands it to the player: its length in ticks (its
 # longest track's) and its events by kind, as tools/wad.nu counts them
 # from the lump:
 #
 #   nu -c 'source tools/wad.nu; open --raw $env.BENDOOM_IWAD | song-events | song-counts'
 #
-# Then Freedoom's song as music.bend renders it with BENDOOM_IDLE,
-# over its first 72000 frames: the idle buffer, the song's two tempo
-# changes at tick 0, which rescale every track's first callback, its
-# first note at frame 4536 and its first voice steal, a note on channel
-# 9 with all nine voices busy. Frame 67843 is the first the steal
-# changes. It prints an FNV-1a hash of the frames (each a 32-bit word,
-# left in the low half), and frames on either side of the first note and
-# of the steal. The expected lines are Chocolate Doom's, read in nushell
-# from a real-time capture (tools/listen.nu --keep) as the same words:
+# Then Freedoom's song as the deck plays it from the sound's start, in
+# uneven takes as the mixer asks, over its first 72000 frames: the
+# chip's first buffer before the song, the song's two tempo changes at
+# tick 0, which rescale every track's first callback, its first note at
+# frame 4536 and its first voice steal, a note on channel 9 with all
+# nine voices busy. Frame 67843 is the first the steal changes. It
+# prints an FNV-1a hash of the frames (each a 32-bit word, left in the
+# low half), and frames on either side of the first note and of the
+# steal. The expected lines are Chocolate Doom's, read in nushell from a
+# real-time capture (tools/listen.nu --keep) as the same words:
 #
 #   let c = open --raw music.raw | bytes at 0..<(72000 * 4) | chunks 4 | each { into int --endian little }
 #   $c | reduce --fold 2166136261 {|x, h| (($h | bits xor $x) * 16777619) mod 4294967296 }
 #   $c | get 67843 | [($in | bits and 65535) ($in | bits shr 16)] | each { if $in >= 32768 { $in - 65536 } else { $in } }
+#
+# Then S_ChangeMusic after the first 10000 frames, against the song
+# playing on: the first frame of the next 10000 that differs. The same
+# song again changes nothing, so none does and the line is 20000. A
+# change to D_INTER waits for the buffer being mixed to end, so no frame
+# before 12288 differs; which one first does is a regression pin.
 #
 # Then OPL_Queue_AdjustCallbacks on callbacks overdue as the tempo
 # changes, worked by hand from C's conversions: 993 at now 1000 with the
@@ -41,14 +48,14 @@
 # Then a SMPTE division, 0xE728, which means 25 frames a second of 40
 # ticks, but MIDI_GetFileTimeDivision divides the whole short, -6360, by
 # 256 toward zero: 24 * 40 ticks a beat.
-# Then the lumps the render refuses, True, in order, and near misses it
+# Then the lumps the deck refuses, True, in order, and near misses it
 # takes, False: neither MUS nor MIDI. MIDI, after the smallest track it
 # takes: a status byte of 0xF3; a data byte before any status; a delta
 # of five bytes, but not of four; a track cut short; format 2; a track
 # header other than MTrk. MUS, after the smallest score it takes:
 # controller 10 in a controller change; event type 5; system event 9; a
 # delay of 2^28 ticks; a delay of 2^28 - 1, which mus2mid.c writes but
-# whose microseconds pass the 2^31 the render counts, though a delay of
+# whose microseconds pass the 2^31 the deck counts, though a delay of
 # 300000 ticks, 35.7 minutes at 140 a second, is taken; a score cut
 # short; and a score of 49144 releases in a lump of 96 KiB, which
 # i_oplmusic.c does not convert.
@@ -155,24 +162,65 @@ def Test.frame(+frames: List<&2, U32>, +i: U32) -> String:
   +lr = Maybe.default(&2, U32, List.get(&2, U32, frames, U32.to_nat(i)), 0)
   U32.show(i) ++ " " ++ Test.signed((lr .&. 65535 : U32)) ++ " " ++ Test.signed((lr >> 16n : U32))
 
-# The song's first 72000 frames, in order: the turn that makes them may
-# pass 72000, and what it passes by is dropped.
-def Test.first(+m: S.Song) -> List<&2, U32>:
-  List.reverse(&2, U32, List.drop(&2, U32, S.Song.out(m), U32.to_nat((S.Song.made(m) - 72000 : U32))))
+# The deck's frames, latest first, and the deck after them.
+type Test.Run is Data:
+  Run{deck: S.Song.Deck, frames: List<&2, U32>}
 
-def Test.frames(t: S.Song.Turn) -> List<&2, U32>:
-  match t:
-    case S.More{+m}:
-      Test.first(m)
-    case S.Ended{+m}:
-      Test.first(m)
-    case S.Stuck{}:
-      []
+def Test.got(frames: List<&2, U32>, p: S.Song.Deck & List<&2, U32>) -> Test.Run:
+  (deck, taken) = p
+  Run{deck, List.reverse.go(&2, U32, taken, frames)}
 
-def Test.print(+env: S.Song.Env) -> IO(Unit):
-  +frames = Test.frames(S.Song.turn(72000, env, S.Song.start(True{}, env)))
+def Test.take(+n: U32, r: Test.Run) -> Test.Run:
+  Run{deck, frames} = r
+  Test.got(frames, S.Song.Deck.take(n, deck))
+
+# A take of each size in turn.
+def Test.run(sizes: List<&2, U32>, r: Test.Run) -> Test.Run:
+  match sizes:
+    case []:
+      r
+    case +n <> rest:
+      Test.run(rest, Test.take(n, r))
+
+# The frames a run took, in order.
+def Test.taken(r: Test.Run) -> List<&2, U32>:
+  Run{deck, frames} = r
+  List.reverse(&2, U32, frames)
+
+# The run from here on: its deck, with no frames yet.
+def Test.on(r: Test.Run) -> Test.Run:
+  Run{deck, frames} = r
+  Run{deck, []}
+
+def Test.cued(+name: String, r: Test.Run) -> Test.Run:
+  Run{deck, frames} = r
+  Run{S.Song.Deck.change(name, deck), []}
+
+# 72000 frames in uneven takes, as the mixer asks for them.
+def Test.sizes() -> List<&2, U32>:
+  List.concat(&2, U32, [[1, 7, 100, 2048, 33, 999, 3072, 5], List.replicate(U32, 21n, 3072), [1223]])
+
+def Test.differs.pick(same: Bool, +i: U32, rest: U32) -> U32:
+  match same:
+    case True{}:
+      rest
+    case False{}:
+      i
+
+# The first index at which two runs of frames differ, or their length.
+def Test.differs(xs: List<&2, U32>, ys: List<&2, U32>, +i: U32) -> U32:
+  match xs ys:
+    case +x <> xr +y <> yr:
+      Test.differs.pick(U32.is_eq(x, y), i, Test.differs(xr, yr, (i + 1 : U32)))
+    case _ _:
+      i
+
+def Test.print(+playing: Test.Run, +songs: List<&2, S.Song.Lump>) -> IO(Unit):
+  +frames = Test.taken(Test.run(Test.sizes(), playing))
+  +later = Test.run([10000], playing)
+  +on = Test.taken(Test.run([10000], Test.on(later)))
   do IO<Unit>:
-    IO.print(Test.song(S.Song.file(env)))
+    IO.print(Test.song(S.Song.find(songs, "D_E1M1")))
     IO.print("hash " ++ U32.show(H.Fnv.words(frames)))
     IO.print(Test.frame(frames, 4535))
     IO.print(Test.frame(frames, 4536))
@@ -180,8 +228,14 @@ def Test.print(+env: S.Song.Env) -> IO(Unit):
     IO.print(Test.frame(frames, 67843))
     IO.print(Test.frame(frames, 70000))
     IO.print(Test.frame(frames, 71999))
+    IO.print("again " ++ U32.show(Test.differs(Test.taken(Test.run([10000], Test.cued("D_E1M1", later))), on, 10000)))
+    IO.print("inter " ++ U32.show(Test.differs(Test.taken(Test.run([10000], Test.cued("D_INTER", later))), on, 10000)))
     IO.print("rescale " ++ U32.show(S.Song.rescale(1000, (U32.to_f32(500000) / U32.to_f32(480000) : F32), 993))
       ++ " " ++ U32.show(S.Song.rescale(100, (U32.to_f32(3) / U32.to_f32(4) : F32), 90)))
+
+def Test.played(+d: S.Song.Deck) -> IO(Unit):
+  S.Deck{songs, name, env, song} = d
+  Test.print(Run{d, []}, songs)
 
 def Test.kind(+e: M.Midi.Event) -> String:
   Maybe.default(&2, String, List.get(&2, String, Test.kinds(), U32.to_nat(Test.slot(e))), "")
@@ -225,8 +279,8 @@ def Test.entry(e: S.Song.Entry) -> String:
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    env : S.Song.Env <- S.Song.load()
-    Test.print(env)
+    deck : S.Song.Deck <- S.Song.Deck.load(["D_E1M1", "D_INTER"])
+    Test.played(S.Song.Deck.change("D_E1M1", deck))
     IO.print(Test.lump("mus", Fx.Closed.song(M.Midi.file(Fx.Closed.mus([147, 188, 100, 5, 19, 62, 31, 164, 133, 35, 129, 51, 14, 67, 0,
       133, 195, 3, 144, 129, 0, 0, 60, 1, 60, 2, 60, 4, 60, 5, 60, 6, 60, 7, 60, 8, 60, 137, 188, 130, 1, 147, 64, 3,
       96])))))
@@ -262,6 +316,8 @@ def main() -> IO(Unit):
 #|67843 1875 1881
 #|70000 649 662
 #|71999 1518 1335
+#|again 20000
+#|inter 12304
 #|rescale 994 87
 #|mus division 70
 #|mus 0 controller 0 123 0

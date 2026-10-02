@@ -3,7 +3,6 @@ set -eu
 
 bundle=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 iwad=$bundle/share/doom.wad
-music=$bundle/share/music
 sounds=$bundle/share/sounds
 
 run() {
