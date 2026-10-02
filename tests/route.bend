@@ -45,7 +45,7 @@ def main() -> IO(Unit):
     cmds : List<&2, K.Cmd> <- R.Route.read("tests/fixtures/freedoom.lmp")
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    loaded(L.Level.load(W.Wad.dir(bytes)), cmds)
+    loaded(L.Level.load(1, 1, W.Wad.dir(bytes)), cmds)
 
 #|exit tic 2060 ended True health 25 armour 82 random 22
 #|position -364.361557 1296.127792 -128.000000

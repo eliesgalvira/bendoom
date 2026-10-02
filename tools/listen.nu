@@ -344,6 +344,7 @@ def "main sounds" [
   angle: int            # its facing in degrees, a multiple of 45
   script: string        # the commands, runs of "count,forward,side,turn,buttons"
   --wad: path           # the IWAD (default $env.BENDOOM_IWAD)
+  --map: string = "E1M1" # the map, by its marker
   --things: string = "" # records to rewrite, each "record,type,x,y", facing 0
   --music               # play the song under the sounds
   --against: path       # a capture of the song alone, the reference under --music
@@ -354,8 +355,8 @@ def "main sounds" [
   let runs = $script | runs
   let run = scratch
   let name = $wad | path basename
-  open --raw $wad | placed $x $y $angle $things | save ($run.dir | path join $name)
-  $runs | demo | save ($run.dir | path join script.lmp)
+  open --raw $wad | placed $map $x $y $angle $things | save ($run.dir | path join $name)
+  $runs | tics | demo (header $map) | save ($run.dir | path join script.lmp)
   let limit = ($runs | get tics | math sum) // 35 + 60
   let game = do { cd $run.dir; with-env $run.sdl {
     ^timeout $limit chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig chocolate-doom.cfg ...(if $music { [] } else { [-nomusic] }) e> stderr | complete

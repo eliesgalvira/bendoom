@@ -172,7 +172,7 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     start(world)
 #|start tic 0 ended False at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|beside tic 6 ended False at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66

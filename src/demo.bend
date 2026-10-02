@@ -60,6 +60,24 @@ def Demo.cmds(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
 def Demo.play(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
   Demo.cmds(List.drop(&2, U32, bytes, 13n))
 
+# The episode and map a demo's header names, E0M0 for a file too short
+# to have one.
+def Demo.map(bytes: List<&2, U32>) -> U32 & U32:
+  match bytes:
+    case version <> skill <> episode <> map <> rest:
+      (episode, map)
+    case _:
+      (0, 0)
+
+def Demo.read.chunk(bytes: List<&2, U32>, kept: List<&2, U32>) -> List<&2, U32>:
+  List.append(&2, U32, kept, bytes)
+
+# The bytes of the demo file at the path.
+def Demo.read(path: String) -> IO(List<&2, U32>):
+  do IO<List<&2, U32>>:
+    file : File <- IO.try(File, File.open(path, "r"))
+    B.Bytes.fold(~List<&2, U32>, ~Demo.read.chunk, file, [])
+
 # The demo at the path, if one is named, created with its header.
 def Demo.open(path: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Demo.Rec>):
   match path:
