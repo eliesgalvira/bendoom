@@ -63,10 +63,11 @@
 # places ahead of the start, taken and raised: its first flash, 2 tics
 # into a held attack, its second at 6, the zombieman it shoots once a
 # shot at 4, 8 and 12, each line with its health and state row, ten
-# shots spent and the zombieman dead after a burst of 40, the chaingun up again after the key 2 and then the key 4, and the
-# fist up once a held attack has spent every bullet. Every frame holds
-# the things E1M1 spawns on Hurt Me Plenty, monsters among them, each in
-# its state on that tic.
+# shots spent and the zombieman dead after a burst of 40, the chaingun
+# up again after the key 2 and then the key 4, and the fist up once a
+# held attack has spent every bullet. Every frame holds the things E1M1
+# spawns on Hurt Me Plenty, monsters among them, each in its state on
+# that tic.
 # Every frame carries the status bar the inventory of its state fills,
 # so the bar at the start, after the rocket is taken, after the green
 # armour and after the blue key are the frames named for those pickups,
@@ -83,8 +84,8 @@
 # taken would be 1465 of the second bonus frame, the green armour is 745
 # of its first frame and would be 419 of its second, and a stimpack and
 # a medikit taken at 100 health 2744 of theirs; a refused frame differs
-# from its taken twin only in the pickup's sprite, 762 pixels of the
-# rocket and 5092 of the chainsaw.
+# from its taken twin in the pickup's sprite and the full inventory's
+# bar.
 # Each frame is drawn twice, over a frame blanked to 0 and to 255: equal
 # hashes mean every pixel of the 200 rows was written.
 # Every line names the palette ST_doPaletteStuff chose for its frame,

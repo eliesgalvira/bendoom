@@ -291,13 +291,12 @@ def ammo_switch() -> IO(Unit):
 # Message: the health bonus 3, the stimpack 5, the medikit 6, green
 # armour 1, blue armour 2, the blue card 7, the chainsaw 15, the berserk
 # pack 8 and the chaingun 18, then PD_BLUEK, 17, for the blue door that
-# refuses; and
-# hu_stuff.c's four seconds, HU_MSGTIMEOUT 140 tics. A pickup takes the
-# line on its own tic with 140 tics left; a pickup the grant refuses
-# (the stimpack at 100, green armour over 150 of blue) says nothing and
-# leaves the line as it was, none or a line of 90 tics now 89; the
-# counter falls by one a tic and the line goes out at zero. The door
-# held open by the blue card says nothing.
+# refuses; and hu_stuff.c's four seconds, HU_MSGTIMEOUT 140 tics. A
+# pickup takes the line on its own tic with 140 tics left; a pickup the
+# grant refuses (the stimpack at 100, green armour over 150 of blue)
+# says nothing and leaves the line as it was, none or a line of 90 tics
+# now 89; the counter falls by one a tic and the line goes out at zero.
+# The door held open by the blue card says nothing.
 def pickup_messages() -> IO(Unit):
   do IO<Unit>:
     shown(Fx.Closed.said(I.Inventory.start(), 2014))
