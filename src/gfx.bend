@@ -1344,7 +1344,7 @@ def Gfx.load.go(+marker: String, +lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L
     flats : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.Names.distinct(fl), dir, "R_FlatNumForName")
     pnames : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "PNAMES")
     texture1 : W.Wad.Lump <- Gfx.lump(dir, "W_GetNumForName", "TEXTURE1")
-    sprites : Gfx.Sprites <- Gfx.sprites(Gfx.sprite.rows(H.Thing.spawn(level)), Gfx.sprite.space(lumps, False{}))
+    sprites : Gfx.Sprites <- Gfx.sprites(Gfx.sprite.rows(H.Thing.spawn(level, 0)), Gfx.sprite.space(lumps, False{}))
     bar : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.bar.names(), dir, "W_GetNumForName")
     font : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.font.names(), dir, "W_CacheLumpName")
     Gfx.load.textures(Base{level, fl, pal, cmap, flats, sprites,

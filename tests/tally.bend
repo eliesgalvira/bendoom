@@ -38,6 +38,7 @@ import ../src/sim.bend as S
 import ../src/inventory.bend as I
 import ../src/inter.bend as W
 import ../src/sound.bend as Sn
+import ../src/things.bend as H
 
 def held(n: Nat, forward: U32, side: U32, turn: U32, use: Bool) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.demo(forward, side, turn, Bool.pick(U32, use, 2, 0)))
@@ -55,9 +56,9 @@ def beside() -> L.Level.Start:
 
 def line(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state}:
+    case W.Playing{+state, map}:
       tag ++ " level tic " ++ U32.show(S.State.clock(state)) ++ " " ++ S.Sim.Tally.show(S.Sim.tally(state))
-    case W.Showing{+wi}:
+    case W.Showing{+wi, after, next}:
       tag ++ " " ++ W.Inter.show(wi)
 
 def told(tag: String, +play: W.Play) -> IO(W.Play):
@@ -65,9 +66,17 @@ def told(tag: String, +play: W.Play) -> IO(W.Play):
     IO.print(line(tag, play))
     return play
 
+# The play after a script's tics, with no map to load in them.
+def replayed(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play) -> W.Play:
+  match script:
+    case []:
+      play
+    case cmd <> rest:
+      replayed(rest, level, W.Play.Step.play(W.Play.step(level, cmd, False{}, play)))
+
 # The play after so many idle tics.
 def run(n: Nat, +level: L.Level, play: W.Play) -> W.Play:
-  W.Play.replay(idle(n), level, play)
+  replayed(idle(n), level, play)
 
 def sound.events(events: List<&2, Sn.Sound.Event>) -> String:
   match events:
@@ -82,9 +91,9 @@ def sound.line(events: List<&2, Sn.Sound.Event>, play: W.Play) -> String:
       ""
     case _:
       match play:
-        case W.Playing{state}:
+        case W.Playing{state, map}:
           "sound level" ++ sound.events(events) ++ "\n"
-        case W.Showing{wi}:
+        case W.Showing{wi, after, next}:
           "sound bcnt " ++ U32.show(W.Inter.bcnt(wi)) ++ sound.events(events) ++ "\n"
 
 def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) -> String:
@@ -97,7 +106,7 @@ def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) 
 
 # A tic of use, which the tally reads as a press, after a tic of none.
 def press(+level: L.Level, play: W.Play) -> W.Play:
-  W.Play.replay(List.append(&2, K.Cmd, idle(1n), held(1n, 0, 0, 0, True{})), level, play)
+  replayed(List.append(&2, K.Cmd, idle(1n), held(1n, 0, 0, 0, True{})), level, play)
 
 # The tally at the tics wi_stuff.c's counts change, the gaps between
 # them run in turn.
@@ -142,15 +151,55 @@ def back() -> List<&2, K.Cmd>:
 
 def initial(+level: L.Level) -> W.Play:
   +took = S.Sim.replay(route(), S.State.at(level, beside()))
-  W.Play.ended(S.State.ended(took), took)
+  W.Play.after(L.Name{1, 1}, took)
 
 def summary(+level: L.Level) -> IO(Unit):
   +took = S.Sim.replay(route(), S.State.at(level, beside()))
   do IO<Unit>:
     IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(S.State.start(level))))
-    IO.print("exit " ++ S.Sim.Tally.show(S.Sim.tally(took)) ++ " ended " ++ Bool.show(S.State.ended(took))
+    IO.print("exit " ++ S.Sim.Tally.show(S.Sim.tally(took)) ++ " ended " ++ S.Sim.Exit.show(S.State.ended(took))
       ++ " random " ++ U32.show(S.State.mrnd(took)))
     return Unit{}
+
+def marker(m: Maybe<&2, L.Level.Name>) -> String:
+  match m:
+    case None{}:
+      "none"
+    case Some{L.Name{episode, map}}:
+      L.Level.marker(episode, map)
+
+# The map a play is on, its clock, where the player stands, what it
+# carries and the random index; or the map the tally leads to.
+def on(tag: String, play: W.Play) -> String:
+  match play:
+    case W.Playing{+state, L.Name{episode, map}}:
+      +p = S.State.player(state)
+      tag ++ " " ++ L.Level.marker(episode, map) ++ " tic " ++ U32.show(S.State.clock(state)) ++ " at "
+        ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " "
+        ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state))
+    case W.Showing{wi, after, next}:
+      tag ++ " tally for " ++ marker(Some{next})
+
+def killed(play: W.Play) -> W.Play:
+  match play:
+    case W.Playing{+state, map}:
+      W.Playing{S.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map}
+    case other:
+      other
+
+# E1M2 from the WAD after the tally: its first tic, and a death there
+# with use held seven tics, then a tic of none.
+def arrived.gl(play: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
+  (gfx, +next) = gl
+  +entered = W.Play.Step.play(W.Play.step(next, K.Cmd.idle(), False{}, W.Play.enter(next, play)))
+  do IO<Unit>:
+    IO.print(on("entered", entered))
+    IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
+      killed(entered))))
+
+def arrived(play: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+  (mem, gl) = opened
+  arrived.gl(play, gl)
 
 def intermission(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -161,8 +210,27 @@ def intermission(+level: L.Level) -> IO(Unit):
     p4 : W.Play <- told("cut short", press(level, run(20n, level, p3)))
     p5 : W.Play <- told("nine tics on", run(9n, level, p4))
     p6 : W.Play <- told("ten tics on", run(1n, level, p5))
-    p7 : W.Play <- told("the level again", run(1n, level, p6))
-    return Unit{}
+    IO.print("wants " ++ marker(W.Play.wants(p5)) ++ " then " ++ marker(W.Play.wants(p6)))
+    opened : Array<U32> & G.Gfx & L.Level <- W.Play.open(L.Name{1, 2})
+    arrived(p6, opened)
+
+# G_DoCompleted's next map from each map of episode 1, by a normal exit
+# and by a secret one.
+def nexts.go(n: Nat, +map: U32) -> String:
+  match n:
+    case 0n:
+      ""
+    case 1n+m:
+      L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(False{}, L.Name{1, map})) ++ " "
+        ++ marker(W.Play.next(True{}, L.Name{1, map})) ++ "\n" ++ nexts.go(m, (map + 1 : U32))
+
+# The seam the secret exit line fires: E1M3 ended by a secret exit shows
+# the tally for E1M9, and E1M8 ended by the exit holds its level.
+def seams(+level: L.Level) -> IO(Unit):
+  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  do IO<Unit>:
+    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, S.State.end(S.Secret{}, took))))
+    IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, took)))
 
 def soundcheck(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -184,6 +252,7 @@ def play(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     summary(level)
     intermission(level)
+    seams(level)
     soundcheck(level)
     secrets(level)
 
@@ -197,7 +266,7 @@ def main() -> IO(Unit):
     world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     start(world)
 #|start kills 0/29 items 0/49 secrets 0/4 time 0
-#|exit kills 0/29 items 0/49 secrets 0/4 time 7 ended True random 73
+#|exit kills 0/29 items 0/49 secrets 0/4 time 7 ended normal random 73
 #|bcnt 0 count 1 cnt 35 bcnt 0 shown - - - - - anims - - - - - - - - - - random 83
 #|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - 0 - - - - - - - 0 random 83
 #|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 0 2 2 2 2 2 2 2 0 random 83
