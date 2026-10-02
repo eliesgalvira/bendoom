@@ -507,8 +507,8 @@ def Midi.spans(ts: List<&2, Midi.Track>) -> Midi.Span:
       Midi.spans.both(Midi.span(t), Midi.spans(rest))
 
 # ScheduleTrack's microseconds are 64 bits wide and the deck's are a
-# U32, so a callback past 2^31 microseconds is refused rather than
-# wrapped: a pass of 35 minutes, and two within the count.
+# U32 from the song's start, so a callback past 2^31 microseconds is
+# refused rather than wrapped: a pass of 35 minutes.
 def Midi.fits(+ticks: U32, +tempo: U32, +division: U32) -> Bool:
   U32.is_le(ticks, (2147483647 / ((tempo / U32.max(division, 1)) + 1 : U32) : U32))
 
