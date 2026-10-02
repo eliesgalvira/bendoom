@@ -50,7 +50,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     walk : Result<&1, &1, U32 & String, String> <- IO.get_env("WALK")
     script : Result<&1, &1, U32 & String, String> <- IO.get_env("SCRIPT")
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     t0 : Nat <- IO.now()
     Bench.run(t0, Bench.input(Result.is_done(&1, &1, U32 & String, String, walk)),
       List.concat(&2, K.Cmd, T.Script.runs(String.split(Result.default(&1, &1, U32 & String, String, script, ""), ' '))),
