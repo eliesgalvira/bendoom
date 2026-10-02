@@ -27,7 +27,7 @@ import ../src/game.bend as M
 import ../tools/script.bend as T
 
 def Bench.input(+walk: Bool) -> K.Input:
-  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}, False{}, False{}, False{}, False{}}, 0}
+  K.Input{K.Keys{walk, False{}, walk, False{}, False{}, False{}, walk, False{}, False{}, K.Keys.numbers.none()}, 0}
 
 def Bench.rate(+t0: Nat, +t1: Nat) -> String:
   Nat.show(Nat.div(U32.to_nat(600000), Nat.sub(t1, t0))) ++ " frames a second (600 frames in "
@@ -51,7 +51,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     walk : Result<&1, &1, U32 & String, String> <- IO.get_env("WALK")
     script : Result<&1, &1, U32 & String, String> <- IO.get_env("SCRIPT")
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     t0 : Nat <- IO.now()
     Bench.run(t0, Bench.input(Result.is_done(&1, &1, U32 & String, String, walk)),
       List.concat(&2, K.Cmd, T.Script.runs(String.split(Result.default(&1, &1, U32 & String, String, script, ""), ' '))),

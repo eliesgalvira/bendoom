@@ -680,7 +680,7 @@ def patch.record(a: Array<U32>, +pos: U32, i: U32, x: U32, y: U32, kind: U32) ->
 
 def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Array<U32> & L.Level:
   (+pos, size) = lump
-  L.Level.load((patch.record(patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), pos, 82,
+  L.Level.load(1, 1, (patch.record(patch.record(patch.record(a, pos, 3, 96, 216, 48), pos, 35, 800, 528, 2035), pos, 82,
     824, 1352, 5), lumps))
 
 # E1M1 with records 3, 35 and 82, a demon and two imps, made a tech
@@ -691,7 +691,7 @@ def patch.at(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, lump: U32 & U32) -> Ar
 # record order.
 def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & L.Level:
   (a, +lumps) = p
-  patch.at(a, lumps, W.Wad.find(L.Level.map(lumps), "THINGS"))
+  patch.at(a, lumps, W.Wad.find(L.Level.map(1, 1, lumps), "THINGS"))
 
 # The solid things, after 20 idle tics as the oracle's scripts start.
 # Walking south at 25 from 1712 under the tech column at -192, 1600,
@@ -1960,24 +1960,24 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
   do IO<Unit>:
     s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
     p0 : S.State <- free(s)
-    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p0)
-    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p1)
-    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p2)
-    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p3)
-    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p4)
-    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p5)
-    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p6)
-    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p7)
-    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p8)
-    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}}, p9)
-    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p10)
-    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}}, p11)
-    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p12)
-    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, S.State.start(level))
-    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q1)
-    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q2)
-    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}}, q3)
+    p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p0)
+    p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p1)
+    p3 : S.State <- step("L:20", 20n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p2)
+    p4 : S.State <- step("U!:200", 200n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p3)
+    p5 : S.State <- step("-:40", 40n, K.Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p4)
+    p6 : S.State <- step("R:10", 10n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p5)
+    p7 : S.State <- step("U!:70", 70n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p6)
+    p8 : S.State <- step("L:30", 30n, K.Keys{False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p7)
+    p9 : S.State <- step("U:100", 100n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p8)
+    p10 : S.State <- step("S:60", 60n, K.Keys{False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p9)
+    p11 : S.State <- step("D!:100", 100n, K.Keys{False{}, True{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p10)
+    p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p11)
+    p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p12)
+    p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p13)
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, S.State.start(level))
+    q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q1)
+    q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q2)
+    q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q3)
     q5 : S.State <- step("-:1", 1n, K.Keys.none(), q4)
     q6 : S.State <- step("-:40", 40n, K.Keys.none(), q5)
     IO.print("the walks: " ++ drawn(p14) ++ ", " ++ drawn(q6))
@@ -1990,7 +1990,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    walk(L.Level.load(W.Wad.dir(bytes)))
+    walk(L.Level.load(1, 1, W.Wad.dir(bytes)))
 
 #|start -416.000000 256.000000 0.000 z 0.000000 floor 0.000000 eye 41.000000
 #|free at start True

@@ -194,7 +194,7 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open()
+    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
     start(world)
 #|start kills 0/29 items 0/49 secrets 0/4 time 0
 #|exit kills 0/29 items 0/49 secrets 0/4 time 7 ended True random 73

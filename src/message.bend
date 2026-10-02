@@ -1,9 +1,9 @@
 # Doom's heads-up message line: the strings d_englsh.h gives the pickups
-# the two E1M1s hold and the blue door's refusal, numbered, and the rule
-# hu_lib.c's HUlib_drawTextLine picks a glyph by. A message is carried
-# as its number, since the state it lives in is what the laws quantify
-# over and the tests print; the text is made where it is drawn or
-# printed.
+# the two E1M1s hold, the chaingun's and the blue door's refusal,
+# numbered, and the rule hu_lib.c's HUlib_drawTextLine picks a glyph by.
+# A message is carried as its number, since the state it lives in is
+# what the laws quantify over and the tests print; the text is made
+# where it is drawn or printed.
 import Base
 
 # No message. The other numbers are this file's own, in the order
@@ -62,8 +62,12 @@ def Message.gotshotgun() -> U32:
 def Message.pd_bluek() -> U32:
   17
 
+def Message.gotchaingun() -> U32:
+  18
+
 # d_englsh.h's English strings, one for each pickup type a census of the
-# two E1M1s on Hurt Me Plenty finds and one for the blue locked door.
+# two E1M1s on Hurt Me Plenty finds, the chaingun's, and one for the
+# blue locked door.
 # GOTMEDINEED is not among them: P_GiveBody heals before p_inter.c tests
 # the health, which is then never under 25, so vanilla never shows it.
 # Nor are the strings of the pickup types neither map places, which
@@ -104,6 +108,8 @@ def Message.text(n: U32) -> String:
       "You got the shotgun!"
     case 17:
       "You need a blue key to open this door"
+    case 18:
+      "You got the chaingun!"
     case _:
       ""
 
