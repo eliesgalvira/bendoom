@@ -17,7 +17,6 @@ runCommand "${name}.tar.gz" {
   mkdir -p bundle/bin bundle/share
   cp ${bendoom.game}/bin/program bundle/bin/game
   cp ${bendoom.iwad} bundle/share/doom.wad
-  cp -r ${bendoom.music} bundle/share/music
   cp -r ${bendoom.sounds} bundle/share/sounds
   cp ${../LICENSE} bundle/LICENSE
   cp ${../README.md} bundle/README.md

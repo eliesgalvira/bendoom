@@ -193,7 +193,7 @@ def arrived.gl(play: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +next) = gl
   +entered = W.Play.Step.play(W.Play.step(next, K.Cmd.idle(), False{}, W.Play.enter(next, play)))
   do IO<Unit>:
-    IO.print(on("entered", entered))
+    IO.print(on("entered", entered) ++ " song " ++ W.Play.song(entered))
     IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
       killed(entered))))
 

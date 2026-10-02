@@ -1,6 +1,6 @@
 # The channels and the mixer, driven by hand-written events over
-# Freedoom's expanded sounds and the render of its song. No device is
-# opened: the mixer's window is taken as the device would take it.
+# Freedoom's expanded sounds and its song. No device is opened: the
+# mixer's window is taken as the device would take it.
 #
 # First the channel table after each event of a scripted sequence, with
 # the sound, the source and the left and right volumes of each of
@@ -24,7 +24,7 @@
 # and 64; the door at volume 51 and separation 204 is 20 and 81, and at
 # 64 and 129 it is 62 and 65.
 #
-# Then the mixer with no song, so that the output is the channel alone:
+# Then the mixer playing no song, so that the output is the channel alone:
 # DSNOWAY started centred at the default volume, read in windows of 1,
 # 7, 100, 2048, 33, 999, 3072, 5 and then 3072 frames until the file
 # ends. Its 16996 frames must be what Chocolate Doom plays, so the hash
@@ -35,8 +35,9 @@
 # now drives through the mixer. The frame after the last is silence,
 # and the channel has freed itself.
 #
-# Last the song with two sounds over it, DSDOROPN from a sector heard at
-# 51 and 204 from the first frame and DSNOWAY centred from frame 2156,
+# Last the song from its first frame, past the chip's first buffer, with
+# two sounds over it, DSDOROPN from a sector heard at 51 and 204 from
+# that frame and DSNOWAY centred from frame 2156,
 # read in the same uneven windows. The hash is over every frame of the
 # run and the frames named are the first, the last before the second
 # sound, the first two of the overlap and the last of the run. Those are
@@ -46,6 +47,7 @@ import Base
 import ../src/fnv.bend as H
 import ../src/sound.bend as Sn
 import ../src/channel.bend as C
+import ../src/song.bend as S
 import ../src/stream.bend as A
 
 def Test.slot(c: Maybe<C.Channel>) -> Maybe<C.Channel> & String:
@@ -83,22 +85,22 @@ def Test.step(+dir: String, +tag: String, e: Sn.Sound.Event, chans: List<Maybe<C
   IO.bind(List<Maybe<C.Channel>>, List<Maybe<C.Channel>>, C.Channel.hear(dir, [e], chans),
     cs => Test.told(tag, Test.table(cs)))
 
-def Test.run.on(acc: List<&2, U32>, p: Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
-  rest: Maybe<A.Stream.Tape> -> List<Maybe<C.Channel>> -> List<&2, U32> ->
-    IO(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>)) ->
-  IO(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
-  (tape, chans, words) = p
-  rest(tape, chans, List.append(&2, U32, acc, words))
+def Test.run.on(acc: List<&2, U32>, p: S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>,
+  rest: S.Song.Deck -> List<Maybe<C.Channel>> -> List<&2, U32> ->
+    IO(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>)) ->
+  IO(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>):
+  (deck, chans, words) = p
+  rest(deck, chans, List.append(&2, U32, acc, words))
 
 # A window of each of the frame counts, its frames gathered in order.
-def Test.run(sizes: List<&2, U32>, tape: Maybe<A.Stream.Tape>, chans: List<Maybe<C.Channel>>,
-  acc: List<&2, U32>) -> IO(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>):
+def Test.run(sizes: List<&2, U32>, deck: S.Song.Deck, chans: List<Maybe<C.Channel>>,
+  acc: List<&2, U32>) -> IO(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>):
   match sizes:
     case []:
-      IO.pure(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, (tape, chans, acc))
+      IO.pure(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>, (deck, chans, acc))
     case n <> more:
-      IO.bind(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>,
-        Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, A.Stream.window(n, tape, chans),
+      IO.bind(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>,
+        S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>, A.Stream.window(n, deck, chans),
         p => Test.run.on(acc, p, t => cs => ws => Test.run(more, t, cs, ws)))
 
 def Test.signed(+x: U32) -> String:
@@ -123,54 +125,57 @@ def Test.alone.told(+tag: String, +words: List<&2, U32>, at: List<&2, U32>, +tak
   IO.print(tag ++ " " ++ U32.show(H.Fnv.words(List.take(&2, U32, words, U32.to_nat(take)))) ++ " "
     ++ String.join(Test.frames(words, at), " "))
 
-def Test.alone.done(p: Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>) -> IO(Unit):
-  (tape, chans, words) = p
+def Test.alone.done(p: S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>) -> IO(Unit):
+  (deck, chans, words) = p
   do IO<Unit>:
     Test.alone.told("grunt", words, [0, 1, 3, 2714, 16995, 16996], 16996)
     kept : List<Maybe<C.Channel>> <- Test.told("after", Test.table(chans))
     C.Channel.stop(kept)
 
-# The grunt alone, over no song at all.
-def Test.alone(+dir: String, chans: List<Maybe<C.Channel>>) -> IO(Unit):
-  IO.bind(Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>, Unit,
-    Test.run(Test.sizes(), None{}, chans, []), Test.alone.done)
+# The grunt alone, over a deck that plays no song.
+def Test.alone(+dir: String, deck: S.Song.Deck, chans: List<Maybe<C.Channel>>) -> IO(Unit):
+  IO.bind(S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>, Unit,
+    Test.run(Test.sizes(), deck, chans, []), Test.alone.done)
 
 def Test.song.told(+words: List<&2, U32>) -> IO(Unit):
   IO.print("song " ++ U32.show(H.Fnv.words(words)) ++ " "
     ++ String.join(Test.frames(words, [0, 1, 2155, 2156, 2157, 15480]), " "))
 
-def Test.song.done(p: Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>) -> IO(Unit):
-  (tape, chans, words) = p
+def Test.song.done(p: S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>) -> IO(Unit):
+  (deck, chans, words) = p
   do IO<Unit>:
     Test.song.told(words)
     kept : List<Maybe<C.Channel>> <- Test.told("playing", Test.table(chans))
     C.Channel.stop(kept)
-    A.Stream.shut(tape)
 
-def Test.song.on(+dir: String, p: Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32>) ->
+def Test.song.on(+dir: String, p: S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>) ->
   IO(Unit):
-  (tape, chans, acc) = p
+  (deck, chans, acc) = p
   do IO<Unit>:
     both : List<Maybe<C.Channel>> <- C.Channel.hear(dir, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}],
       chans)
-    after : Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32> <-
-      Test.run([33, 999, 3072, 5, 3072, 3072, 3072], tape, both, acc)
+    after : S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32> <-
+      Test.run([33, 999, 3072, 5, 3072, 3072, 3072], deck, both, acc)
     Test.song.done(after)
 
-# The song, with a door from the first frame and the grunt from 2156.
-def Test.song(+dir: String, tape: Maybe<A.Stream.Tape>) -> IO(Unit):
+def Test.started(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
+  (deck, idle) = p
+  deck
+
+# The song from its first frame, after the chip's first buffer, with a
+# door from that frame and the grunt from 2156.
+def Test.song(+dir: String, deck: S.Song.Deck) -> IO(Unit):
   do IO<Unit>:
     door : List<Maybe<C.Channel>> <- C.Channel.hear(dir,
       [Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}], C.Channel.none())
-    first : Maybe<A.Stream.Tape> & List<Maybe<C.Channel>> & List<&2, U32> <-
-      Test.run([1, 7, 100, 2048], tape, door, [])
+    first : S.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32> <-
+      Test.run([1, 7, 100, 2048], Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))), door, [])
     Test.song.on(dir, first)
 
-def Test.played(+dir: String, +render: String, chans: List<Maybe<C.Channel>>) -> IO(Unit):
+def Test.played(+dir: String, +deck: S.Song.Deck, chans: List<Maybe<C.Channel>>) -> IO(Unit):
   do IO<Unit>:
-    Test.alone(dir, chans)
-    tape : Maybe<A.Stream.Tape> <- A.Stream.tape(render)
-    Test.song(dir, tape)
+    Test.alone(dir, deck, chans)
+    Test.song(dir, deck)
 
 def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
   match source:
@@ -209,11 +214,11 @@ def Test.script(+dir: String) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     +dir : String <- IO.try(String, IO.get_env("BENDOOM_SOUNDS"))
-    render : String <- IO.try(String, IO.get_env("BENDOOM_MUSIC"))
+    deck : S.Song.Deck <- S.Song.Deck.load(["D_E1M1"])
     Test.script(dir)
     grunt : List<Maybe<C.Channel>> <- C.Channel.hear(dir, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}],
       C.Channel.none())
-    Test.played(dir, render, grunt)
+    Test.played(dir, deck, grunt)
     IO.print("postmix " ++ Test.frame(A.Stream.post([(35536 << 16n : U32)],
       [A.Stream.mix(0, 255, 30000, A.Stream.mix(0, 255, 30000, 0))]), 0))
 #|01 DSSTNMOV/sector 1/63,64 - - - - - - -
@@ -236,6 +241,6 @@ def main() -> IO(Unit):
 #|18 - DSGETPOW/sector 9/20,81 - DSPSTART/sector 4/20,81 DSPSTOP/sector 5/20,81 DSBDOPN/sector 6/20,81 DSBDCLS/sector 7/20,81 -
 #|grunt 3631499139 0 63 64 1 49 50 3 -50 -50 2714 7399 7517 16995 -43 -44 16996 0 0
 #|after - - - - - - - -
-#|song 2975658234 0 -20 -81 1 -22 -91 2155 -484 -1330 2156 -970 -1188 2157 -624 -1543 15480 2454 6999
+#|song 4183762350 0 -20 -81 1 -22 -91 2155 -698 -1447 2156 -828 -1245 2157 -1038 -1548 15480 2248 6736
 #|playing DSDOROPN/sector 2/20,81 DSNOWAY/nobody/63,64 - - - - - -
 #|postmix 0 0 2767
