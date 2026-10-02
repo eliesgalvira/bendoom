@@ -1,9 +1,9 @@
 # Doom's heads-up message line: the strings d_englsh.h gives the pickups
-# the two E1M1s hold, the chaingun's and the blue door's refusal,
-# numbered, and the rule hu_lib.c's HUlib_drawTextLine picks a glyph by.
-# A message is carried as its number, since the state it lives in is
-# what the laws quantify over and the tests print; the text is made
-# where it is drawn or printed.
+# and the blue door's refusal, numbered, and the rule hu_lib.c's
+# HUlib_drawTextLine picks a glyph by. A message is carried
+# as its number, since the state it lives in is what the laws quantify
+# over and the tests print; the text is made where it is drawn or
+# printed.
 import Base
 
 # No message. The other numbers are this file's own, in the order
@@ -65,13 +65,31 @@ def Message.pd_bluek() -> U32:
 def Message.gotchaingun() -> U32:
   18
 
-# d_englsh.h's English strings, one for each pickup type a census of the
-# two E1M1s on Hurt Me Plenty finds, the chaingun's, and one for the
-# blue locked door.
-# GOTMEDINEED is not among them: P_GiveBody heals before p_inter.c tests
-# the health, which is then never under 25, so vanilla never shows it.
-# Nor are the strings of the pickup types neither map places, which
-# Inventory.grant still takes but says nothing for.
+def Message.gotyelwcard() -> U32:
+  19
+
+def Message.gotredcard() -> U32:
+  20
+
+def Message.gotinvis() -> U32:
+  21
+
+def Message.gotsuit() -> U32:
+  22
+
+def Message.gotmap() -> U32:
+  23
+
+def Message.gotvisor() -> U32:
+  24
+
+def Message.gotrockbox() -> U32:
+  25
+
+# d_englsh.h's English strings for the pickups Inventory.grant names
+# and for the blue locked door. GOTMEDINEED is not among them: P_GiveBody
+# heals before p_inter.c tests the health, which is then never under 25,
+# so vanilla never shows it.
 def Message.text(n: U32) -> String:
   match n:
     case 1:
@@ -110,6 +128,20 @@ def Message.text(n: U32) -> String:
       "You need a blue key to open this door"
     case 18:
       "You got the chaingun!"
+    case 19:
+      "Picked up a yellow keycard."
+    case 20:
+      "Picked up a red keycard."
+    case 21:
+      "Partial Invisibility"
+    case 22:
+      "Radiation Shielding Suit"
+    case 23:
+      "Computer Area Map"
+    case 24:
+      "Light Amplification Visor"
+    case 25:
+      "Picked up a box of rockets."
     case _:
       ""
 
