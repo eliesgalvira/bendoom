@@ -4,7 +4,7 @@
 # it, printed as a line of the palette's index and then 200 lines of 320
 # palette indices, two hex digits each. A demo that takes the exit
 # leaves the tally showing, and its tics after the exit are the tally's,
-# their use the press that accelerates it. tools/oracle.nu writes the
+# their use the press that accelerates it, and then the next map's. tools/oracle.nu writes the
 # demo and diffs the frame against Chocolate Doom's after the same one.
 #
 #   bend tools/frame.bend -o frame
@@ -15,7 +15,6 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/inter.bend as I
-import ../src/project.bend as P
 import ../src/demo.bend as D
 
 def Frame.line(p: Array<U32> & List<&2, U32>) -> Array<U32> & String:
@@ -42,20 +41,20 @@ def Frame.palette(p: Array<U32> & U32) -> Array<U32> & String:
   (mem, palette) = p
   (mem, B.Bytes.hex([palette]))
 
-def Frame.draw(script: List<&2, K.Cmd>, mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
-  (+gfx, +level) = gl
+def Frame.draw(ran: I.Play.Run) -> IO(Unit):
+  I.Ran{I.World{play, mem, gfx, tables, level}, sounds} = ran
   do IO<Unit>:
-    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(P.Project.tables(level), gfx,
-      I.Play.replay(script, level, I.Play.start(level)), False{}, mem)))
+    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(tables, gfx, play, False{}, mem)))
     Frame.rows(200n, 0, rest)
 
-def Frame.start(script: List<&2, K.Cmd>, w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
-  (mem, gl) = w
-  Frame.draw(script, mem, gl)
+def Frame.load(script: List<&2, K.Cmd>, +map: L.Level.Name) -> IO(Unit):
+  do IO<Unit>:
+    w : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
+    ran : I.Play.Run <- I.Play.run(script, False{}, I.Ran{I.Play.World.start(map, w), []})
+    Frame.draw(ran)
 
 def Frame.demo(+demo: List<&2, U32>) -> IO(Unit):
-  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, G.Gfx.open(D.Demo.episode(demo), D.Demo.map(demo)),
-    w => Frame.start(D.Demo.play(demo), w))
+  Frame.load(D.Demo.play(demo), D.Demo.map(demo))
 
 def main() -> IO(Unit):
   do IO<Unit>:

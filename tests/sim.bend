@@ -304,8 +304,12 @@ def Run.state(r: Run) -> S.State:
   state
 
 # An ended level runs no tic, so nothing new is heard.
-def heard(still: Bool, log: String, +q: S.State) -> Run:
-  Run{log ++ Bool.pick(String, still, "", events(S.State.sounds(q), S.State.clock(q))), q}
+def heard(ended: S.Sim.Exit, log: String, +q: S.State) -> Run:
+  match ended:
+    case S.Unended{}:
+      Run{log ++ events(S.State.sounds(q), S.State.clock(q)), q}
+    case _:
+      Run{log, q}
 
 def play(script: List<&2, K.Cmd>, r: Run) -> Run:
   match script r:
@@ -504,7 +508,7 @@ def ending(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
   +r = ran(n, cmd, s)
   +q = Run.state(r)
   do IO<S.State>:
-    IO.print(Run.log(r) ++ watch(tag, [], q) ++ " ended " ++ Bool.show(S.State.ended(q)) ++ " special "
+    IO.print(Run.log(r) ++ watch(tag, [], q) ++ " ended " ++ S.Sim.Exit.show(S.State.ended(q)) ++ " special "
       ++ U32.show(L.Level.special(S.State.level(q), 407)))
     return q
 
@@ -605,7 +609,7 @@ def south(d: U32, degrees: U32, s: S.State) -> S.State:
   S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
-  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}), level,
+  S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}, I.Inventory.start()), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
     sounds, mrnd, reborn, secrets}
 
@@ -2949,12 +2953,12 @@ def main() -> IO(Unit):
 #|- tic 92 831.939605 1463.978836 90.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 10 sector 71 -128.000000 -4.000000 key True things 209 cards 8 flash 0 message 0 "" tics 0
 #|sounds drew to 161
 #|-
-#|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
+#|exit first tic use tic 1 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended none special 11
 #|sound tic 5 DSPOSIT2 from thing 289 vol 64 sep 33
-#|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended False special 11
+#|- tic 20 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended none special 11
 #|sound tic 21 DSSWTCHN from nobody vol 64 sep 128
-#|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
-#|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended True special 0
+#|use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended normal special 0
+#|walk held use tic 21 -352.000000 1296.000000 180.000 z -128.000000 floor -128.000000 eye 41.000000 thinkers 9 ended normal special 0
 #|sounds drew to 87
 #|-
 #|states tic 0 2:45/4294967295 6:6/2 87:24/1 24:10/3 121:18/1 144:12/2 172:51/5

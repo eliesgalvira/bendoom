@@ -14,9 +14,11 @@
 # i << BT_WEAPONSHIFT, so 1 is 4, 2 is 4 + 8 = 12, 3 is 4 + 16 = 20, 4
 # is 4 + 24 = 28, 2 with 3 is 12, 1 with 3 is 4 and 3 with 4 is 20; Ctrl
 # with Space is 3, and with 3 too, 23. The byte is written and read
-# back whole.
+# back whole. The header is G_BeginRecording's for E1M5: version 109,
+# the skill, the episode, the map, and the options and players after.
 import Base
 import ../src/keys.bend as K
+import ../src/level.bend as L
 import ../src/demo.bend as D
 
 def int(+x: U32) -> String:
@@ -49,7 +51,7 @@ def held(use: Bool, fire: Bool, numbers: List<&2, Bool>) -> K.Cmd:
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    IO.print("header" ++ bytes(D.Demo.header()))
+    IO.print("header" ++ bytes(D.Demo.header(L.Name{1, 5})))
     IO.print(recorded("left", D.Demo.tics(K.Cmd{50, (0 - 40 : U32), 640, 2} <> turns(2n, 640), 0)))
     IO.print(recorded("right", D.Demo.tics(K.Cmd{(0 - 25 : U32), 24, (0 - 640 : U32), 0}
       <> turns(2n, (0 - 640 : U32)), 0)))
@@ -65,7 +67,7 @@ def main() -> IO(Unit):
     IO.print("marker" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 128, 0, 0, 0, 25, 0, 0, 0])))
     IO.print("cut" ++ cmds(D.Demo.cmds([50, 0, 0, 0, 25, 0, 0])))
 
-#|header 109 2 1 1 0 0 0 0 0 1 0 0 0
+#|header 109 2 1 5 0 0 0 0 0 1 0 0 0
 #|left 50 216 3 2 0 0 2 0 0 0 3 0 | carry -128 | read 50,-40,768,2 0,0,512,0 0,0,768,0
 #|right 231 24 254 0 0 0 253 0 0 0 254 0 | carry -128 | read -25,24,-512,0 0,0,-768,0 0,0,-512,0
 #|slow 0 0 1 0 0 0 2 0 0 0 1 0 0 0 1 0 | carry 0 | read 0,0,256,0 0,0,512,0 0,0,256,0 0,0,256,0

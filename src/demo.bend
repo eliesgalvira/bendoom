@@ -5,11 +5,14 @@
 import Base
 import ./bytes.bend as B
 import ./keys.bend as K
+import ./level.bend as L
 
-# Version 109, skill 2 (Hurt me plenty), E1M1, no deathmatch, respawn,
-# fast or -nomonsters, player 1 alone in the game.
-def Demo.header() -> List<&2, U32>:
-  [109, 2, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+# Version 109, skill 2 (Hurt me plenty), the map's episode and number,
+# no deathmatch, respawn, fast or -nomonsters, player 1 alone in the
+# game.
+def Demo.header(at: L.Level.Name) -> List<&2, U32>:
+  L.Name{episode, map} = at
+  [109, 2, episode, map, 0, 0, 0, 0, 0, 1, 0, 0, 0]
 
 # A demo being recorded, and the turn the last tic's rounding left over.
 type Demo.Rec is Type:
@@ -62,11 +65,8 @@ def Demo.play(bytes: List<&2, U32>) -> List<&2, K.Cmd>:
 
 # The episode and map a demo's header names, its third and fourth bytes,
 # 0 for a file too short to have them.
-def Demo.episode(bytes: List<&2, U32>) -> U32:
-  Maybe.default(&2, U32, List.get(&2, U32, bytes, 2n), 0)
-
-def Demo.map(bytes: List<&2, U32>) -> U32:
-  Maybe.default(&2, U32, List.get(&2, U32, bytes, 3n), 0)
+def Demo.map(+bytes: List<&2, U32>) -> L.Level.Name:
+  L.Name{Maybe.default(&2, U32, List.get(&2, U32, bytes, 2n), 0), Maybe.default(&2, U32, List.get(&2, U32, bytes, 3n), 0)}
 
 def Demo.read.chunk(bytes: List<&2, U32>, kept: List<&2, U32>) -> List<&2, U32>:
   List.append(&2, U32, kept, bytes)
@@ -77,15 +77,16 @@ def Demo.read(path: String) -> IO(List<&2, U32>):
     file : File <- IO.try(File, File.open(path, "r"))
     B.Bytes.fold(~List<&2, U32>, ~Demo.read.chunk, file, [])
 
-# The demo at the path, if one is named, created with its header.
-def Demo.open(path: Result<&1, &1, U32 & String, String>) -> IO(Maybe<Demo.Rec>):
+# The demo at the path, if one is named, created with its header for
+# the map it starts on.
+def Demo.open(path: Result<&1, &1, U32 & String, String>, at: L.Level.Name) -> IO(Maybe<Demo.Rec>):
   match path:
     case Fail{e}:
       IO.pure(Maybe<Demo.Rec>, None{})
     case Done{name}:
       do IO<Maybe<Demo.Rec>>:
         file : File <- IO.try(File, File.open(name, "w"))
-        kept : File <- B.Bytes.put_hex(file, Demo.header())
+        kept : File <- B.Bytes.put_hex(file, Demo.header(at))
         return Some{Rec{kept, 0}}
 
 def Demo.recorded(file: File, p: List<&2, U32> & U32) -> IO(Maybe<Demo.Rec> & List<&2, K.Cmd>):

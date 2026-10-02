@@ -38,7 +38,7 @@ def Walk.line(+which: List<&2, String>, +first: S.State, +s: S.State) -> String:
     ++ F.Fixed.show(S.Player.y(p)) ++ " " ++ A.Angle.show(S.Player.angle(p)) ++ " z "
     ++ F.Fixed.show(S.Player.z(p)) ++ " floor " ++ F.Fixed.show(S.Player.floorz(p)) ++ " eye "
     ++ F.Fixed.show((S.Player.viewz(p) - S.Player.floorz(p) : U32)) ++ " ended "
-    ++ Bool.show(S.State.ended(s)) ++ Walk.sectors(which, S.State.level(s)) ++ "\n  "
+    ++ S.Sim.Exit.show(S.State.ended(s)) ++ Walk.sectors(which, S.State.level(s)) ++ "\n  "
     ++ I.Inventory.show(S.Player.inv(p)) ++ H.Things.tally(H.Things.list(S.State.things(first)),
       S.State.things(s))
 
