@@ -11,15 +11,14 @@ import ./sim.bend as S
 import ./project.bend as P
 import ./show.bend as V
 import ./demo.bend as D
-import ./sound.bend as Sn
 import ./stream.bend as M
 
 # The clock is read each frame; the tics it owes accumulate in
 # thousandths of a tic, and at most eight run per frame, the rest
 # forgiven, so a stall cannot snowball. The array is the frame and the
 # graphics, redrawn each frame from the play's latest tic, the level or
-# the tally after it. The level is the map as loaded, which the tally
-# builds a fresh state from. Again is whether Space or Enter is down,
+# the tally after it. The level is the map as loaded, which a death
+# loads again. Again is whether Space or Enter is down,
 # which accelerates the tally. The demo is the one being recorded, until
 # the level ends, and the music the song being streamed, if there is
 # one.
@@ -88,42 +87,28 @@ def Game.ended(ending: Bool, demo: Maybe<D.Demo.Rec>) -> IO(Maybe<D.Demo.Rec>):
     case False{}:
       IO.pure(Maybe<D.Demo.Rec>, demo)
 
-type Game.Steps is Data:
-  Steps{play: I.Play, sounds: List<&2, Sn.Sound.Event>}
-
-def Game.tics(cmds: List<&2, K.Cmd>, +held: Bool, +level: L.Level, play: I.Play,
-  sounds: List<&2, Sn.Sound.Event>) -> Game.Steps:
-  match cmds:
-    case []:
-      Steps{play, sounds}
-    case cmd <> rest:
-      +step = I.Play.step(level, cmd, held, play)
-      Game.tics(rest, held, level, I.Play.Step.play(step),
-        List.append(&2, Sn.Sound.Event, sounds, I.Play.Step.sounds(step)))
-
-def Game.started(+play: I.Play, demo: Maybe<D.Demo.Rec>, +level: L.Level, gfx: G.Gfx,
-  tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
-  music: Maybe<M.Stream>, steps: Game.Steps) -> IO(Bool & Game):
-  Steps{+next, events} = steps
+def Game.started(was: Bool, demo: Maybe<D.Demo.Rec>, input: K.Input, +again: Bool, last: Nat, owed: Nat,
+  music: Maybe<M.Stream>, steps: I.Play.Run) -> IO(Bool & Game):
+  I.Ran{I.World{+next, mem, gfx, tables, level}, events} = steps
   do IO<Bool & Game>:
     playing : Maybe<M.Stream> <- M.Stream.hear(events, music)
-    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(I.Play.playing(play), Bool.not(I.Play.playing(next))),
-      demo)
+    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(was, Bool.not(I.Play.playing(next))), demo)
     return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, playing})
 
-def Game.advanced(+play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, +level: L.Level, gfx: G.Gfx,
+def Game.advanced(+play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
   tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
-  Game.started(play, demo, level, gfx, tables, input, again, last, owed, mem, music,
-    Game.tics(cmds, again, level, I.Play.ready(level, play), []))
+  +was = I.Play.playing(play)
+  IO.bind(I.Play.Run, Bool & Game, I.Play.run(cmds, again, I.Ran{I.World{play, mem, gfx, tables, level}, []}),
+    steps => Game.started(was, demo, input, again, last, owed, music, steps))
 
 # The play runs the tics the clock owes since the last frame, each on
 # the command built from the held keys, as the demo holds it, and with
 # Space or Enter held as the press that accelerates the tally, which the
 # tally itself reads on its first tic down.
 def Game.advance(+now: Nat, g: Game) -> IO(Bool & Game):
-  Game{+level, gfx, tables, play, +input, +again, last, owed, mem, demo, music} = g
+  Game{level, gfx, tables, play, +input, +again, last, owed, mem, demo, music} = g
   +due = Nat.add(owed, Nat.mul(Nat.sub(now, last), 35n))
   +capped = Nat.is_gt(Nat.div(due, 1000n), 8n)
   +tics = Bool.pick(Nat, capped, 8n, Nat.div(due, 1000n))
@@ -152,15 +137,15 @@ def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
 def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   Game{level, gfx, tables, +play, input, again, last, owed, mem, demo, music} = g
   match play:
-    case I.Playing{+state}:
+    case I.Playing{+state, map}:
       do IO<Bool & Game>:
         moved : Maybe<M.Stream> <- M.Stream.update(~S.State,
           ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music)
         playing : Maybe<M.Stream> <- M.Stream.play(moved)
-        return (quit, Game{level, gfx, tables, I.Playing{state}, input, again, last, owed, mem, demo, playing})
-    case I.Showing{+wi}:
+        return (quit, Game{level, gfx, tables, I.Playing{state, map}, input, again, last, owed, mem, demo, playing})
+    case I.Showing{wi, after, next}:
       IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(music),
-        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi}, input, again, last, owed,
+        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi, after, next}, input, again, last, owed,
           mem, demo, playing})))
 
 def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
@@ -216,21 +201,55 @@ def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Maybe<U32>):
     case 1n+f:
       Game.draw(window, Game.view(g), w => h => Game.loop(f, w, h))
 
-def Game.start.go(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Maybe<U32>):
-  (+gfx, +level) = gl
+def Game.start.go(frames: Nat, input: K.Input, demo: Maybe<D.Demo.Rec>, now: Nat, steps: I.Play.Run) ->
+  IO(Maybe<U32>):
+  I.Ran{I.World{play, mem, gfx, tables, level}, sounds} = steps
   do IO<Maybe<U32>>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
     music : Maybe<M.Stream> <- M.Stream.open()
-    Game.loop(frames, window, Game{level, gfx, P.Project.tables(level),
-      I.Play.replay(script, level, I.Play.start(level)), input, False{}, now, 0n, mem, demo, music})
+    Game.loop(frames, window, Game{level, gfx, tables, play, input, False{}, now, 0n, mem, demo, music})
 
 # The window opened and the loop run for at most so many frames, from
-# the player 1 start after a script, with the given input at first,
-# recording the demo if one is open. The song starts with the loop, as
-# vanilla's does at the level's load, and plays on through the level's
-# end and a restart. It answers what Game.shut does.
+# the player 1 start of the map after a script, with the given input at
+# first, recording the demo if one is open. The song starts with the
+# loop, as vanilla's does at the level's load, and plays on. It answers
+# what Game.shut does.
 def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  world: Array<U32> & G.Gfx & L.Level) -> IO(Maybe<U32>):
-  (mem, gl) = world
-  Game.start.go(frames, input, script, demo, now, mem, gl)
+  map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level) -> IO(Maybe<U32>):
+  IO.bind(I.Play.Run, Maybe<U32>, I.Play.run(script, False{}, I.Ran{I.Play.World.start(map, world), []}),
+    steps => Game.start.go(frames, input, demo, now, steps))
+
+# A number given as the first character of an argument, as d_main.c
+# reads one: its code less '0', in C's int arithmetic, which an empty
+# argument's NUL makes -48.
+def Game.digit(arg: String) -> U32:
+  match arg:
+    case SCon{c, rest}:
+      (Char.to_u32(c) - 48 : U32)
+    case _:
+      (0 - 48 : U32)
+
+def Game.warp.at(arg: String, rest: List<String>) -> L.Level.Name:
+  match rest:
+    case []:
+      L.Name{Game.digit(arg), 1}
+    case map <> more:
+      L.Name{Game.digit(arg), Game.digit(map)}
+
+def Game.warp.go(args: List<String>, here: Bool) -> L.Level.Name:
+  match args here:
+    case [] _:
+      L.Name{1, 1}
+    case arg <> rest True{}:
+      Game.warp.at(arg, rest)
+    case +arg <> rest False{}:
+      Game.warp.go(rest, String.eq(String.to_lower(arg), "-warp"))
+
+# The map a game starts on: E1M1, or the one Chocolate Doom's -warp
+# names outside Doom II. M_CheckParmWithArgs finds the first -warp in any
+# case with an argument after it; the episode is that argument's first
+# character, and the map the next argument's, or 1 when there is none.
+# G_InitNew's clamps are not applied, so a map the WAD lacks fails as
+# W_GetNumForName does.
+def Game.warp(args: List<String>) -> L.Level.Name:
+  Game.warp.go(args, False{})

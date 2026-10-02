@@ -61,6 +61,17 @@ nix run --accept-flake-config github:eliesgalvira/bendoom#bendoom-freedoom
 If your Nix installation does not enable flakes, add
 `--extra-experimental-features 'nix-command flakes'` after `nix`.
 
+### Start on another map
+
+The game starts on E1M1. `-warp <episode> <map>` starts it on another map,
+as Chocolate Doom's option does: `./bendoom -warp 1 5`, or
+`nix run --accept-flake-config github:eliesgalvira/bendoom -- -warp 1 5`.
+The `play.sh` launcher passes it on too:
+`curl -fsSL https://github.com/eliesgalvira/bendoom/releases/latest/download/play.sh | sh -s -- -warp 1 5`.
+Each digit is read as Chocolate Doom reads it, from the first character
+of its argument; the map defaults to 1. A map the WAD lacks ends the game
+with an error.
+
 ## Controls
 
 | Action | Keys |

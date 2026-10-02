@@ -42,7 +42,7 @@ def Bench.dry(dry: Maybe<U32>) -> String:
 def Bench.run(+t0: Nat, input: K.Input, script: List<&2, K.Cmd>, world: Array<U32> & G.Gfx & L.Level) ->
   IO(Unit):
   do IO<Unit>:
-    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, world)
+    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, L.Name{1, 1}, world)
     t1 : Nat <- IO.now()
     IO.print(Bench.rate(t0, t1) ++ Bench.dry(dry))
 

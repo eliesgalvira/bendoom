@@ -174,17 +174,18 @@ def Bar.arm(+weapons: U32, +i: U32) -> U32:
   Bool.pick(U32, Bar.owned(weapons, i), (Bar.short() + i + 2 : U32), (Bar.grey() + i : U32))
 
 # The six numbers of the arms panel, three to a row from ST_ARMSX,
-# ST_ARMSY. Every one but the pistol's, owned from the start, turns
-# yellow during the level once its weapon is owned.
-def Bar.arms.go(n: Nat, +i: U32, +weapons: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+# ST_ARMSY. One whose weapon was owned at ST_Start was drawn yellow
+# then over the panel; one that turned yellow since restored the
+# background first.
+def Bar.arms.go(n: Nat, +i: U32, +weapons: U32, +armed: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   match n:
     case 0n:
       mem
     case 1n+m:
       +x = (111 + (i % 3) * 12 : U32)
       +y = (172 + (i / 3) * 10 : U32)
-      Bar.arms.go(m, (i + 1 : U32), weapons, gfx, Bar.patch(G.Gfx.bar(gfx, Bar.arm(weapons, i)), x, y,
-        Bar.arm.back(Bool.and(Bool.not(U32.is_zero(i)), Bar.owned(weapons, i)), x, y, gfx, mem)))
+      Bar.arms.go(m, (i + 1 : U32), weapons, armed, gfx, Bar.patch(G.Gfx.bar(gfx, Bar.arm(weapons, i)), x, y,
+        Bar.arm.back(Bool.and(Bool.not(Bar.owned(armed, i)), Bar.owned(weapons, i)), x, y, gfx, mem)))
 
 # ST_updateWidgets' keyboxes: a colour shows its skull when that is
 # held, else its card, and nothing when neither is.
@@ -233,16 +234,16 @@ def Bar.numbers(+inv: I.Inventory, +ammo: U32, +gfx: G.Gfx, mem: Array<U32>) -> 
 # ST_drawWidgets' icons: the arms panel with its six weapon numbers, the
 # face the sim chose at ST_FACESX, ST_FACESY, and the key slot of each
 # colour.
-def Bar.icons(+inv: I.Inventory, +face: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
+def Bar.icons(+inv: I.Inventory, +face: U32, +armed: U32, +gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
   Bar.keys.go(3n, 0, I.Inventory.cards(inv), gfx,
     Bar.patch(G.Gfx.bar(gfx, (Bar.face() + face : U32)), 143, 168,
-      Bar.arms.go(6n, 0, I.Inventory.weapons(inv), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem))))
+      Bar.arms.go(6n, 0, I.Inventory.weapons(inv), armed, gfx, Bar.patch(G.Gfx.bar(gfx, Bar.arms()), 104, 168, mem))))
 
 # Doom's ST_Drawer with the bar on: the background, then the widgets in
 # ST_drawWidgets' order.
-def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +face: U32, +gfx: G.Gfx, mem: Array<U32>) ->
+def Bar.draw(+inv: I.Inventory, ready: H.Thing.Weapon, +face: U32, +armed: U32, +gfx: G.Gfx, mem: Array<U32>) ->
   Array<U32>:
-  Bar.icons(inv, face, gfx,
+  Bar.icons(inv, face, armed, gfx,
     Bar.numbers(inv, H.Thing.Weapon.ammo(ready), gfx, Bar.patch(G.Gfx.bar(gfx, Bar.back()), 0, 168, mem)))
 
 # The palette
