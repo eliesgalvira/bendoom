@@ -86,6 +86,14 @@ def Wad.index.pick(hit: Bool, rest: Maybe<Nat>) -> Maybe<Nat>:
     case False{}:
       Wad.index.bump(rest)
 
+# The bytes and directory of the WAD BENDOOM_IWAD names; a WAD that
+# cannot be read ends the program with the error.
+def Wad.open() -> IO(Array<U32> & List<&2, Wad.Lump>):
+  do IO<Array<U32> & List<&2, Wad.Lump>>:
+    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
+    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
+    return Wad.dir(bytes)
+
 # The index of the first lump called name.
 def Wad.index(+name: String, lumps: List<&2, Wad.Lump>) -> Maybe<Nat>:
   match lumps:
