@@ -63,11 +63,10 @@ law arrows_wasd:
 # G_BuildTiccmd's loop breaks at the first: BT_CHANGE, 4, with the key's
 # number less one at BT_WEAPONSHIFT, 3.
 law lowest_number_wins:
-  for two: Bool
-  for three: Bool
-  {(K.Keys.change(True{}, two, three), K.Keys.change(False{}, True{}, three),
-    K.Keys.change(False{}, False{}, True{}), K.Keys.change(False{}, False{}, False{}))
-    == (4, 12, 20, 0) : U32 & U32 & U32 & U32}
+  for rest: List<&2, Bool>
+  {(K.Keys.change(True{} <> rest, 4), K.Keys.change(False{} <> True{} <> rest, 4),
+    K.Keys.change(False{} <> False{} <> False{} <> True{} <> rest, 4), K.Keys.change(K.Keys.numbers.none(), 4))
+    == (4, 12, 28, 0) : U32 & U32 & U32 & U32}
 
 # The sim
 # -------
