@@ -1,4 +1,4 @@
-# The map: E1M1's lumps read into trees, its things as recorded, and
+# A map's lumps read into trees, its things as recorded, and
 # Doom's tables. Data, so the sim and the renderer take it by copy. Each
 # lump is one tree of its 16-bit words, record after record, indexed by
 # record number times the words kept of a record, plus the field. The
@@ -20,6 +20,10 @@ type Level.Blockmap is Data:
 
 type Level.Start is Data:
   Start{x: U32, y: U32, angle: U32}
+
+# A map by its episode and number, Doom's gameepisode and gamemap.
+type Level.Name is Data:
+  Name{episode: U32, map: U32}
 
 # The THINGS lump's five words a record (x and y in map units, the angle
 # in degrees, the DoomEd type and the options), and how many records.
@@ -522,18 +526,25 @@ def Level.sector_at(+l: Level, +x: U32, +y: U32) -> U32:
 # Loading
 # -------
 
-def Level.map.drop(lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
-  List<&2, W.Wad.Lump>:
+# The marker lump that starts a map's lumps, as G_DoLoadLevel names it:
+# ExMy.
+def Level.marker(+episode: U32, +map: U32) -> String:
+  "E" ++ U32.show(episode) ++ "M" ++ U32.show(map)
+
+def Level.map.drop(+marker: String, lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
+  Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>:
   match i:
     case None{}:
-      []
+      Fail{(1, "W_GetNumForName: " ++ marker ++ " not found")}
     case Some{k}:
-      List.drop(&2, W.Wad.Lump, lumps, k)
+      Done{List.drop(&2, W.Wad.Lump, lumps, k)}
 
-# The lumps from the E1M1 marker on, so Freedoom's first map loads the
-# same way.
-def Level.map(+lumps: List<&2, W.Wad.Lump>) -> List<&2, W.Wad.Lump>:
-  Level.map.drop(lumps, W.Wad.index("E1M1", lumps))
+# The lumps from the map's marker on, or P_SetupLevel's error for a
+# marker the WAD lacks.
+def Level.map(+episode: U32, +map: U32, +lumps: List<&2, W.Wad.Lump>) ->
+  Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>:
+  +marker = Level.marker(episode, map)
+  Level.map.drop(marker, lumps, W.Wad.index(marker, lumps))
 
 # The offsets of the given fields in every record of a lump.
 def Level.fields(ps: U32 & U32, +stride: U32, fields: List<&2, U32>) -> List<&2, U32>:
@@ -674,8 +685,24 @@ def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, List<&2, U3
   Level.flats(map, Level.vecs(lists), B.Bytes.each(~String, ~B.Bytes.name,
     Level.fields(W.Wad.find(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
 
-# The level from the WAD's bytes and directory.
-def Level.load(p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Level:
+def Level.read(a: Array<U32>, found: Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>) ->
+  Result<&1, &1, U32 & String, Array<U32> & Level>:
+  match found:
+    case Fail{e}:
+      Fail{e}
+    case Done{+map}:
+      Done{Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(map), a))}
+
+# Map ExMy of the WAD from its bytes and directory, or Doom's error for
+# a map the WAD lacks.
+def Level.load(+episode: U32, +map: U32, p: Array<U32> & List<&2, W.Wad.Lump>) ->
+  Result<&1, &1, U32 & String, Array<U32> & Level>:
   (a, +lumps) = p
-  +map = Level.map(lumps)
-  Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(map), a))
+  Level.read(a, Level.map(episode, map, lumps))
+
+# Map ExMy of the WAD BENDOOM_IWAD names; a WAD that cannot be read, or
+# a map it lacks, ends the program with the error.
+def Level.open(+episode: U32, +map: U32) -> IO(Array<U32> & Level):
+  do IO<Array<U32> & Level>:
+    dir : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    IO.pass(Array<U32> & Level, Level.load(episode, map, dir))

@@ -520,10 +520,11 @@ def Sim.once(line: U32, s: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
 
-# Doom's G_ExitLevel: the level ends, and the tic it ends on runs on.
-def State.end(s: S.State) -> S.State:
+# Doom's G_ExitLevel and G_SecretExitLevel: the level ends the way
+# given, and the tic it ends on runs on.
+def State.end(how: S.Sim.Exit, s: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  S.State{player, level, things, sidetex, thinkers, rnd, clock, True{}, usedown, sounds, mrnd, reborn, secrets}
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, how, usedown, sounds, mrnd, reborn, secrets}
 
 # A switch that works once: when its tag starts a mover, its texture is
 # swapped and its special cleared.
@@ -625,7 +626,7 @@ def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.S
     case 62:
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
     case 11:
-      State.end(Sim.once(i, Sim.switch(False{}, i, s)))
+      State.end(S.Normal{}, Sim.once(i, Sim.switch(False{}, i, s)))
     case _:
       s
 

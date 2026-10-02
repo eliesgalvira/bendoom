@@ -8,6 +8,6 @@ import ../src/sim.bend as S
 import ../src/keys.bend as K
 
 def main() -> IO(Unit):
-  IO.print(Nat.show(List.length(&2, K.Cmd, F.Film.outro(I.Showing{
-    I.Inter.start(S.Tally{1, 2, 0, 4, 5, 1, 1691}, 0, True{})}))))
+  IO.print(Nat.show(List.length(&2, K.Cmd, F.Film.outro.of(I.Inter.start(S.Tally{1, 2, 0, 4, 5, 1, 1691}, 0,
+    True{})))))
 #|332

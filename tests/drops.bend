@@ -11,8 +11,6 @@ import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/vec.bend as V
-import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ./fixtures/combat.bend as C
 import ../src/fixed.bend as F
 import ../src/keys.bend as K
@@ -171,9 +169,8 @@ def main() -> IO(Unit):
     IO.print("placed kept " ++ Bool.show(Bool.not(Maybe.is_none(&2, H.Thing, H.Things.get(things(clipped(0, spawned(2007))), 0)))))
     IO.print("living fits " ++ Bool.show(S.Sim.Try.ok(clipped(0, spawned(3004)))))
     IO.print("lift removed drop " ++ Bool.show(Maybe.is_none(&2, H.Thing, H.Things.get(things(lifted(killed(3004))), 1))))
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    actual(L.Level.load(W.Wad.dir(bytes)))
+    world : Array<U32> & L.Level <- L.Level.open(1, 1)
+    actual(world)
 
 #|pain retaliation True
 #|zombieman 2007 dropped True draws 3

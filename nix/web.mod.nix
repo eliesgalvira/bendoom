@@ -24,7 +24,7 @@
       checks = optionalAttrs (system == "x86_64-linux") {
         web = pkgs.callPackage ./web-check.nix {
           bend = config.packages.bend-web;
-          inherit (config.packages) web music;
+          inherit (config.packages) web;
         };
       };
     };
