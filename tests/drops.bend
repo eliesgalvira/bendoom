@@ -171,7 +171,7 @@ def main() -> IO(Unit):
     IO.print("lift removed drop " ++ Bool.show(Maybe.is_none(&2, H.Thing, H.Things.get(things(lifted(killed(3004))), 1))))
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    actual(L.Level.load(W.Wad.dir(bytes)))
+    actual(L.Level.load(1, 1, W.Wad.dir(bytes)))
 
 #|pain retaliation True
 #|zombieman 2007 dropped True draws 3
