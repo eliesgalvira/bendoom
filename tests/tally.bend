@@ -21,8 +21,15 @@
 # WI_checkForAccelerate reads them: one while the counts climb shows
 # them all at once and leaves sp_state 10, the next leaves for the
 # screen that names E1M2 with its four seconds, the next cuts that
-# short to the ten tics of WI_initNoState, and after them G_WorldDone
-# starts E1M1 again, its things and its random index as they spawn.
+# short to the ten tics of WI_initNoState, after which G_WorldDone asks
+# for E1M2. Its first tic starts at its player 1 start in the WAD, 608,
+# 48, with the inventory G_PlayerFinishLevel leaves, P_Random's index
+# carried on (which no G_InitNew clears), and S_Start's song for it,
+# D_E1M2; a death there and a held use reload E1M2 from a pistol start
+# on the next tic. The indices are regression pins. Then G_DoCompleted's
+# next map from each E1 map by each exit, the secret exit's seam on
+# E1M3, which leads to E1M9's tally, and E1M8's exit, which vanilla
+# follows with the finale and no tally, so its level holds.
 # Last a secret sector counted: the player put in sector 86, which
 # P_PlayerInSpecialSector counts on the tic it stands on its floor, then
 # walked north into the pit it rings, sector 87, and back into 86, which
@@ -294,6 +301,19 @@ def main() -> IO(Unit):
 #|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 93
 #|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93 wants none
 #|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93 wants E1M2
+#|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 237 song D_E1M2
+#|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 153
+#|E1M1 E1M2 E1M9
+#|E1M2 E1M3 E1M9
+#|E1M3 E1M4 E1M9
+#|E1M4 E1M5 E1M9
+#|E1M5 E1M6 E1M9
+#|E1M6 E1M7 E1M9
+#|E1M7 E1M8 E1M9
+#|E1M8 none none
+#|E1M9 E1M4 E1M9
+#|E1M3 secret tally for E1M9
+#|E1M8 normal E1M8 tic 7 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 67
 #|sound bcnt 36 DSPISTOL from nobody vol 64 sep 128 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 41 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 192 DSSGCOCK from nobody vol 64 sep 128

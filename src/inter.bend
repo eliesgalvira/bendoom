@@ -825,8 +825,9 @@ def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
     case Playing{+state, map}:
+      +ended = S.State.ended(state)
       +after = S.Sim.tic(cmd, Play.reborn(S.State.reborn(state), level, state))
-      Step{Play.after(map, after), Play.sounds(S.State.ended(state), after)}
+      Step{Play.after(map, after), Play.sounds(ended, after)}
     case Showing{+wi, after, next}:
       +press = Play.pressed(held, cmd)
       +ticked = Inter.tic(press, wi)
