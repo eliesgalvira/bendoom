@@ -5,8 +5,6 @@
 # The three-room fixture has edges 0-1-2; one sound-block line passes,
 # two stop at room 1. Targets survive a later closing door in vanilla.
 import Base
-import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/level.bend as L
 import ../src/vec.bend as V
 import ../src/sim.bend as S
@@ -78,9 +76,8 @@ def run(w: Array<U32> & L.Level) -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    run(L.Level.load(1, 1, W.Wad.dir(bytes)))
+    world : Array<U32> & L.Level <- L.Level.open(1, 1)
+    run(world)
 
 #|unfired 0
 #|closed door 38

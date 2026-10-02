@@ -2,8 +2,6 @@
 # 3.1.1 reaches the exit on tic 2060 with these exact player and RNG
 # values, then settles at 37% kills, 22% items, 0% secrets and 0:58.
 import Base
-import ../src/bytes.bend as B
-import ../src/wad.bend as W
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
@@ -43,9 +41,8 @@ def loaded(world: Array<U32> & L.Level, cmds: List<&2, K.Cmd>) -> IO(Unit):
 def main() -> IO(Unit):
   do IO<Unit>:
     cmds : List<&2, K.Cmd> <- R.Route.read("tests/fixtures/freedoom.lmp")
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    loaded(L.Level.load(1, 1, W.Wad.dir(bytes)), cmds)
+    world : Array<U32> & L.Level <- L.Level.open(1, 1)
+    loaded(world, cmds)
 
 #|exit tic 2060 ended True health 25 armour 82 random 22
 #|position -364.361557 1296.127792 -128.000000
