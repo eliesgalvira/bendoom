@@ -6,7 +6,6 @@
     in {
       devShells.default = pkgs.mkShell ({
         BENDOOM_IWAD = config.packages.bendoom-freedoom.iwad;
-        BENDOOM_MUSIC = config.packages.music-freedoom;
         BENDOOM_SOUNDS = config.packages.sounds-freedoom;
 
         packages = [
@@ -18,6 +17,8 @@
           pkgs.chocolate-doom
           pkgs.xorg.xorgserver
           pkgs.xdotool
+          pkgs.pulseaudio
+          pkgs.ffmpeg-headless
         ];
 
         buildInputs = optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libx11 pkgs.alsa-lib ];
