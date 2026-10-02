@@ -885,21 +885,28 @@ def Gfx.sprite.weapon(w: H.Thing.Weapon, +n: Nat, marks: V.Vec) -> V.Vec:
     Gfx.sprite.chase(n, False{}, down, down,
       Gfx.sprite.chase(n, False{}, ready, ready, Gfx.sprite.chase(n, False{}, up, up, marks)))))
 
+def Gfx.sprite.weapons(ws: List<&2, H.Thing.Weapon>, +n: Nat, marks: V.Vec) -> V.Vec:
+  match ws:
+    case []:
+      marks
+    case w <> rest:
+      Gfx.sprite.weapons(rest, n, Gfx.sprite.weapon(w, n, marks))
+
 # A type spawned in play alone, whose rows no THINGS record reaches.
 def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
 # The state rows the level and runtime drops can spawn, the weapons,
-# and every row those entry points lead to, each once, in order.
+# the chaingun's second flash, which A_FireCGun sets and no row leads
+# to, and every row those entry points lead to, each once, in order.
 def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   H.Spawn{things, rnd, you} = s
   +n = List.length(&2, H.Thing.Row, H.Thing.rows())
   +marks = V.Vec.set(V.Vec.of_list([], U32.from_nat(n)), 50, 1)
-  +marks = Gfx.sprite.weapon(H.Thing.pistol(), n, marks)
-  +marks = Gfx.sprite.weapon(H.Thing.shotgun(), n, marks)
-  +marks = Gfx.sprite.weapon(H.Thing.fist(), n, marks)
-  +marks = Gfx.sprite.weapon(H.Thing.saw(), n, marks)
+  +marks = Gfx.sprite.weapons(H.Thing.weapons(), n, marks)
+  +second = (H.Thing.Weapon.flash(H.Thing.chaingun()) + 1 : U32)
+  +marks = Gfx.sprite.chase(n, False{}, second, second, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(2007), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(2001), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
