@@ -14,3 +14,5 @@ Ticket 03 landed every shareware thing type; its standards review found no hard 
 - [ ] `Thing.rows()`'s header describes how the table grew rather than where each row group sits.
 - [ ] `Inventory.tic` nests four `Inventory.power.tic(...)` calls with `4294967295` for −1; a named step or a per-power row reads better. `Inventory.sound` mixes `||` with `Bool.or`.
 - [ ] The player's link in `Sim.relink` and `State.entered.you` passes a literal 0 for flags rather than the player's own; `Things.edit.if` needs a name that says what it edits.
+
+**Where it stopped (2026-10-03, 17:45):** stopped by Elies. Branch `e1-23` (worktree `../bendoom-e1-23`) has 2 unverified commits toward this list; it was moving the open-work notes out of src/tic.bend and src/bar.bend.

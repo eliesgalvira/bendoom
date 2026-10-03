@@ -13,3 +13,5 @@
 - [ ] The film exporter's E1M1 video has the same audio as before, plus the demon's attack.
 - [ ] The web build plays sound effects in the browser check.
 - [ ] No build-time sound renderer, packaged sound file or `BENDOOM_SOUNDS` remains.
+
+**Where it stopped (2026-10-03, 17:45):** stopped by Elies. Branch `e1-05` (worktree `../bendoom-e1-05`) has 3 unreviewed commits: 3a17912 (one WAD directory parser for the whole-file and streaming readers), dd80cdd (every sound expanded from the opened WAD at start), e3cccda (one Xvfb launch and wait-for shared by listen, oracle and the smoke test). About 260 uncommitted lines on 9 files (including LAWS.bend) rework the sound bank from a list to an array; it was chasing an out-of-memory failure in a patched runtime when stopped. Not merged with episode-1 since 2a8fb63.
