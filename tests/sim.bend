@@ -270,6 +270,7 @@ import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/vec.bend as V
@@ -316,7 +317,7 @@ def play(script: List<&2, K.Cmd>, r: Run) -> Run:
     case [] _:
       r
     case cmd <> rest Run{log, +s}:
-      play(rest, heard(S.State.ended(s), log, S.Sim.tic(cmd, s)))
+      play(rest, heard(S.State.ended(s), log, Tic.Sim.tic(cmd, s)))
 
 def ran(n: Nat, cmd: K.Cmd, s: S.State) -> Run:
   play(List.replicate(K.Cmd, n, cmd), Run{"", s})
@@ -388,7 +389,7 @@ def fire() -> K.Cmd:
   K.Cmd.demo(0, 0, 0, 1)
 
 def at(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
-  S.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
+  Tic.State.at(level, L.Start{F.Fixed.of_map(x), F.Fixed.of_map(y), A.Angle.of_thing(degrees)})
 
 # The map with the middle textures of its two switches' sides, 1166 (the
 # special 23 switch) and 615 (the exit), numbered 1, a switch whose
@@ -428,7 +429,7 @@ def fast(+p: S.Player) -> S.Player:
 
 def split.crossed(+level: L.Level) -> IO(Unit):
   +s = at(level, 2025, 65086, 0)
-  +q = S.Sim.tic(idle(), S.State.player.put(s, fast(S.State.player(s))))
+  +q = Tic.Sim.tic(idle(), S.State.player.put(s, fast(S.State.player(s))))
   IO.print(events(S.State.sounds(q), S.State.clock(q)) ++ line("split crossing", q))
 
 def crossed(+level: L.Level) -> IO(Unit):
@@ -447,7 +448,7 @@ def crossed(+level: L.Level) -> IO(Unit):
 # pit east of it, used again while it runs, and again once it is back.
 def lift(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, 0), [98], S.State.start(level))
+    l0 : S.State <- run("lift run", 35n, K.Cmd.demo(50, 0, 0, 0), [98], Tic.State.start(level))
     l1 : S.State <- run("-", 4n, idle(), [98], l0)
     l2 : S.State <- run("over", 1n, idle(), [98], l1)
     l3 : S.State <- run("-", 33n, idle(), [98], l2)
@@ -491,7 +492,7 @@ def holding(inv: I.Inventory, s: S.State) -> S.State:
 def blue(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     k0 : S.State <- keyed("key turn", 87, 1n, K.Cmd.demo(0, 0, 4294967280, 0),
-      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 2246, 592, 180)))
     k1 : S.State <- keyed("strafe", 87, 12n, K.Cmd.demo(0, 4294967272, 0, 0), k0)
     k2 : S.State <- keyed("-", 87, 1n, K.Cmd.demo(0, 4294967272, 0, 0), k1)
     k3 : S.State <- keyed("-", 87, 10n, K.Cmd.demo(0, 4294967272, 0, 0), k2)
@@ -536,7 +537,7 @@ def lights(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
     case n <> rest:
       do IO<Unit>:
         IO.print("lights tic " ++ U32.show(S.State.clock(s)) ++ lit([32, 33, 48, 90], S.State.level(s)))
-        lights(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
+        lights(rest, Tic.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
 
 # The state row and tics of a thing, none for one gone.
 def phase(m: Maybe<&2, H.Thing>) -> String:
@@ -562,7 +563,7 @@ def states(gaps: List<&2, Nat>, +s: S.State) -> IO(Unit):
       do IO<Unit>:
         IO.print("states tic " ++ U32.show(S.State.clock(s)) ++ phases([2, 6, 87, 24, 121, 144, 172],
           S.State.things(s)))
-        states(rest, S.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
+        states(rest, Tic.Sim.replay(List.replicate(K.Cmd, n, idle()), s))
 
 # A use while the door closes sends it back up; one while it waits
 # starts it down.
@@ -650,7 +651,7 @@ def used(+before: S.State) -> IO(Unit):
     h2 : S.State <- run("use", 200n, use(), [10], h1)
     IO.print(drawn(h2))
     IO.print("-")
-    placements(S.Sim.replay(use() <> List.replicate(K.Cmd, 61n, idle()), before))
+    placements(Tic.Sim.replay(use() <> List.replicate(K.Cmd, 61n, idle()), before))
 
 # A thing's type, height, floor and ceiling, state and tics, none for
 # one gone.
@@ -725,14 +726,14 @@ def patched(p: Array<U32> & List<&2, W.Wad.Lump>) -> Result<&1, &1, U32 & String
 def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
   do IO<Unit>:
     c0 : S.State <- run("column walk", 17n, forward(), [],
-      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 65344, 1712, 270)))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 65344, 1712, 270)))
     c1 : S.State <- run("-", 1n, forward(), [], c0)
     c2 : S.State <- run("-", 10n, forward(), [], c1)
     k0 : S.State <- run("corpse walk", 10n, forward(), [],
-      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 128, 432, 270)))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 128, 432, 270)))
     k1 : S.State <- run("-", 8n, forward(), [], k0)
     z0 : S.State <- run("zombieman walk", 24n, forward(), [],
-      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 832, 384, 90)))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(level, 832, 384, 90)))
     z1 : S.State <- run("-", 20n, forward(), [], z0)
     l0 : S.State <- carry("column lift switch walk", 10n, forward(), [98], 3,
       at(placed, 240, 256, 180))
@@ -767,7 +768,7 @@ def solids(+level: L.Level, +placed: L.Level) -> IO(Unit):
 def locked(+placed: L.Level) -> IO(Unit):
   do IO<Unit>:
     k0 : S.State <- keyed("blue door refused", 82, 1n, use(),
-      S.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, idle()), at(placed, 880, 1440, 90)))
     k1 : S.State <- keyed("-", 82, 20n, idle(), k0)
     k2 : S.State <- keyed("turn", 82, 1n, K.Cmd.demo(0, 0, 112, 0), k1)
     k3 : S.State <- keyed("walk", 82, 13n, forward(), k2)
@@ -801,9 +802,9 @@ def door(+level: L.Level) -> IO(Unit):
     lift(level)
     blue(level)
     exits(switched(level))
-    states([1n, 1n, 1n, 1n, 1n, 8n, 10n, 12n, 1n, 0n], S.State.start(level))
+    states([1n, 1n, 1n, 1n, 1n, 8n, 10n, 12n, 1n, 0n], Tic.State.start(level))
     lights([1n, 7n, 1n, 6n, 20n, 1n, 5n, 24n, 5n, 1n, 5n, 1n, 3n, 1n, 1n, 1n, 8n, 44n, 7n, 2n, 0n],
-      S.State.start(level))
+      Tic.State.start(level))
 
 def count(things: List<&2, H.Thing>, +kind: U32) -> U32:
   match things:
@@ -1014,7 +1015,7 @@ def loose(+level: L.Level) -> IO(Unit):
 # one clip short of the cap, and at it: an idle tic, since the player
 # starts with use held, the use, the door rising, the walk.
 def box(tag: String, +s: S.State) -> IO(Unit):
-  +opened = S.Sim.replay(List.concat(&2, K.Cmd, [[idle(), use()], List.replicate(K.Cmd, 30n, idle())]), s)
+  +opened = Tic.Sim.replay(List.concat(&2, K.Cmd, [[idle(), use()], List.replicate(K.Cmd, 30n, idle())]), s)
   do IO<Unit>:
     b : S.State <- walked(tag, 19n, opened)
     IO.print("-")
@@ -1025,7 +1026,7 @@ def chainsaw(tag: String, inv: I.Inventory, +level: L.Level) -> IO(S.State):
   +s = holding(inv, at(level, 3158, 2176, 180))
   do IO<S.State>:
     a : S.State <- picked(tag, 12n, K.Cmd.demo(0, 4294967272, 0, 0), s,
-      S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
+      Tic.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
         [K.Cmd.demo(0, 0, 4294967280, 0)]), s))
     b : S.State <- picked("-", 1n, K.Cmd.demo(0, 4294967272, 0, 0), s, a)
     finished(b)
@@ -1154,13 +1155,13 @@ def seen(tag: String, id: U32, +s: S.State) -> IO(S.State):
 # it, a tic, and another spawned; then the player's first move.
 def relinks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    s0 : S.State <- seen("start", 58, S.State.start(level))
+    s0 : S.State <- seen("start", 58, Tic.State.start(level))
     s1 : S.State <- seen("moved", 58, moved(58, 65136, 300, s0))
     s2 : S.State <- seen("spawned", 292, spawned(H.Thing.def(2014), 65196, 288, s1))
-    s3 : S.State <- seen("a tic", 292, S.Sim.tic(idle(), s2))
-    s4 : S.State <- seen("removed, a tic", 292, S.Sim.tic(idle(), S.Sim.remove(292, s3)))
+    s3 : S.State <- seen("a tic", 292, Tic.Sim.tic(idle(), s2))
+    s4 : S.State <- seen("removed, a tic", 292, Tic.Sim.tic(idle(), S.Sim.remove(292, s3)))
     s5 : S.State <- seen("spawned", 293, spawned(H.Thing.def(2014), 65196, 288, s4))
-    s6 : S.State <- seen("walked", 293, S.Sim.tic(forward(), s5))
+    s6 : S.State <- seen("walked", 293, Tic.Sim.tic(forward(), s5))
     IO.print(links(s6))
 
 def psprite(psp: S.Psprite) -> String:
@@ -1173,7 +1174,7 @@ def psprites(ps: S.Psprites) -> String:
   " state " ++ psprite(weapon) ++ " flash " ++ psprite(flash)
 
 def armed(n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
-  +q = S.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
+  +q = Tic.Sim.replay(List.replicate(K.Cmd, n, cmd), s)
   do IO<S.State>:
     IO.print("weapon tic " ++ U32.show(S.State.clock(q)) ++ psprites(S.Player.psprites(S.State.player(q))))
     return q
@@ -1182,7 +1183,7 @@ def armed(n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 # walk east, and at rest again once the momentum is gone.
 def weapon(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    w0 : S.State <- armed(0n, idle(), S.State.start(level))
+    w0 : S.State <- armed(0n, idle(), Tic.State.start(level))
     w1 : S.State <- armed(1n, idle(), w0)
     w2 : S.State <- armed(13n, idle(), w1)
     w3 : S.State <- armed(1n, idle(), w2)
@@ -1275,12 +1276,12 @@ def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
 # the blow reads it.
 def struck(health: U32, rnd: U32, tx: U32, ty: U32, tz: U32) -> S.State:
   struck.in(holding(stocked(health, 0, 0, [50, 0, 0, 0], I.Inventory.start()),
-    S.State.at(L.Level.room(0, 128), L.Start{0, 0, 0})), rnd,
+    Tic.State.at(L.Level.room(0, 128), L.Start{0, 0, 0})), rnd,
     H.Thing{0, 2035, F.Fixed.of_map(tx), F.Fixed.of_map(ty), tz, 0, 8388608, 0, 0, 10, 6, 0,
       H.Thing.Hurt.of(2035)})
 
 def blown(damage: U32, +s: S.State) -> S.State:
-  S.Sim.damage(H.Things.you(S.State.things(s)), damage, 0, 0, s)
+  Tic.Sim.damage(H.Things.you(S.State.things(s)), damage, 0, 0, s)
 
 # A blow from a thing, which nothing on the map can deal yet: the thrust
 # away from the inflictor, the attacker kept, and after a lethal one the
@@ -1308,7 +1309,7 @@ def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
 
 # The player killed on the spot by a blow from nobody.
 def killed(+s: S.State) -> S.State:
-  S.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
+  Tic.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
 
 # The clip west of 672, 992, which a walk from there takes on its tenth
 # tic: a corpse killed on the spot and slid west over it at 5 a tic
@@ -1349,7 +1350,7 @@ def faced(script: List<&2, K.Cmd>, +was: U32, r: Run) -> Run:
     case [] _:
       r
     case cmd <> rest Run{log, s}:
-      +q = S.Sim.tic(cmd, s)
+      +q = Tic.Sim.tic(cmd, s)
       faced(rest, face.at(q), Run{faced.line(Bool.not(U32.is_eq(face.at(q), was)), log, q), q})
 
 # A run of one command, its face changes, and the face the run left with
@@ -1367,7 +1368,7 @@ def faces(tag: String, n: Nat, cmd: K.Cmd, +s: S.State) -> IO(S.State):
 # the health ST_Ticker saw last is no longer -1 and the ouch test is
 # the one vanilla makes of a wound.
 def sided(tag: String, tx: U32, ty: U32) -> IO(S.State):
-  faces(tag, 3n, idle(), blown(20, S.Sim.tic(idle(), struck(100, 0, tx, ty, 0))))
+  faces(tag, 3n, idle(), blown(20, Tic.Sim.tic(idle(), struck(100, 0, tx, ty, 0))))
 
 def face.chased(n: Nat, s: S.State) -> S.State:
   Run.state(ran(n, idle(), s))
@@ -1379,7 +1380,7 @@ def face.chased(n: Nat, s: S.State) -> S.State:
 # ST_RAMPAGEDELAY of held fire.
 def faces.cases(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    g0 : S.State <- faces("glance", 60n, idle(), S.State.start(level))
+    g0 : S.State <- faces("glance", 60n, idle(), Tic.State.start(level))
     n0 : S.State <- faces("nukage", 200n, idle(), at(level, 1600, 1000, 90))
     n1 : S.State <- faces("nukage until it kills", 460n, idle(), n0)
     r0 : S.State <- sided("blow from the right", 0, 4294967232)
@@ -1388,10 +1389,10 @@ def faces.cases(+level: L.Level) -> IO(Unit):
     m0 : S.State <- faces("shotgun guy hit", 0n, idle(),
       face.chased(61n, at(level, 144, 1888, 0)))
     w0 : S.State <- faces("chainsaw grin", 16n, K.Cmd.demo(0, 4294967272, 0, 0),
-      S.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
+      Tic.Sim.replay(List.append(&2, K.Cmd, List.replicate(K.Cmd, 20n, idle()),
         [K.Cmd.demo(0, 0, 4294967280, 0)]), at(level, 3158, 2176, 180)))
-    f0 : S.State <- faces("held fire", 90n, fire(), S.State.start(level))
-    f1 : S.State <- faces("held before release", 69n, fire(), S.State.start(level))
+    f0 : S.State <- faces("held fire", 90n, fire(), Tic.State.start(level))
+    f1 : S.State <- faces("held before release", 69n, fire(), Tic.State.start(level))
     f2 : S.State <- faces("release during firing", 1n, idle(), f1)
     f3 : S.State <- faces("held after release", 20n, fire(), f2)
     IO.print("-")
@@ -1447,16 +1448,16 @@ def clipped(+rounds: U32, +s: S.State) -> S.State:
 # the sky.
 def firing(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    a0 : S.State <- fired("ready", 20n, idle(), 292, S.State.start(level))
+    a0 : S.State <- fired("ready", 20n, idle(), 292, Tic.State.start(level))
     a1 : S.State <- fired("press", 1n, fire(), 292, a0)
     a2 : S.State <- fired("shot", 4n, idle(), 292, a1)
     a3 : S.State <- fired("after", 10n, idle(), 292, a2)
     a4 : S.State <- fired("gone", 20n, idle(), 292, a3)
-    b0 : S.State <- fired("held", 20n, idle(), 292, S.State.start(level))
+    b0 : S.State <- fired("held", 20n, idle(), 292, Tic.State.start(level))
     b1 : S.State <- fired("held", 5n, fire(), 292, b0)
     b2 : S.State <- fired("held", 14n, fire(), 292, b1)
     b3 : S.State <- fired("held", 5n, idle(), 292, b2)
-    c0 : S.State <- fired("last", 20n, idle(), 292, clipped(1, S.State.start(level)))
+    c0 : S.State <- fired("last", 20n, idle(), 292, clipped(1, Tic.State.start(level)))
     c1 : S.State <- fired("last", 5n, fire(), 292, c0)
     c2 : S.State <- fired("dry", 19n, fire(), 292, c1)
     d0 : S.State <- fired("ledge", 20n, idle(), 292, at(level, 704, 256, 0))
@@ -1548,7 +1549,7 @@ def attack.missile.ticks(n: Nat, +id: U32, s: S.State) -> S.State:
     case 0n:
       s
     case 1n+k:
-      attack.missile.ticks(k, id, S.Sim.thing(id, s))
+      attack.missile.ticks(k, id, Tic.Sim.thing(id, s))
 
 def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U32, +s: S.State) -> S.State:
   S.Body{i, sx, sy, z, radius, height, flags} = source
@@ -1556,7 +1557,7 @@ def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U
     S.Body{4294967294, F.Fixed.of_map(tx), F.Fixed.of_map(ty), z, radius, height, flags}, you, s)
   +id = H.Things.count(S.State.things(s))
   attack.missile.ticks(n, id,
-    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+    Tic.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
 
 def attack.missile.up.from(+source: S.Sim.Body, n: Nat, +you: U32, +s: S.State) -> S.State:
   S.Body{i, x, y, z, radius, height, flags} = source
@@ -1564,7 +1565,7 @@ def attack.missile.up.from(+source: S.Sim.Body, n: Nat, +you: U32, +s: S.State) 
     S.Body{4294967294, x, y, (z + F.Fixed.of_map(64) : U32), radius, height, flags}, you, s)
   +id = H.Things.count(S.State.things(s))
   attack.missile.ticks(n, id,
-    S.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
+    Tic.Sim.missile.first(H.Things.get(S.State.things(spawned), id), id, spawned))
 
 def attack.missile(+level: L.Level, +x: U32, +y: U32, +tx: U32, +ty: U32, n: Nat) -> S.State:
   +s = at(level, x, y, 0)
@@ -1588,8 +1589,8 @@ def attack.missile.vertical(+th: H.Thing, +z: U32, +floorz: U32, +momz: U32) -> 
 
 def attack.missile.floor.some(+th: H.Thing, +id: U32, +s: S.State) -> IO(Unit):
   +floor = H.Thing.floorz(th)
-  +resting = S.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 0), s))
-  +crossing = S.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 4294967295), s))
+  +resting = Tic.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 0), s))
+  +crossing = Tic.Sim.thing(id, S.State.thing.put(id, attack.missile.vertical(th, floor, floor, 4294967295), s))
   do IO<Unit>:
     IO.print("fireball resting random " ++ U32.show(S.State.rnd(resting))
       ++ spawned.all(id, S.State.things(resting)))
@@ -1636,10 +1637,10 @@ def attack.ticked(m: Maybe<&2, H.Thing>, +id: U32, +tics: U32, s: S.State) -> S.
       S.State.thing.put(id, H.Thing.ticking(th, tics), s)
 
 def attack.retaliation.hit(+level: L.Level) -> IO(Unit):
-  +s = S.State.start(level)
+  +s = Tic.State.start(level)
   +aimed = S.Sim.thing.counted(240, H.Thing.hurt.target(), 81, s)
-  +first = S.Sim.sposattack(240, aimed)
-  +held = S.Sim.damage(81, 4, 82, 82, first)
+  +first = Tic.Sim.sposattack(240, aimed)
+  +held = Tic.Sim.damage(81, 4, 82, 82, first)
   do IO<Unit>:
     IO.print("imp retaliates" ++ attack.combatant(H.Things.get(S.State.things(first), 81))
       ++ " random " ++ U32.show(S.State.rnd(first)))
@@ -1647,21 +1648,21 @@ def attack.retaliation.hit(+level: L.Level) -> IO(Unit):
       ++ " random " ++ U32.show(S.State.rnd(held)))
 
 def attack.retaliation.barrel(+level: L.Level) -> IO(Unit):
-  +s = S.State.start(level)
-  +barrel = S.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
+  +s = Tic.State.start(level)
+  +barrel = Tic.Sim.damage(81, 4, 24, H.Things.you(S.State.things(s)), s)
   IO.print("barrel credits player" ++ attack.combatant(H.Things.get(S.State.things(barrel), 81))
     ++ " random " ++ U32.show(S.State.rnd(barrel)))
 
 def attack.retaliation.fight(+level: L.Level) -> IO(Unit):
-  +s = S.State.start(level)
+  +s = Tic.State.start(level)
   +aimed = S.Sim.thing.counted(240, H.Thing.hurt.target(), 81, s)
-  +first = S.Sim.sposattack(240, aimed)
+  +first = Tic.Sim.sposattack(240, aimed)
   +fight = attack.play(60n, idle(), first)
   IO.print("shotgun imp fight" ++ attack.combatant(H.Things.get(S.State.things(fight), 81))
     ++ attack.combatant(H.Things.get(S.State.things(fight), 240)) ++ " random " ++ U32.show(S.State.rnd(fight)))
 
 def attack.retaliation.blast(+level: L.Level) -> IO(Unit):
-  +s = S.State.start(level)
+  +s = Tic.State.start(level)
   +moved = S.State.thing.moved(24, F.Fixed.of_map(832), F.Fixed.of_map(1056), s)
   +credited = S.Sim.thing.counted(24, H.Thing.hurt.target(), H.Things.you(S.State.things(moved)), moved)
   +entered = S.Sim.damage.entered(24, S.State.thing(24, credited), 178, credited)
@@ -1687,11 +1688,11 @@ def attack.retaliation(+level: L.Level) -> IO(Unit):
 def attacks(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     claw : S.State <- attack.result("imp claw", 81,
-      S.Sim.troopattack(81, attack.target(81, at(level, 848, 1000, 0))))
+      Tic.Sim.troopattack(81, attack.target(81, at(level, 848, 1000, 0))))
     bite : S.State <- attack.result("demon bite", 3,
-      S.Sim.sargattack(3, attack.target(3, at(level, 2576, 2112, 0))))
+      Tic.Sim.sargattack(3, attack.target(3, at(level, 2576, 2112, 0))))
     ball : S.State <- attack.result("imp throw", 81,
-      S.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
+      Tic.Sim.troopattack(81, attack.target(81, at(level, 848, 900, 0))))
     wall : S.State <- attack.missile.result("fireball wall", attack.missile(level, 704, 256, 900, 256, 8n))
     sky : S.State <- attack.missile.result("fireball sky", attack.missile.up(level, 64896, 256, 3n))
     attack.missile.floor(level)
@@ -1728,7 +1729,7 @@ def weapon.line(tag: String, +s: S.State) -> IO(S.State):
     return s
 
 def weapon.run(tag: String, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
-  weapon.line(tag, S.Sim.replay(List.replicate(K.Cmd, n, cmd), s))
+  weapon.line(tag, Tic.Sim.replay(List.replicate(K.Cmd, n, cmd), s))
 
 def weapon.pick(m: Maybe<&2, I.Inventory>) -> String:
   match m:
@@ -1769,7 +1770,7 @@ def weapon.melee(tag: String, +id: U32, +s: S.State) -> IO(S.State):
     return s
 
 def weapons(+level: L.Level) -> IO(Unit):
-  +base = weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 4, S.State.start(level))
+  +base = weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 4, Tic.State.start(level))
   do IO<Unit>:
     IO.print("shotgun pickup " ++ weapon.pick(I.Inventory.grant(2001, False{}, I.Inventory.start())))
     k0 : S.State <- weapon.run("key", 1n, K.Cmd.demo(0, 0, 0, 20), base)
@@ -1778,24 +1779,24 @@ def weapons(+level: L.Level) -> IO(Unit):
     b0 : S.State <- weapon.run("trigger", 1n, fire(), k2)
     b1 : S.State <- weapon.run("blast", 3n, idle(), b0)
     l0 : S.State <- weapon.run("last trigger", 1n, fire(),
-      weapon.state(2, H.Thing.Weapon.ready(H.Thing.shotgun()), 1, S.State.start(level)))
+      weapon.state(2, H.Thing.Weapon.ready(H.Thing.shotgun()), 1, Tic.State.start(level)))
     l1 : S.State <- weapon.run("last blast", 3n, idle(), l0)
     l2 : S.State <- weapon.run("switch away", 70n, idle(), l1)
-    p0 : S.State <- weapon.melee("punch", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+    p0 : S.State <- weapon.melee("punch", 25, Tic.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
       weapon.state(0, H.Thing.Weapon.ready(H.Thing.fist()), 0, at(level, 992, 660, 270))))
-    p1 : S.State <- weapon.melee("berserk punch", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+    p1 : S.State <- weapon.melee("berserk punch", 25, Tic.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
       weapon.strong(weapon.state(0, H.Thing.Weapon.ready(H.Thing.fist()), 0, at(level, 992, 660, 270)))))
-    c0 : S.State <- weapon.melee("saw hit", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+    c0 : S.State <- weapon.melee("saw hit", 25, Tic.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
       weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, at(level, 992, 660, 270))))
-    c1 : S.State <- weapon.melee("saw pull", 25, S.Sim.tic(fire(), c0))
-    c2 : S.State <- weapon.melee("saw miss", 25, S.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
-      weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, S.State.start(level))))
+    c1 : S.State <- weapon.melee("saw pull", 25, Tic.Sim.tic(fire(), c0))
+    c2 : S.State <- weapon.melee("saw miss", 25, Tic.Sim.replay(List.replicate(K.Cmd, 5n, fire()),
+      weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0, Tic.State.start(level))))
     k3 : S.State <- weapon.run("key 1 saw", 1n, K.Cmd.demo(0, 0, 0, 4),
       weapon.state(1, H.Thing.Weapon.ready(H.Thing.pistol()), 0,
-        weapon.carrying(False{}, S.State.start(level))))
+        weapon.carrying(False{}, Tic.State.start(level))))
     k4 : S.State <- weapon.run("key 1 berserk", 1n, K.Cmd.demo(0, 0, 0, 4),
       weapon.state(7, H.Thing.Weapon.ready(H.Thing.saw()), 0,
-        weapon.carrying(True{}, S.State.start(level))))
+        weapon.carrying(True{}, Tic.State.start(level))))
     IO.print("-")
 
 def cases(a: Array<U32>, +level: L.Level) -> IO(Unit):
@@ -1964,7 +1965,7 @@ def chases(+level: L.Level) -> IO(Unit):
 def walk(p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
   do IO<Unit>:
-    s : S.State <- step("start", 0n, K.Keys.none(), S.State.start(level))
+    s : S.State <- step("start", 0n, K.Keys.none(), Tic.State.start(level))
     p0 : S.State <- free(s)
     p1 : S.State <- step("U:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p0)
     p2 : S.State <- step("U!:34", 34n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p1)
@@ -1980,7 +1981,7 @@ def walk(p: Array<U32> & L.Level) -> IO(Unit):
     p12 : S.State <- step("R:40", 40n, K.Keys{False{}, False{}, False{}, True{}, False{}, False{}, False{}, False{}, False{}, K.Keys.numbers.none()}, p11)
     p13 : S.State <- step("U!:120", 120n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p12)
     p14 : S.State <- step("A!:40", 40n, K.Keys{False{}, False{}, False{}, False{}, True{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, p13)
-    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, S.State.start(level))
+    q1 : S.State <- step("ledge U!:47", 47n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, Tic.State.start(level))
     q2 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q1)
     q3 : S.State <- step("U!:1", 1n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q2)
     q4 : S.State <- step("U!:15", 15n, K.Keys{True{}, False{}, False{}, False{}, False{}, False{}, True{}, False{}, False{}, K.Keys.numbers.none()}, q3)

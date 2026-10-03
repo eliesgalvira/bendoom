@@ -42,6 +42,8 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/special.bend as Sp
+import ../src/tic.bend as Tic
 import ../src/inventory.bend as I
 import ../src/inter.bend as W
 import ../src/sound.bend as Sn
@@ -157,13 +159,13 @@ def back() -> List<&2, K.Cmd>:
   List.concat(&2, K.Cmd, [held(1n, 0, 0, 128, False{}), held(15n, 25, 0, 0, False{}), idle(8n)])
 
 def initial(+level: L.Level) -> W.Play:
-  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   W.Play.after(L.Name{1, 1}, took)
 
 def summary(+level: L.Level) -> IO(Unit):
-  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(S.State.start(level))))
+    IO.print("start " ++ S.Sim.Tally.show(S.Sim.tally(Tic.State.start(level))))
     IO.print("exit " ++ S.Sim.Tally.show(S.Sim.tally(took)) ++ " ended " ++ S.Sim.Exit.show(S.State.ended(took))
       ++ " random " ++ U32.show(S.State.mrnd(took)))
     return Unit{}
@@ -190,7 +192,7 @@ def on(tag: String, play: W.Play) -> String:
 def killed(play: W.Play) -> W.Play:
   match play:
     case W.Playing{+state, map}:
-      W.Playing{S.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map}
+      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map}
     case other:
       other
 
@@ -239,9 +241,9 @@ def nexts.go(n: Nat, +map: U32) -> String:
 # The seam the secret exit line fires: E1M3 ended by a secret exit shows
 # the tally for E1M9, and E1M8 ended by the exit holds its level.
 def seams(+level: L.Level) -> IO(Unit):
-  +took = S.Sim.replay(route(), S.State.at(level, beside()))
+  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, S.State.end(S.Secret{}, took))))
+    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, Sp.State.end(S.Secret{}, took))))
     IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, took)))
 
 def soundcheck(+level: L.Level) -> IO(Unit):
@@ -253,11 +255,11 @@ def soundcheck(+level: L.Level) -> IO(Unit):
 
 def secrets(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    s0 : S.State <- secret("in the secret", level, S.State.at(level, L.Start{F.Fixed.of_map(400),
+    s0 : S.State <- secret("in the secret", level, Tic.State.at(level, L.Start{F.Fixed.of_map(400),
       F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
-    s1 : S.State <- secret("stood a tic", level, S.Sim.tic(K.Cmd.idle(), s0))
-    s2 : S.State <- secret("out south", level, S.Sim.replay(out(), s1))
-    s3 : S.State <- secret("back north", level, S.Sim.replay(back(), s2))
+    s1 : S.State <- secret("stood a tic", level, Tic.Sim.tic(K.Cmd.idle(), s0))
+    s2 : S.State <- secret("out south", level, Tic.Sim.replay(out(), s1))
+    s3 : S.State <- secret("back north", level, Tic.Sim.replay(back(), s2))
     return Unit{}
 
 def play(+level: L.Level) -> IO(Unit):
