@@ -27,9 +27,11 @@
 # carried on (which no G_InitNew clears), and S_Start's song for it,
 # D_E1M2; a death there and a held use reload E1M2 from a pistol start
 # on the next tic. The indices are regression pins. Then G_DoCompleted's
-# next map from each E1 map by each exit, the secret exit's seam on
-# E1M3, which leads to E1M9's tally, and E1M8's exit, which vanilla
-# follows with the finale and no tally, so its level holds.
+# next map from each E1 map by each exit and its par, g_game.c's
+# pars[1]; the secret exit's seam on E1M3, which leads to E1M9's tally
+# with E1M9 not done; E1M8's exit, which vanilla follows with the
+# finale and no tally, so its level holds; and the trips that mark
+# E1M9 done.
 # Last a secret sector counted: the player put in sector 86, which
 # P_PlayerInSpecialSector counts on the tic it stands on its floor, then
 # walked north into the pit it rings, sector 87, and back into 86, which
@@ -65,9 +67,9 @@ def beside() -> L.Level.Start:
 
 def line(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, map}:
+    case W.Playing{+state, map, didsecret}:
       tag ++ " level tic " ++ U32.show(S.State.clock(state)) ++ " " ++ S.Sim.Tally.show(S.Sim.tally(state))
-    case W.Showing{+wi, after, next}:
+    case W.Showing{+wi, after, trip}:
       tag ++ " " ++ W.Inter.show(wi)
 
 def told(tag: String, +play: W.Play) -> IO(W.Play):
@@ -100,9 +102,9 @@ def sound.line(events: List<&2, Sn.Sound.Event>, play: W.Play) -> String:
       ""
     case _:
       match play:
-        case W.Playing{state, map}:
+        case W.Playing{state, map, didsecret}:
           "sound level" ++ sound.events(events) ++ "\n"
-        case W.Showing{wi, after, next}:
+        case W.Showing{wi, after, trip}:
           "sound bcnt " ++ U32.show(W.Inter.bcnt(wi)) ++ sound.events(events) ++ "\n"
 
 def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) -> String:
@@ -160,7 +162,7 @@ def back() -> List<&2, K.Cmd>:
 
 def initial(+level: L.Level) -> W.Play:
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
-  W.Play.after(L.Name{1, 1}, took)
+  W.Play.after(L.Name{1, 1}, False{}, took)
 
 def summary(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
@@ -181,18 +183,21 @@ def marker(m: Maybe<&2, L.Level.Name>) -> String:
 # carries and the random index; or the map the tally leads to.
 def on(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, L.Name{episode, map}}:
+    case W.Playing{+state, L.Name{episode, map}, didsecret}:
       +p = S.State.player(state)
       tag ++ " " ++ L.Level.marker(episode, map) ++ " tic " ++ U32.show(S.State.clock(state)) ++ " at "
         ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " "
-        ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state))
-    case W.Showing{wi, after, next}:
-      tag ++ " tally for " ++ marker(Some{next})
+        ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state)) ++ " didsecret "
+        ++ Bool.show(didsecret)
+    case W.Showing{+wi, after, W.Trip{L.Name{e, last}, L.Name{f, next}, didsecret}}:
+      tag ++ " tally for " ++ L.Level.marker(f, next) ++ " from " ++ L.Level.marker(e, last) ++ " par "
+        ++ U32.show(V.Vec.get(W.Inter.target(wi), W.Inter.parat())) ++ " didsecret " ++ Bool.show(didsecret)
 
 def killed(play: W.Play) -> W.Play:
   match play:
-    case W.Playing{+state, map}:
-      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map}
+    case W.Playing{+state, map, didsecret}:
+      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map,
+        didsecret}
     case other:
       other
 
@@ -236,15 +241,31 @@ def nexts.go(n: Nat, +map: U32) -> String:
       ""
     case 1n+m:
       L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(False{}, L.Name{1, map})) ++ " "
-        ++ marker(W.Play.next(True{}, L.Name{1, map})) ++ "\n" ++ nexts.go(m, (map + 1 : U32))
+        ++ marker(W.Play.next(True{}, L.Name{1, map})) ++ " par " ++ U32.show(W.Inter.par(map)) ++ "\n"
+        ++ nexts.go(m, (map + 1 : U32))
 
 # The seam the secret exit line fires: E1M3 ended by a secret exit shows
-# the tally for E1M9, and E1M8 ended by the exit holds its level.
+# the tally for E1M9, and E1M8 ended by the exit holds its level. Then
+# didsecret, the player's flag that E1M9 is done, which G_DoCompleted
+# sets on leaving E1M9 and the map screen reads after each map on.
 def seams(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, Sp.State.end(S.Secret{}, took))))
-    IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, took)))
+    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, False{}, Sp.State.end(S.Secret{}, took))))
+    IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, False{}, took)))
+    IO.print(on("E1M9 normal", W.Play.after(L.Name{1, 9}, False{}, took)))
+    IO.print(on("E1M4 normal", W.Play.after(L.Name{1, 4}, True{}, took)))
+
+# A tic keeps didsecret, and G_PlayerReborn clears it once a death asks
+# for the level again.
+def done(+level: L.Level) -> W.Play:
+  W.Playing{Tic.State.at(level, beside()), L.Name{1, 4}, True{}}
+
+def didsecret(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    IO.print(on("E1M4 a tic", replayed(idle(1n), level, done(level))))
+    IO.print(on("E1M4 reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), level,
+      killed(done(level)))))
 
 def soundcheck(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -267,6 +288,7 @@ def play(+level: L.Level) -> IO(Unit):
     summary(level)
     intermission(level)
     seams(level)
+    didsecret(level)
     soundcheck(level)
     secrets(level)
 
@@ -303,19 +325,23 @@ def main() -> IO(Unit):
 #|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 93
 #|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93 wants none
 #|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93 wants E1M2
-#|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 3 song D_E1M2
-#|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 199
-#|E1M1 E1M2 E1M9
-#|E1M2 E1M3 E1M9
-#|E1M3 E1M4 E1M9
-#|E1M4 E1M5 E1M9
-#|E1M5 E1M6 E1M9
-#|E1M6 E1M7 E1M9
-#|E1M7 E1M8 E1M9
-#|E1M8 none none
-#|E1M9 E1M4 E1M9
-#|E1M3 secret tally for E1M9
-#|E1M8 normal E1M8 tic 7 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 67
+#|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 3 didsecret False song D_E1M2
+#|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 199 didsecret False
+#|E1M1 E1M2 E1M9 par 30
+#|E1M2 E1M3 E1M9 par 75
+#|E1M3 E1M4 E1M9 par 120
+#|E1M4 E1M5 E1M9 par 90
+#|E1M5 E1M6 E1M9 par 165
+#|E1M6 E1M7 E1M9 par 180
+#|E1M7 E1M8 E1M9 par 180
+#|E1M8 none none par 30
+#|E1M9 E1M4 E1M9 par 165
+#|E1M3 secret tally for E1M9 from E1M3 par 120 didsecret False
+#|E1M8 normal E1M8 tic 7 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 67 didsecret False
+#|E1M9 normal tally for E1M4 from E1M9 par 165 didsecret True
+#|E1M4 normal tally for E1M5 from E1M4 par 90 didsecret True
+#|E1M4 a tic E1M4 tic 1 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 61 didsecret True
+#|E1M4 reborn E1M4 tic 7 at -416.000000 256.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 126 didsecret False
 #|sound bcnt 36 DSPISTOL from nobody vol 64 sep 128 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 41 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 192 DSSGCOCK from nobody vol 64 sep 128
