@@ -6,7 +6,6 @@
     in {
       devShells.default = pkgs.mkShell ({
         BENDOOM_IWAD = config.packages.bendoom-freedoom.iwad;
-        BENDOOM_SOUNDS = config.packages.sounds-freedoom;
 
         packages = [
           config.packages.bend

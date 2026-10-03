@@ -71,6 +71,8 @@ import Base
 import ../src/fnv.bend as H
 import ../src/midi.bend as M
 import ../src/song.bend as S
+import ../src/channel.bend as C
+import ../src/stream.bend as A
 import ../src/opl.bend as O
 import ./fixtures/closed.bend as Fx
 
@@ -279,8 +281,8 @@ def Test.entry(e: S.Song.Entry) -> String:
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    deck : S.Song.Deck <- S.Song.Deck.load(["D_E1M1", "D_INTER"])
-    Test.played(S.Song.Deck.change("D_E1M1", deck))
+    loaded : S.Song.Deck & List<&2, C.Channel.Sound> <- A.Stream.load(["D_E1M1", "D_INTER"], [])
+    Test.played(S.Song.Deck.change("D_E1M1", Pair.fst(S.Song.Deck, List<&2, C.Channel.Sound>, loaded)))
     IO.print(Test.lump("mus", Fx.Closed.song(M.Midi.file(Fx.Closed.mus([147, 188, 100, 5, 19, 62, 31, 164, 133, 35, 129, 51, 14, 67, 0,
       133, 195, 3, 144, 129, 0, 0, 60, 1, 60, 2, 60, 4, 60, 5, 60, 6, 60, 7, 60, 8, 60, 137, 188, 130, 1, 147, 64, 3,
       96])))))

@@ -90,9 +90,8 @@ def Game.started(was: Bool, demo: Maybe<D.Demo.Rec>, input: K.Input, +again: Boo
   music: Maybe<M.Stream>, steps: I.Play.Run) -> IO(Bool & Game):
   I.Ran{I.World{+next, mem, gfx, tables, level}, events} = steps
   do IO<Bool & Game>:
-    playing : Maybe<M.Stream> <- M.Stream.hear(events, music)
     kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(was, Bool.not(I.Play.playing(next))), demo)
-    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, playing})
+    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, M.Stream.hear(events, music)})
 
 def Game.advanced(+play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
   tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
@@ -138,9 +137,8 @@ def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   match play:
     case I.Playing{+state, +map}:
       do IO<Bool & Game>:
-        moved : Maybe<M.Stream> <- M.Stream.update(~S.State,
-          ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music)
-        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map}), moved)
+        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map}), M.Stream.update(~S.State,
+          ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music))
         return (quit, Game{level, gfx, tables, I.Playing{state, map}, input, again, last, owed, mem, demo, playing})
     case I.Showing{+wi, +after, +next}:
       IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(I.Showing{wi, after, next}), music),

@@ -3,7 +3,6 @@ set -eu
 
 bundle=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 iwad=$bundle/share/doom.wad
-sounds=$bundle/share/sounds
 
 run() {
   if [ -f "$bundle/bin/ld.so" ]; then
