@@ -1033,8 +1033,12 @@ def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
     case 1n+m:
       List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
 
+# The prefix of episode 1's map names, from WILV00 for E1M1 to WILV08.
+def Gfx.wi.level() -> String:
+  "WILV0"
+
 def Gfx.wi.names() -> List<&2, String>:
-  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, "WILV0", 0),
+  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, Gfx.wi.level(), 0),
     ["WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR", "WISUCKS", "WIPCNT", "WICOLON"],
     Gfx.bar.numbered(10n, "WINUM", 0), ["WISPLAT", "WIURH0", "WIURH1"],
     Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0)])
