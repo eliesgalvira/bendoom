@@ -112,7 +112,7 @@ def Closed.level(ox: U32, records: V.Vec, count: U32) -> L.Level:
     L.Things{records, count}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
     V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
-    V.Vec.of_list([0, 8388608, 160, 0, 0, 160, 0, 4718592, 160], 9), V.Vec.of_list([1, 0, 117, 0], 4), V.Vec.of_list([], 3)})
+    V.Vec.of_list([0, 8388608, 0, 0, 160, 0, 0, 0, 0, 0, 0, 160, 0, 0, 0, 4718592, 0, 0, 160, 0, 0], 21), V.Vec.of_list([1, 0, 117, 0], 4), V.Vec.of_list([], 3)})
 
 def Closed.doors() -> L.Level:
   Closed.level(0, V.Leaf{0}, 0)
