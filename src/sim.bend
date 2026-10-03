@@ -1,9 +1,9 @@
 # The playsim for one player among things: Doom's P_MovePlayer,
 # P_CalcHeight, P_MovePsprites, P_XYMovement, P_TryMove,
 # P_CheckPosition, P_SlideMove and P_ZMovement, as pure functions of the
-# level, the things, the tic command and the player, and the state a tic
-# maps to the next, with the sounds it starts and stops where vanilla
-# calls S_StartSound and S_StopSound. The player can be hurt and killed:
+# level, the things, the tic command and the player, and the state the
+# tic steps, with the sounds they start and stop where vanilla calls
+# S_StartSound and S_StopSound. The player can be hurt and killed:
 # P_DamageMobj, P_KillMobj and P_DeathThink, which asks for the level
 # again as vanilla's PST_REBORN does. The specials and the tic itself
 # build on this (src/special.bend and src/tic.bend).
@@ -3943,6 +3943,9 @@ def Sim.psprites.up(+weapon: H.Thing.Weapon, s: State) -> State:
 def Sim.psprites.start(+s: State) -> State:
   Sim.psprites.up(Player.ready(State.player(s)), s)
 
+# Things' moves and actions
+# -------------------------
+
 # The state with a try's player and things, in a level.
 def State.moved(t: Sim.Try, level: L.Level, s: State) -> State:
   Try{ok, p, got} = t
@@ -4401,8 +4404,8 @@ def Sim.Walk.left(w: Sim.Walk) -> State:
   Walk{ok, id, s} = w
   s
 
-# The level's start
-# -----------------
+# Populating a level
+# ------------------
 
 def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
   match things:
