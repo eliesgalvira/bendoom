@@ -341,6 +341,11 @@ def strafe(n: Nat) -> List<&2, K.Cmd>:
 def idle(n: Nat) -> List<&2, K.Cmd>:
   List.replicate(K.Cmd, n, K.Cmd.idle())
 
+# The start after the oracle's 20 idle tics with a locked door's refusal
+# said, as EV_VerticalDoor sets it.
+def refused(+level: L.Level, msg: U32) -> S.State:
+  S.State.says(msg, Tic.Sim.replay(idle(20n), Tic.State.start(level)))
+
 # A place after the oracle's 20 idle tics.
 def rested(+level: L.Level, x: U32, y: U32, degrees: U32) -> S.State:
   Tic.Sim.replay(idle(20n), at(level, x, y, degrees))
@@ -523,6 +528,8 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     n3 : Array<U32> <- said("said chainsaw", tables, gfx, strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180)), n2)
     n4 : Array<U32> <- said("said none", tables, gfx, Tic.Sim.replay(idle(20n), Tic.State.start(level)), n3)
+    n5 : Array<U32> <- said("said red door", tables, gfx, refused(level, Msg.Message.pd_redk()), n4)
+    n6 : Array<U32> <- said("said yellow door", tables, gfx, refused(level, Msg.Message.pd_yellowk()), n5)
     IO.print("end")
 
 def words(xs: List<&2, U32>) -> String:
@@ -731,4 +738,6 @@ def main() -> IO(Unit):
 #|said key message 7 "Picked up a blue keycard." tics 140 pixels 901 0,47 1,45 2,45 3,45
 #|said chainsaw message 15 "A chainsaw!  Find some meat!" tics 140 pixels 1030 3,47 4,45 5,189 16,47
 #|said none message 0 "" tics 0 pixels 0
+#|said red door message 26 "You need a red key to open this door" tics 140 pixels 1229 0,47 1,45 2,45 3,45
+#|said yellow door message 27 "You need a yellow key to open this door" tics 140 pixels 1338 0,47 1,45 2,45 3,45
 #|end

@@ -634,7 +634,7 @@ def Sim.explode.acted(m: Maybe<&2, H.Thing>, +s: S.State) -> S.State:
 # player's own.
 def Sim.bullet.at(+x: U32, +y: U32, +shootz: U32, +id: U32, +angle: U32, +slope: U32, +damage: U32,
   +s: S.State) -> S.State:
-  S.Sim.attack.with(~Sim.damage.enter.acted, S.State.level(s), S.State.things(s), S.State.player(s), x, y, shootz, id, angle, S.Sim.missilerange(),
+  S.Sim.attack.with(~Sim.damage.enter.acted, ~Sp.Sim.shoot, S.State.level(s), S.State.things(s), S.State.player(s), x, y, shootz, id, angle, S.Sim.missilerange(),
     slope, damage, s)
 
 def Sim.bullet(+x: U32, +y: U32, +shootz: U32, +id: U32, +bangle: U32, +slope: U32, s: S.State) -> S.State:
@@ -1094,7 +1094,7 @@ def Sim.weapon.select(+cmd: K.Cmd, +s: S.State) -> S.State:
 # fixes leaves it, is compared once per read (docs/bend.md).
 def Sim.player.thinks(+cmd: K.Cmd, hurt: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = hurt
-  Sim.player.counted(S.Sim.psprites.with(~Sim.damage.enter.acted, cmd, Sim.weapon.select(cmd, Sp.Sim.sector.secret(
+  Sim.player.counted(S.Sim.psprites.with(~Sim.damage.enter.acted, ~Sp.Sim.shoot, cmd, Sim.weapon.select(cmd, Sp.Sim.sector.secret(
     S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}))))
 
 # Doom's P_PlayerThink for a living player, in its order: the move, the

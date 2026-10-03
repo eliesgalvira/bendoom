@@ -143,8 +143,8 @@ def Inventory.green_armour() -> U32:
 def Inventory.blue_armour() -> U32:
   2
 
-# The bits among the cards of card_t's it_bluecard, it_yellowcard,
-# it_redcard and it_blueskull.
+# The bits among the cards of card_t's it_bluecard, it_yellowcard and
+# it_redcard. Each skull's is its card's three bits up.
 def Inventory.bluecard() -> U32:
   1
 
@@ -153,9 +153,6 @@ def Inventory.yellowcard() -> U32:
 
 def Inventory.redcard() -> U32:
   4
-
-def Inventory.blueskull() -> U32:
-  8
 
 # ammotype_t's indexes.
 def Inventory.am_clip() -> U32:
@@ -221,9 +218,9 @@ def Inventory.power.of(+power: U32, inv: Inventory) -> U32:
 def Inventory.strength(+inv: Inventory) -> U32:
   Inventory.power.of(Inventory.pw_strength(), inv)
 
-# Whether the blue card or the blue skull is owned.
-def Inventory.blue(inv: Inventory) -> Bool:
-  Bool.not(U32.is_zero((Inventory.cards(inv) .&. (Inventory.bluecard() .|. Inventory.blueskull() : U32) : U32)))
+# Whether a card or its skull is owned, the key to its colour's doors.
+def Inventory.key(+card: U32, inv: Inventory) -> Bool:
+  Bool.not(U32.is_zero((Inventory.cards(inv) .&. (card .|. (card << 3n) : U32) : U32)))
 
 # P_DamageMobj's saved: green armour absorbs a third of a blow and blue
 # a half, and neither more than the points worn. No armour absorbs
