@@ -20,17 +20,17 @@
 # (E1M1 when not given) from a copy of the IWAD whose player 1 starts
 # at x, y facing angle; the default script idles 20 tics, past the
 # pistol's rise. G_PlayerReborn leaves use and attack held, so either
-# on the first tic does nothing. `demo` takes a demo lump of the IWAD, such as DEMO1, or
-# a .lmp file, and plays its first tics on the map its header names.
-# Bendoom plays Hurt Me Plenty with player 1 alone and no options, and
-# a header that asks for anything else is refused. Either way --things
-# rewrites the map's records it names in the copy and leaves its other
-# things as they are.
+# on the first tic does nothing. `demo` takes a demo lump of the IWAD,
+# such as DEMO1, or a .lmp file, and plays its first tics on the map its
+# header names. Bendoom plays Hurt Me Plenty with player 1 alone and no
+# options, and a header that asks for anything else is refused. Either
+# way --things rewrites the map's records it names in the copy and
+# leaves its other things as they are.
 #
-# --tally compares the tally the exit leads to instead. Its demo takes
-# the exit and then idles long enough for WI_updateStats to settle,
-# after which the screen stands still until a press, so no pause tic is
-# written: its buttons byte carries BT_ATTACK, which
+# --screen tally compares the tally the exit leads to instead. Its demo
+# takes the exit and then idles long enough for WI_updateStats to
+# settle, after which the screen stands still until a press, so no
+# pause tic is written: its buttons byte carries BT_ATTACK, which
 # WI_checkForAccelerate would read as that press, and vanilla would
 # leave the counts and load the next level. A shot counts once it shows
 # "Finished!" where WI_drawLF puts it under the map's name, and the mask
@@ -38,12 +38,13 @@
 # while the shot is taken, and not the bar's face, which the tally
 # covers.
 #
-# --entering compares the map screen after the tally the same way. Its
-# demo presses after the counts settle, and ends within the 12 tics
-# after the press that WI_updateShowNextLoc shows the pointer, since
-# vanilla's four seconds on that screen leave room for a few shots. A
-# shot counts once it shows "Entering", the name of the map after the
-# one played (E1M4 after E1M9) and the pointer on that map's place.
+# --screen entering compares the map screen after the tally the same
+# way. Its demo presses after the counts settle, and ends within the 12
+# tics after the press that WI_updateShowNextLoc shows the pointer,
+# since vanilla's four seconds on that screen leave room for a few
+# shots. A shot counts once it shows "Entering", the name of the map
+# after the one played (E1M4 after E1M9) and the pointer on that map's
+# place. The default, --screen level, compares the paused level.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built:
@@ -52,9 +53,9 @@
 #   tools/oracle.nu -416 256 0
 #   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
-#   tools/oracle.nu -363 1316 180 "1,0,0,16,0 5,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --tally
+#   tools/oracle.nu -363 1316 180 "1,0,0,16,0 5,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --screen tally
 #   tools/oracle.nu -224 -624 90 --map E1M5 --wad doom1.wad
-#   tools/oracle.nu 1920 -2304 0 "1,0,0,0,0 1,0,0,0,1 300,0,0,0,0 1,0,0,0,1 5,0,0,0,0" --map E1M7 --wad doom1.wad --entering
+#   tools/oracle.nu 1920 -2304 0 "1,0,0,0,0 1,0,0,0,1 300,0,0,0,0 1,0,0,0,1 5,0,0,0,0" --map E1M7 --wad doom1.wad --screen entering
 #   tools/oracle.nu demo DEMO3 300 --wad doom1.wad
 #   tools/oracle.nu demo run.lmp 1000
 
@@ -81,7 +82,7 @@ def pcx-palette []: binary -> string {
 
 # A patch's size and where its offsets put it when drawn at x, y.
 def patch-box [wad: binary, name: string, x: int, y: int]: nothing -> list<int> {
-  let patch = $wad | lumps | where name == $name | last | get pos
+  let patch = $wad | lump-pos $name
   let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
   let height = $wad | bytes at ($patch + 2)..($patch + 3) | into int --endian little
   let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
@@ -104,7 +105,7 @@ def anim-boxes [wad: binary]: nothing -> list<int> {
 # The pixels of a patch centred across the screen at y, as WI_drawLF
 # and WI_drawEL centre theirs.
 def centred [wad: binary, name: string, y: int]: nothing -> table<at: int, colour: string> {
-  let p = $wad | lumps | where name == $name | last | get pos
+  let p = $wad | lump-pos $name
   patch-pixels $wad $name ((320 - ($wad | bytes at $p..($p + 1) | into int --endian little)) // 2) $y
 }
 
@@ -114,7 +115,7 @@ def level-name [m: int]: nothing -> string { $"WILV0($m - 1)" }
 # The row under a name where WI_drawLF and WI_drawEL draw the next
 # patch: a name and a quarter down from the title's row.
 def under [wad: binary, name: string]: nothing -> int {
-  let p = $wad | lumps | where name == $name | last | get pos
+  let p = $wad | lump-pos $name
   2 + 5 * ($wad | bytes at ($p + 2)..($p + 3) | into int --endian little) // 4
 }
 
@@ -218,11 +219,6 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $shot | first
 }
 
-# The screen the flags ask to compare.
-def screen [tally: bool, entering: bool]: nothing -> string {
-  if $entering { "entering" } else if $tally { "tally" } else { "level" }
-}
-
 # Our frame and vanilla's after the tics of a demo on the IWAD copy
 # given, and where they differ. The run is the flags both commands take.
 def compare [
@@ -235,7 +231,8 @@ def compare [
   let told = match $run.screen {
     tally => (finished $iwad $m)
     entering => (entering $iwad $m)
-    _ => (patch-pixels $iwad M_PAUSE 126 4)
+    level => (patch-pixels $iwad M_PAUSE 126 4)
+    _ => (error make {msg: $"--screen ($run.screen) is none of level, tally or entering"})
   }
   let inter = $run.screen != level
   let dir = mktemp --directory
@@ -250,7 +247,7 @@ def compare [
   let masked = if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
-  let playpal = $iwad | lumps | where name == "PLAYPAL" | last | get pos
+  let playpal = $iwad | lump-pos PLAYPAL
   if not $run.keep { rm --recursive $dir }
   {
     differing: ($differing | length)
@@ -272,14 +269,13 @@ def main [
   --map: string = "E1M1"                   # the map, by its marker
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
-  --tally                                  # the script takes the exit: compare the tally it leads to
-  --entering                               # the script takes the exit and leaves the tally: compare the map screen
+  --screen: string = "level"              # level, or tally or entering after the exit the script takes
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: (screen $tally $entering), keep: $keep})
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep})
 }
 
 # The first tics of a recorded demo.
@@ -289,8 +285,7 @@ def "main demo" [
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
-  --tally                                  # the tics take the exit: compare the tally they lead to
-  --entering                               # the tics take the exit and leave the tally: compare the map screen
+  --screen: string = "level"              # level, or tally or entering after the exit the tics take
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
@@ -309,5 +304,5 @@ def "main demo" [
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
   | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
-    {wad: $wad, frame: $frame, screen: (screen $tally $entering), keep: $keep})
+    {wad: $wad, frame: $frame, screen: $screen, keep: $keep})
 }
