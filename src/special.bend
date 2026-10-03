@@ -1,11 +1,13 @@
 # The line and sector specials of the shareware maps: Doom's p_spec.c,
 # p_switch.c, p_doors.c, p_plats.c, p_floor.c and p_lights.c over the
 # sim's state. A crossed line fires through Sim.cross for the player and
-# Sim.thing.crossed for a monster, both by Sim.cross.special's table; a
-# used line through Sim.use for the player, by Sim.use.special's table,
-# and Sim.thing.uses for a monster. Each tic the sectors' thinkers run
-# through Sim.think, and the sector under the player acts through
-# Sim.sector and Sim.sector.secret. A level's lights start in Sim.lights.
+# Sim.thing.crossed for a monster, both by Sim.cross.special's table,
+# which Sim.thing.cross.special filters for a monster; a used line
+# through Sim.use for the player, by Sim.use.special's table, and
+# Sim.thing.uses for a monster, by Sim.thing.use.special's. The tic's
+# Sim.think steps the sectors' thinkers here, and the sector under the
+# player acts through Sim.sector and Sim.sector.secret. A level's lights
+# start in Sim.lights.
 import Base
 import ./vec.bend as V
 import ./fixed.bend as F
@@ -673,11 +675,19 @@ def Sim.secret(+line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, +flags, front, back} = line
   Bool.not(U32.is_zero((flags .&. 32 : U32)))
 
-# Doom's P_UseSpecialLine for a thing that is not the player: it opens a
-# manual door, special 1, unless the line is secret, and answers no to
-# every other special either E1M1 carries. The three manual locked doors
-# vanilla also lets a thing press, 32 to 34, are in neither map, and
-# EV_VerticalDoor turns a thing with no player away from them anyway.
+# Doom's P_UseSpecialLine for a thing that is not the player: the
+# specials it may press. It opens a manual door, special 1, and answers
+# no to every other special either E1M1 carries. The three manual locked
+# doors vanilla also lets a thing press, 32 to 34, are in neither map,
+# and EV_VerticalDoor turns a thing with no player away from them anyway.
+def Sim.thing.use.special(special: U32) -> Bool:
+  match special:
+    case 1:
+      True{}
+    case _:
+      False{}
+
+# A thing presses a line it may press unless the line is secret.
 def Sim.thing.use.at(opens: Bool, +i: U32, w: S.Sim.Walk) -> S.Sim.Walk:
   match opens:
     case False{}:
@@ -689,7 +699,7 @@ def Sim.thing.use.at(opens: Bool, +i: U32, w: S.Sim.Walk) -> S.Sim.Walk:
 
 def Sim.thing.use(+i: U32, w: S.Sim.Walk) -> S.Sim.Walk:
   S.Walk{ok, id, +s} = w
-  Sim.thing.use.at(Bool.and(U32.is_eq(L.Level.special(S.State.level(s), i), 1),
+  Sim.thing.use.at(Bool.and(Sim.thing.use.special(L.Level.special(S.State.level(s), i)),
     Bool.not(Sim.secret(L.Level.line(S.State.level(s), i)))), i, S.Walk{ok, id, s})
 
 def Sim.thing.uses(lines: List<&2, U32>, w: S.Sim.Walk) -> S.Sim.Walk:
@@ -699,17 +709,27 @@ def Sim.thing.uses(lines: List<&2, U32>, w: S.Sim.Walk) -> S.Sim.Walk:
     case i <> rest:
       Sim.thing.uses(rest, Sim.thing.use(i, w))
 
-# The walk-over specials a thing's move crossed. Doom's
-# P_CrossSpecialLine lets a thing that is not the player fire only seven
-# of them, and the lift's retrigger, special 88, is the one of those
-# either E1M1 carries.
+# The walk-over specials a thing that is not the player may fire. Doom's
+# P_CrossSpecialLine allows seven, and the lift's retrigger, special 88,
+# is the one of those either E1M1 carries.
+def Sim.thing.cross.special(special: U32) -> Bool:
+  match special:
+    case 88:
+      True{}
+    case _:
+      False{}
+
+# A crossed line fires its special when a thing may fire it, else none.
+def Sim.thing.cross.one(+special: U32, +line: U32, +s: S.State) -> S.State:
+  Sim.cross.special(Bool.pick(U32, Sim.thing.cross.special(special), special, 0), line, s)
+
+# The walk-over specials a thing's move crossed.
 def Sim.thing.crossed(lines: List<&2, U32>, +s: S.State) -> S.State:
   match lines:
     case []:
       s
     case +line <> rest:
-      Sim.thing.crossed(rest, Sim.cross.special(Bool.pick(U32,
-        U32.is_eq(L.Level.special(S.State.level(s), line), 88), 88, 0), line, s))
+      Sim.thing.crossed(rest, Sim.thing.cross.one(L.Level.special(S.State.level(s), line), line, s))
 
 # The sector's special
 # --------------------
