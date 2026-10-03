@@ -87,9 +87,9 @@ def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
 
 def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
   match play:
-    case I.Playing{state, map}:
+    case I.Playing{state, map, didsecret}:
       told(tag, state, g)
-    case I.Showing{wi, after, next}:
+    case I.Showing{wi, after, trip}:
       do IO<Maybe<M.Game>>:
         IO.print(tag ++ " tally " ++ I.Inter.show(wi))
         return Some{g}
@@ -128,7 +128,7 @@ def route() -> List<&2, K.Cmd>:
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
   M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
-  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}}, input, again, last, owed, mem, demo, music}
+  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}}, input, again, last, owed, mem, demo, music}
 
 def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
   match m:
@@ -164,7 +164,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("beside", beside))
     IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}},
+      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}, False{}},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
     g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)

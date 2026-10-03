@@ -32,9 +32,17 @@
 # written: its buttons byte carries BT_ATTACK, which
 # WI_checkForAccelerate would read as that press, and vanilla would
 # leave the counts and load the next level. A shot counts once it shows
-# "Finished!" where WI_drawLF puts it, and the mask is the ten
-# animations of WIMAP0, which keep turning on the wall clock while the
-# shot is taken, and not the bar's face, which the tally covers.
+# "Finished!" where WI_drawLF puts it under the map's name, and the mask
+# is the ten animations of WIMAP0, which keep turning on the wall clock
+# while the shot is taken, and not the bar's face, which the tally
+# covers.
+#
+# --entering compares the map screen after the tally the same way. Its
+# demo presses after the counts settle, and ends within the 12 tics
+# after the press that WI_updateShowNextLoc shows the pointer, since
+# vanilla's four seconds on that screen leave room for a few shots. A
+# shot counts once it shows "Entering", the name of the map after the
+# one played (E1M4 after E1M9) and the pointer on that map's place.
 #
 # Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
 # frame dump built:
@@ -91,14 +99,44 @@ def anim-boxes [wad: binary]: nothing -> list<int> {
   } | flatten | flatten | uniq
 }
 
-# WI_drawLF's "Finished!", centred under the level's name: the pixels
+# The pixels of a patch centred across the screen at y, as WI_drawLF
+# and WI_drawEL centre theirs.
+def centred [wad: binary, name: string, y: int]: nothing -> table<at: int, colour: string> {
+  let p = $wad | lumps | where name == $name | last | get pos
+  patch-pixels $wad $name ((320 - ($wad | bytes at $p..($p + 1) | into int --endian little)) // 2) $y
+}
+
+# The name of map m of episode 1, WILV00 for E1M1.
+def level-name [m: int]: nothing -> string { $"WILV0($m - 1)" }
+
+# The row under a name where WI_drawLF and WI_drawEL draw the next
+# patch: a name and a quarter down from the title's row.
+def under [wad: binary, name: string]: nothing -> int {
+  let p = $wad | lumps | where name == $name | last | get pos
+  2 + 5 * ($wad | bytes at ($p + 2)..($p + 3) | into int --endian little) // 4
+}
+
+# WI_drawLF's "Finished!", centred under the name of map m: the pixels
 # that say the tally is showing its counts.
-def finished [wad: binary]: nothing -> table<at: int, colour: string> {
-  let name = $wad | lumps | where name == "WILV00" | last | get pos
-  let f = $wad | lumps | where name == "WIF" | last | get pos
-  let height = $wad | bytes at ($name + 2)..($name + 3) | into int --endian little
-  let width = $wad | bytes at $f..($f + 1) | into int --endian little
-  patch-pixels $wad WIF ((320 - $width) // 2) (2 + 5 * $height // 4)
+def finished [wad: binary, m: int]: nothing -> table<at: int, colour: string> {
+  centred $wad WIF (under $wad (level-name $m))
+}
+
+# wi_stuff.c's lnodes[0]: where each map of episode 1 stands on WIMAP0.
+const lnodes = [[185 164] [148 143] [69 122] [209 102] [116 89] [166 55] [71 56] [135 29] [71 24]]
+
+# WI_drawEL's "Entering" and the name of the map after map m, and the
+# pointer WI_drawShowNextLoc puts on that map's place where the two
+# words, drawn after it, leave it showing: the pixels that say the map
+# screen shows with its pointer on. WIURH0 fits at every place of
+# episode 1, so WI_drawOnLnode never tries WIURH1 there.
+def entering [wad: binary, m: int]: nothing -> table<at: int, colour: string> {
+  let next = if $m == 9 { 4 } else { $m + 1 }
+  let name = level-name $next
+  let words = (centred $wad WIENTER 2) ++ (centred $wad $name (under $wad $name))
+  let node = $lnodes | get ($next - 1)
+  let covered = $words | get at
+  $words ++ (patch-pixels $wad WIURH0 $node.0 $node.1 | where at not-in $covered)
 }
 
 # Every frame pixel the marine's face can cover: the box around the
@@ -132,12 +170,12 @@ def face-box [wad: binary]: nothing -> list<int> {
 # out, so runs side by side never share one. Once the script has had
 # its time, xdotool presses the screenshot key until a shot shows the
 # patch that tells the frame is the one wanted whole: the pause graphic
-# the pause froze, or the tally's "Finished!". The config
-# sets screen size 10, the full 320 by 168 view over the status bar that
-# Bendoom draws (Doom's default 9 borders a 288 by 144 view), and turns
-# messages off; the extra config binds F1, scancode 59, to the
-# screenshot, since -devparm, which binds it too, writes its frame-rate
-# dots over the bar's last row.
+# the pause froze, the tally's "Finished!" or the map screen's words and
+# pointer. The config sets screen size 10, the full 320 by 168 view over
+# the status bar that Bendoom draws (Doom's default 9 borders a 288 by
+# 144 view), and turns messages off; the extra config binds F1,
+# scancode 59, to the screenshot, since -devparm, which binds it too,
+# writes its frame-rate dots over the bar's last row.
 def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
@@ -178,25 +216,36 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $shot | first
 }
 
+# The screen the flags ask to compare.
+def screen [tally: bool, entering: bool]: nothing -> string {
+  if $entering { "entering" } else if $tally { "tally" } else { "level" }
+}
+
 # Our frame and vanilla's after the tics of a demo on the IWAD copy
 # given, and where they differ. The run is the flags both commands take.
 def compare [
   iwad: binary, header: binary, tics: binary
-  run: record<wad: path, frame: path, tally: bool, keep: bool>
+  run: record<wad: path, frame: path, screen: string, keep: bool>
 ]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
-  let told = if $run.tally { finished $iwad } else { patch-pixels $iwad M_PAUSE 126 4 }
+  let m = $header | bytes at 3..3 | into int
+  let told = match $run.screen {
+    tally => (finished $iwad $m)
+    entering => (entering $iwad $m)
+    _ => (patch-pixels $iwad M_PAUSE 126 4)
+  }
+  let inter = $run.screen != level
   let dir = mktemp --directory
   let name = $run.wad | path basename
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
-  let tail = if $run.tally { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
+  let tail = if $inter { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
   let shot = vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
   $tics | demo $header | save ($dir | path join ours.lmp)
   let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let face = face-box $iwad
-  let masked = if $run.tally { anim-boxes $iwad } else { ($told | get at) ++ $face }
+  let masked = if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
   let playpal = $iwad | lumps | where name == "PLAYPAL" | last | get pos
@@ -222,12 +271,13 @@ def main [
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --tally                                  # the script takes the exit: compare the tally it leads to
+  --entering                               # the script takes the exit and leaves the tally: compare the map screen
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: (screen $tally $entering), keep: $keep})
 }
 
 # The first tics of a recorded demo.
@@ -238,6 +288,7 @@ def "main demo" [
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --tally                                  # the tics take the exit: compare the tally they lead to
+  --entering                               # the tics take the exit and leave the tally: compare the map screen
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
@@ -256,5 +307,5 @@ def "main demo" [
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
   | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
-    {wad: $wad, frame: $frame, tally: $tally, keep: $keep})
+    {wad: $wad, frame: $frame, screen: (screen $tally $entering), keep: $keep})
 }
