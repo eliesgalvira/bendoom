@@ -57,8 +57,8 @@ def Bsp.sub.planes(+view: P.View, +gfx: G.Gfx, s: U32, sector: L.Level.Sector, f
 # Doom's R_Subsector.
 def Bsp.sub(+view: P.View, +level: L.Level, +gfx: G.Gfx, +ss: U32, st: D.Draw) -> D.Draw:
   +sector = L.Level.leaf_sector(level, ss)
-  Bsp.sub.planes(view, gfx, sector, L.Level.sector(level, sector), G.Gfx.floorpic(gfx, sector),
-    G.Gfx.ceilpic(gfx, sector), L.Level.sub(level, ss), st)
+  Bsp.sub.planes(view, gfx, sector, L.Level.sector(level, sector), G.Gfx.floorpic(gfx, level, sector),
+    G.Gfx.ceilpic(gfx, level, sector), L.Level.sub(level, ss), st)
 
 # A node's near child, then its far one if its box might show. Child
 # 65535 is Doom's -1, subsector 0 of a map with no nodes.
