@@ -418,9 +418,10 @@ law channels_priority:
   {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice(priority, slots) : Nat}
 
 # LAW: a sound at 16000 or 17990 Hz, the rates of Freedoom's two sounds
-# that SDL's converter is not given, has no run, whatever it holds.
+# that SDL's converter is not given, expands to nothing, whatever it
+# holds.
 law sfx_rates_unserved:
   for count: U32
   for bytes: List<&2, U32>
-  {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
-    == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
+  {(X.Sfx.expand(X.Sound{16000, count, bytes}), X.Sfx.expand(X.Sound{17990, count, bytes}))
+    == ([], []) : List<&2, U32> & List<&2, U32>}

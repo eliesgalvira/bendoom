@@ -12,6 +12,7 @@ import ./src/gfx.bend as G
 import ./src/keys.bend as K
 import ./src/sim.bend as S
 import ./src/inter.bend as I
+import ./src/sound.bend as Sn
 import ./src/channel.bend as C
 import ./src/stream.bend as M
 import ./src/song.bend as Sg
@@ -39,15 +40,15 @@ def Film.pcm(words: List<&2, U32>) -> List<&2, U32>:
       (w .&. 255 : U32) <> ((w >> 8n : U32) .&. 255 : U32) <>
         ((w >> 16n : U32) .&. 255 : U32) <> ((w >> 24n : U32) .&. 255 : U32) <> Film.pcm(rest)
 
-def Film.channels(play: I.Play, chans: List<Maybe<C.Channel>>) -> IO(List<Maybe<C.Channel>>):
+def Film.channels(play: I.Play, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
   match play:
     case I.Playing{+state, map}:
       C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
     case I.Showing{wi, after, next}:
-      IO.pure(List<Maybe<C.Channel>>, chans)
+      chans
 
-def Film.mixed(audio: File, mixed: Sg.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32>,
-  next: File -> Sg.Song.Deck -> List<Maybe<C.Channel>> -> IO(Unit)) -> IO(Unit):
+def Film.mixed(audio: File, mixed: Sg.Song.Deck & List<&2, Maybe<&2, C.Channel>> & List<&2, U32>,
+  next: File -> Sg.Song.Deck -> List<&2, Maybe<&2, C.Channel>> -> IO(Unit)) -> IO(Unit):
   (later, voices, words) = mixed
   IO.bind(File, Unit, B.Bytes.put_hex(audio, Film.pcm(words)),
     file => next(file, later, voices))
@@ -78,42 +79,40 @@ def Film.outro(play: I.Play) -> List<&2, K.Cmd>:
 # A tic at a time, each in the world loaded for it, its frame and its
 # 36 ms of audio written.
 def Film.go(outros: Nat, cmds: List<&2, K.Cmd>, world: I.Play.World, deck: Sg.Song.Deck,
-  chans: List<Maybe<C.Channel>>, +dir: String, audio: File) -> IO(Unit):
+  chans: List<&2, Maybe<&2, C.Channel>>, +bank: List<&2, C.Channel.Sound>, audio: File) -> IO(Unit):
   match outros cmds:
     case 0n Nil{}:
       File.close(audio)
     case 1n+o Nil{}:
       I.World{+play, mem, gfx, tables, level} = world
-      Film.go(o, Film.outro(play), I.World{play, mem, gfx, tables, level}, deck, chans, dir, audio)
+      Film.go(o, Film.outro(play), I.World{play, mem, gfx, tables, level}, deck, chans, bank, audio)
     case _ cmd <> rest:
       I.World{play, mem, +gfx, +tables, +level} = world
       +step = I.Play.step(level, cmd, False{}, play)
       +next = I.Play.Step.play(step)
-      do IO<Unit>:
-        heard : List<Maybe<C.Channel>> <- C.Channel.hear(dir, I.Play.Step.sounds(step), chans)
-        moved : List<Maybe<C.Channel>> <- Film.channels(next, heard)
-        mixed : Sg.Song.Deck & List<Maybe<C.Channel>> & List<&2, U32> <-
-          M.Stream.window(1260, Sg.Song.Deck.change(I.Play.song(next), deck), moved)
-        Film.mixed(audio, mixed, file => later => voices =>
+      Film.mixed(audio, M.Stream.window(1260, Sg.Song.Deck.change(I.Play.song(next), deck),
+          Film.channels(next, C.Channel.hear(bank, I.Play.Step.sounds(step), chans))),
+        file => later => voices =>
           Film.shot(V.Show.rgb(I.Play.frame(tables, gfx, next, True{}, mem)),
             m => IO.bind(I.Play.World, Unit, I.Play.load(I.World{next, m, gfx, tables, level}),
-              loaded => Film.go(outros, rest, loaded, later, voices, dir, file))))
+              loaded => Film.go(outros, rest, loaded, later, voices, bank, file))))
 
-def Film.start(demo: List<&2, U32>, +sounds: String, audio: File, world: I.Play.World) -> IO(Unit):
-  do IO<Unit>:
-    deck : Sg.Song.Deck <- Sg.Song.Deck.load(I.Play.songs())
-    Film.go(1n, D.Demo.play(demo), world, deck, C.Channel.none(), sounds, audio)
+def Film.start(demo: List<&2, U32>, audio: File, world: I.Play.World, loaded: Sg.Song.Deck & List<&2, C.Channel.Sound>) ->
+  IO(Unit):
+  (deck, bank) = loaded
+  Film.go(1n, D.Demo.play(demo), world, deck, C.Channel.none(), bank, audio)
 
-def Film.load(+demo: List<&2, U32>, sounds: String, audio: File) -> IO(Unit):
+def Film.load(+demo: List<&2, U32>, audio: File) -> IO(Unit):
   +map = D.Demo.map(demo)
-  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, I.Play.open(map),
-    world => Film.start(demo, sounds, audio, I.Play.World.start(map, world)))
+  do IO<Unit>:
+    world : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
+    loaded : Sg.Song.Deck & List<&2, C.Channel.Sound> <- M.Stream.load(I.Play.songs(), Sn.Sound.table())
+    Film.start(demo, audio, I.Play.World.start(map, world), loaded)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     path : String <- IO.try(String, IO.get_env("DEMO"))
     audio_path : String <- IO.try(String, IO.get_env("AUDIO"))
-    sounds : String <- IO.try(String, IO.get_env("BENDOOM_SOUNDS"))
     audio : File <- IO.try(File, File.open(audio_path, "w"))
     demo : List<&2, U32> <- D.Demo.read(path)
-    Film.load(demo, sounds, audio)
+    Film.load(demo, audio)
