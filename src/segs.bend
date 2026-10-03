@@ -182,12 +182,12 @@ def Segs.rw(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg, wall
   geo: Segs.Geo) -> Segs.Rw:
   L.Seg{x1, y1, x2, y2, angle, offset, flags, +side, +front, +back} = seg
   +onesided = U32.is_eq(back, L.Level.none())
-  +skyfront = U32.is_eq(G.Gfx.ceilpic(gfx, front), G.Gfx.sky(gfx))
+  +skyfront = U32.is_eq(G.Gfx.ceilpic(gfx, level, front), G.Gfx.sky(gfx))
   Segs.rw.of(gfx, wall, G.Gfx.mid(gfx, side), G.Gfx.top(gfx, side), G.Gfx.bottom(gfx, side), flags,
     Segs.side.yoff(L.Level.side(level, side)), onesided,
-    Bool.and(Bool.not(onesided), Bool.and(skyfront, U32.is_eq(G.Gfx.ceilpic(gfx, back), G.Gfx.sky(gfx)))),
-    U32.is_eq(G.Gfx.floorpic(gfx, back), G.Gfx.floorpic(gfx, front)),
-    U32.is_eq(G.Gfx.ceilpic(gfx, back), G.Gfx.ceilpic(gfx, front)),
+    Bool.and(Bool.not(onesided), Bool.and(skyfront, U32.is_eq(G.Gfx.ceilpic(gfx, level, back), G.Gfx.sky(gfx)))),
+    U32.is_eq(G.Gfx.floorpic(gfx, level, back), G.Gfx.floorpic(gfx, level, front)),
+    U32.is_eq(G.Gfx.ceilpic(gfx, level, back), G.Gfx.ceilpic(gfx, level, front)),
     L.Level.sector(level, front), L.Level.sector(level, back), P.View.z(view), skyfront,
     Segs.lightnum(seg, L.Level.sector.light(level, front), P.View.extralight(view)), geo)
 
@@ -402,8 +402,8 @@ def Segs.kind(f: L.Level.Sector, b: L.Level.Sector, onesided: Bool, samepics: Bo
 def Segs.kind.of(+level: L.Level, +gfx: G.Gfx, seg: L.Level.Seg) -> Segs.Kind:
   L.Seg{x1, y1, x2, y2, angle, offset, flags, side, +front, +back} = seg
   Segs.kind(L.Level.sector(level, front), L.Level.sector(level, back), U32.is_eq(back, L.Level.none()),
-    Bool.and(U32.is_eq(G.Gfx.ceilpic(gfx, back), G.Gfx.ceilpic(gfx, front)),
-      U32.is_eq(G.Gfx.floorpic(gfx, back), G.Gfx.floorpic(gfx, front))),
+    Bool.and(U32.is_eq(G.Gfx.ceilpic(gfx, level, back), G.Gfx.ceilpic(gfx, level, front)),
+      U32.is_eq(G.Gfx.floorpic(gfx, level, back), G.Gfx.floorpic(gfx, level, front))),
     U32.is_zero(G.Gfx.mid(gfx, side)))
 
 # The gaps the solid columns leave are stored; a solid wall's columns
