@@ -113,6 +113,7 @@ async function main() {
     await game.evaluate(async () => {
       const device = [...Module.bendAudio.values()][0];
       window.notes = [];
+      window.split = 0;
       const source = `class Notes extends AudioWorkletProcessor {
         process(inputs) {
           if (inputs[0].length === 2) this.port.postMessage([inputs[0][0].slice(), inputs[0][1].slice()]);
@@ -126,6 +127,7 @@ async function main() {
       node.port.onmessage = ({ data: [left, right] }) => left.forEach((l, i) => {
         const word = ((Math.round(l * 32768) & 65535) | (Math.round(right[i] * 32768) & 65535) << 16) >>> 0;
         if (word !== 0 && notes.length < 1024) notes.push(word);
+        if (l !== right[i]) split += 1;
       });
       device.node.connect(node);
       node.connect(device.context.destination);
@@ -142,15 +144,18 @@ async function main() {
     assert.equal(await game.evaluate(() => held.size), 0);
     await game.keyboard.up('w');
     assert.notEqual(await game.evaluate(() => document.getElementById('bend').toDataURL()), before, 'movement changes the frame');
+    // The song plays the same on both sides; the pistol's shot, centred,
+    // plays at 63 left and 64 right, so a sound effect parts them.
+    assert.equal(await game.evaluate(() => split), 0, 'the song alone is the same on both sides');
     await game.keyboard.down('f');
     assert.equal(await game.evaluate(() => held.has('ControlLeft')), true, 'F reaches the fire binding');
-    await game.waitForTimeout(500);
+    await game.waitForFunction(() => split > 0, null, { timeout: 5000 });
     await game.keyboard.up('f');
     await game.keyboard.press('Escape');
     await game.waitForFunction(() => document.getElementById('status').textContent === 'Game closed.');
     assert.equal(await game.evaluate(() => Module.bendAudio.size), 0);
     assert.deepEqual(errors, []);
-    console.log('PASS game: assets, the song from the WAD, audio activation, controls, focus loss and exit');
+    console.log('PASS game: assets, the song and a sound effect from the WAD, audio activation, controls, focus loss and exit');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));
