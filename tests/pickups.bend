@@ -55,17 +55,42 @@ def things(+tag: String, ths: List<&2, H.Thing>) -> IO(Unit):
         IO.print(tag ++ " " ++ thing(th))
         things(tag, rest)
 
-# The blue locked door, special 26, after a tic of use: with no card, or
-# with the yellow card alone, it stays shut at 0; with the blue card or
-# the blue skull it is the manual door, 2 up (131072).
-def blue_door_locked() -> IO(Unit):
-  IO.print("blue door none " ++ U32.show(Fx.Closed.ceil(Fx.Closed.used(0n, Fx.Closed.locked(I.Inventory.start())), 1))
-    ++ " yellow " ++ U32.show(Fx.Closed.ceil(Fx.Closed.used(0n,
-      Fx.Closed.locked(I.Inventory.card(2, Msg.Message.none(), I.Inventory.start()))), 1))
-    ++ " card " ++ U32.show(Fx.Closed.ceil(Fx.Closed.used(0n,
-      Fx.Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start()))), 1))
-    ++ " skull " ++ U32.show(Fx.Closed.ceil(Fx.Closed.used(0n,
-      Fx.Closed.locked(I.Inventory.card(8, Msg.Message.none(), I.Inventory.start()))), 1)))
+def locked.of(l: Fx.Closed.Line, +s: S.State) -> String:
+  Fx.Shown{message, tics} = l
+  " ceiling " ++ U32.show(Fx.Closed.ceil(s, 1)) ++ " special " ++ U32.show(L.Level.special(S.State.level(s), 0))
+    ++ " line " ++ U32.show(message) ++ " " ++ U32.show(tics)
+
+def locked(+special: U32, +cards: U32) -> IO(Unit):
+  +s = Fx.Closed.used(0n, Fx.Closed.door(special, Fx.Closed.inv([Fx.Cards{cards}])))
+  IO.print("locked " ++ U32.show(special) ++ " cards " ++ U32.show(cards) ++ locked.of(Fx.Closed.line(s), s))
+
+# The locked doors after a tic of use, by p_doors.c's EV_VerticalDoor
+# and card_t's bits: 26 and 32 open to the blue card, 1, or the blue
+# skull, 8; 27 and 34 to the yellow card, 2, or skull, 16; 28 and 33 to
+# the red card, 4, or skull, 32. Without its key a door stays shut at 0
+# and keeps its special, and the line says PD_BLUEK 17, PD_YELLOWK 27 or
+# PD_REDK 26 for HU_MSGTIMEOUT, 140 tics. With it, it is the manual door,
+# 2 up (131072) and silent; 26 to 28 keep their special and 32 to 34,
+# which stay open, spend theirs.
+def locked_doors() -> IO(Unit):
+  do IO<Unit>:
+    locked(26, 0)
+    locked(26, 2)
+    locked(26, 1)
+    locked(26, 8)
+    locked(27, 0)
+    locked(27, 1)
+    locked(27, 2)
+    locked(27, 16)
+    locked(28, 0)
+    locked(28, 4)
+    locked(28, 32)
+    locked(32, 0)
+    locked(32, 1)
+    locked(33, 0)
+    locked(33, 4)
+    locked(34, 0)
+    locked(34, 2)
 
 # The blue card, walked past north at 8 a tic with a bloody mess
 # (record 3) beside it and another card (record 90) far ahead. Tic 1
@@ -346,9 +371,9 @@ def pickup_messages() -> IO(Unit):
     shown(Fx.Closed.ticked(1n, Fx.Closed.inv([Fx.Said{3, 2}])))
     shown(Fx.Closed.ticked(2n, Fx.Closed.inv([Fx.Said{3, 2}])))
     shown(Fx.Closed.ticked(3n, Fx.Closed.inv([Fx.Said{3, 2}])))
-    shown(Fx.Closed.line(Fx.Closed.used(0n, Fx.Closed.locked(I.Inventory.start()))))
+    shown(Fx.Closed.line(Fx.Closed.used(0n, Fx.Closed.door(26, I.Inventory.start()))))
     shown(Fx.Closed.line(Fx.Closed.used(0n,
-      Fx.Closed.locked(I.Inventory.card(1, Msg.Message.none(), I.Inventory.start())))))
+      Fx.Closed.door(26, I.Inventory.card(1, Msg.Message.none(), I.Inventory.start())))))
     shown(Fx.Closed.said(I.Inventory.start(), 6))
     shown(Fx.Closed.said(I.Inventory.start(), 13))
     shown(Fx.Closed.said(Fx.Closed.inv([Fx.Cards{4}]), 13))
@@ -480,7 +505,7 @@ def bonus_cycle() -> IO(Unit):
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    blue_door_locked()
+    locked_doors()
     key_taken()
     key_taken_once()
     key_reach()
@@ -509,7 +534,23 @@ def main() -> IO(Unit):
     spawn_unseen(unseen())
     bonus_cycle()
 
-#|blue door none 0 yellow 0 card 131072 skull 131072
+#|locked 26 cards 0 ceiling 0 special 26 line 17 140
+#|locked 26 cards 2 ceiling 0 special 26 line 17 140
+#|locked 26 cards 1 ceiling 131072 special 26 line 0 0
+#|locked 26 cards 8 ceiling 131072 special 26 line 0 0
+#|locked 27 cards 0 ceiling 0 special 27 line 27 140
+#|locked 27 cards 1 ceiling 0 special 27 line 27 140
+#|locked 27 cards 2 ceiling 131072 special 27 line 0 0
+#|locked 27 cards 16 ceiling 131072 special 27 line 0 0
+#|locked 28 cards 0 ceiling 0 special 28 line 26 140
+#|locked 28 cards 4 ceiling 131072 special 28 line 0 0
+#|locked 28 cards 32 ceiling 131072 special 28 line 0 0
+#|locked 32 cards 0 ceiling 0 special 32 line 17 140
+#|locked 32 cards 1 ceiling 131072 special 0 line 0 0
+#|locked 33 cards 0 ceiling 0 special 33 line 26 140
+#|locked 33 cards 4 ceiling 131072 special 0 line 0 0
+#|locked 34 cards 0 ceiling 0 special 34 line 27 140
+#|locked 34 cards 2 ceiling 131072 special 0 line 0 0
 #|key tic 1 alive 3 87 90, inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 ready 1 pending 255
 #|key tic 2 alive 3 90, inventory health 100 armour 0 type 0 cards 1 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 12 ready 1 pending 255
 #|key tic 3 alive 3 90, inventory health 100 armour 0 type 0 cards 1 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 11 ready 1 pending 255

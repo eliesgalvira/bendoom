@@ -4,7 +4,8 @@
 # Sim.thing.crossed for a monster, both by Sim.cross.special's table,
 # which Sim.thing.cross.special filters for a monster; a used line
 # through Sim.use for the player, by Sim.use.special's table, and
-# Sim.thing.uses for a monster, by Sim.thing.use.special's. The tic's
+# Sim.thing.uses for a monster, by Sim.thing.use.special's; a line a
+# bullet meets through Sim.shoot, which the shot calls back. The tic's
 # Sim.think steps the sectors' thinkers here, and the sector under the
 # player acts through Sim.sector and Sim.sector.secret. A level's lights
 # start in Sim.lights.
@@ -187,28 +188,44 @@ def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, S.Sim
 def Sim.mover.heard(+sector: U32, grind: U32, stop: U32, s: S.State) -> S.State:
   S.Sim.sound(stop, Sn.Sector{sector}, S.Sim.sound(grind, Sn.Sector{sector}, s))
 
+# The rest of a plan from its first travel the way given, else what is
+# given: where a crushed mover goes on, and a door turned back, as
+# T_VerticalDoor and T_PlatRaise turn their direction.
+def Sim.plan.from(steps: List<&2, S.Sim.Step>, +down: Bool, +otherwise: List<&2, S.Sim.Step>) ->
+  List<&2, S.Sim.Step>:
+  match steps:
+    case []:
+      otherwise
+    case S.Travel{+way, +dest} <> +rest:
+      Bool.pick(List<&2, S.Sim.Step>, Bool.xor(way, down), Sim.plan.from(rest, down, otherwise),
+        S.Travel{way, dest} <> rest)
+    case S.Hold{tics} <> rest:
+      Sim.plan.from(rest, down, otherwise)
+
 # A step something does not fit is undone, everything clipped again, and
-# the mover crushed: it starts its plan again and sounds its crush,
-# unless the step was its travel's last, which Doom ends all the same.
-def Sim.mover.fitted(t: S.Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was: U32, past: Bool,
-  +rest: List<&2, S.Sim.Step>, going: List<&2, S.Sim.Step>, +plan: List<&2, S.Sim.Step>, noise: S.Sim.Noise, grind: U32,
-  stop: U32, crush: U32, +s: S.State) -> S.State:
+# the mover crushed: it sounds its crush and goes on from the steps
+# given for that.
+def Sim.mover.fitted(t: S.Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was: U32,
+  going: List<&2, S.Sim.Step>, crushed: List<&2, S.Sim.Step>, +plan: List<&2, S.Sim.Step>, noise: S.Sim.Noise,
+  grind: U32, stop: U32, crush: U32, +s: S.State) -> S.State:
   match t:
     case S.Try{True{}, p, got}:
       Sim.mover.kept(sector, ceiling, speed, going, plan, noise,
         Sim.mover.heard(sector, grind, stop, S.State.moved(S.Try{True{}, p, got}, S.State.level(s), s)))
     case S.Try{False{}, p, got}:
       +undone = L.Level.plane.put(S.State.level(s), sector, ceiling, was)
-      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, past, rest, plan), plan, noise,
+      Sim.mover.kept(sector, ceiling, speed, crushed, plan, noise,
         Sim.mover.heard(sector, grind, crush, S.State.moved(Sim.change(undone, sector, p, got), undone, s)))
 
 # Doom's T_MovePlane: a step that would pass the destination lands on it
 # and ends the travel. A ceiling going up short of its destination does
 # not care what fits under it. The sector grinds when the clock's low
-# three bits are clear, and a travel's last step sounds its end whether
-# or not everything fits.
+# three bits are clear. A travel's last step ends it and sounds its end
+# whether or not everything fits, undone if not; any other step that
+# does not fit turns the mover back on its plan from its first travel
+# the other way, or, for a floor with none, tries again next tic.
 def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest: U32,
-  +rest: List<&2, S.Sim.Step>, plan: List<&2, S.Sim.Step>, +noise: S.Sim.Noise, s: S.State) -> S.State:
+  +rest: List<&2, S.Sim.Step>, +plan: List<&2, S.Sim.Step>, +noise: S.Sim.Noise, s: S.State) -> S.State:
   S.Noise{start, wake, rose, fell, crush, grind} = noise
   S.State{+player, +level, +things, sidetex, thinkers, rnd, +clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   +was = L.Level.plane(level, sector, ceiling)
@@ -216,9 +233,10 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
   +moved = L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next))
   +stop = Bool.pick(U32, past, Bool.pick(U32, down, fell, rose), 0)
+  +going = Bool.pick(List<&2, S.Sim.Step>, past, rest, S.Travel{down, dest} <> rest)
   Sim.mover.fitted(S.Sim.Try.or(Bool.and(ceiling, Bool.not(Bool.or(down, past))),
-    Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, past, rest,
-    Bool.pick(List<&2, S.Sim.Step>, past, rest, S.Travel{down, dest} <> rest), plan, noise,
+    Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, going,
+    Bool.pick(List<&2, S.Sim.Step>, past, going, Sim.plan.from(plan, Bool.not(down), going)), plan, noise,
     Bool.pick(U32, U32.is_zero((clock .&. 7 : U32)), grind, 0), stop, Bool.pick(U32, past, stop, crush),
     S.State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets})
 
@@ -282,12 +300,12 @@ def Sim.mover.begin(+sector: U32, ceiling: Bool, speed: U32, +plan: List<&2, S.S
   S.State.thinking(S.Sim.sound(Sim.Noise.start(noise), Sn.Sector{sector}, s),
     S.Mover{sector, ceiling, speed, plan, plan, noise})
 
-# T_VerticalDoor's sounds: the door opens, closes once its wait is over,
-# and opens again on what is in its way. The blazing door has its own
-# open and close, closes aloud a second time as it shuts, and is turned
-# back with the plain door's sound.
-def Sim.noise.door() -> S.Sim.Noise:
-  S.Noise{Sn.Sound.doropn(), Sn.Sound.dorcls(), 0, 0, Sn.Sound.doropn(), 0}
+# T_VerticalDoor's sounds: the door starts with a sound given, its wait
+# ends with another, and it opens again on what is in its way. The
+# blazing door has its own open and close, closes aloud a second time as
+# it shuts, and is turned back with the plain door's sound.
+def Sim.noise.door(start: U32, wake: U32) -> S.Sim.Noise:
+  S.Noise{start, wake, 0, 0, Sn.Sound.doropn(), 0}
 
 def Sim.noise.blazing() -> S.Sim.Noise:
   S.Noise{Sn.Sound.bdopn(), Sn.Sound.bdcls(), 0, Sn.Sound.bdcls(), Sn.Sound.doropn(), 0}
@@ -340,16 +358,22 @@ def Sim.lights(n: Nat, +sector: U32, +s: S.State) -> S.State:
 # Doors
 # -----
 
+# A line that works once has no special afterwards.
+def Sim.once(line: U32, s: S.State) -> S.State:
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+
 # Doom's EV_VerticalDoor on a door already moving: one closing goes back
-# up through its plan, and any other starts down at once for the player
-# and is left alone for anything else, since bad guys never close doors.
-def Sim.door.turned(steps: List<&2, S.Sim.Step>, shuts: Bool, plan: List<&2, S.Sim.Step>, floor: U32) ->
+# up, on its plan from its first travel up, and any other starts down at
+# once for the player, on its plan from its first travel down, and is
+# left alone for anything else, since bad guys never close doors.
+def Sim.door.turned(steps: List<&2, S.Sim.Step>, shuts: Bool, +plan: List<&2, S.Sim.Step>, floor: U32) ->
   List<&2, S.Sim.Step>:
   match steps shuts:
     case S.Travel{True{}, dest} <> rest _:
-      plan
+      Sim.plan.from(plan, False{}, plan)
     case other True{}:
-      [S.Travel{True{}, floor}]
+      Sim.plan.from(plan, True{}, [S.Travel{True{}, floor}])
     case other False{}:
       other
 
@@ -369,9 +393,12 @@ def Sim.door.turn(thinkers: List<&2, S.Thinker>, +shuts: Bool, +sector: U32, +fl
 def Sim.door.top(+level: L.Level, sector: U32) -> U32:
   (Sim.extreme(~F.Fixed.min, ~L.Level.ceil, Sim.around(level, sector), level, 2147483647) - 262144 : U32)
 
-# A door's plan: up to its top, 150 tics open, down to its floor.
-def Sim.door.plan(+level: L.Level, +sector: U32) -> List<&2, S.Sim.Step>:
-  [S.Travel{False{}, Sim.door.top(level, sector)}, S.Hold{150}, S.Travel{True{}, L.Level.floor(level, sector)}]
+# A door begun up to its top, and for one that closes again, VDOORWAIT's
+# 150 tics open and down to its floor.
+def Sim.door.begin(raise: Bool, +sector: U32, +top: U32, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
+  Sim.mover.begin(sector, True{}, speed, Bool.pick(List<&2, S.Sim.Step>, raise,
+    [S.Travel{False{}, top}, S.Hold{150}, S.Travel{True{}, L.Level.floor(S.State.level(s), sector)}],
+    [S.Travel{False{}, top}]), noise, s)
 
 # A door already moving is turned without a sound.
 def Sim.door.on(moving: Bool, +shuts: Bool, +sector: U32, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
@@ -383,22 +410,62 @@ def Sim.door.on(moving: Bool, +shuts: Bool, +sector: U32, speed: U32, noise: S.S
           Sim.door.turn(due, shuts, sector, L.Level.floor(level, sector))}, rnd, clock, ended, usedown, sounds,
         mrnd, reborn, secrets}
     case False{}:
-      Sim.mover.begin(sector, True{}, speed, Sim.door.plan(S.State.level(s), sector), noise, s)
+      Sim.door.begin(True{}, sector, Sim.door.top(S.State.level(s), sector), speed, noise, s)
 
-# Doom's EV_VerticalDoor: the door is the sector behind the line. Only
-# the player may send a door that is not already closing back down.
-def Sim.door(line: L.Level.Line, shuts: Bool, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
-  L.Line{x1, y1, x2, y2, flags, front, +back} = line
-  Sim.door.on(Sim.moving(S.State.thinkers(s), back), shuts, back, speed, noise, s)
+def Sim.door.behind(+level: L.Level, +i: U32) -> U32:
+  L.Level.side.sector(level, L.Level.line.side(level, i, 1))
 
-# Doom's locked EV_VerticalDoor: without the key it refuses with a grunt
-# from nobody; with it, it is the manual door.
-def Sim.door.locked(opens: Bool, line: L.Level.Line, s: S.State) -> S.State:
-  match opens:
+# Doom's EV_VerticalDoor: the door is the sector behind the line. One
+# that closes again is turned if it moves already; one that stays open
+# starts beside whatever moves there, and spends its line. Only the
+# player may send a door that is not already closing back down.
+def Sim.door(raise: Bool, +i: U32, shuts: Bool, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
+  match raise:
     case True{}:
-      Sim.door(line, True{}, 131072, Sim.noise.door(), s)
+      +back = Sim.door.behind(S.State.level(s), i)
+      Sim.door.on(Sim.moving(S.State.thinkers(s), back), shuts, back, speed, noise, s)
     case False{}:
-      S.Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, S.State.says(Msg.Message.pd_bluek(), s))
+      +back = Sim.door.behind(S.State.level(s), i)
+      Sim.once(i, Sim.door.begin(False{}, back, Sim.door.top(S.State.level(s), back), speed, noise, s))
+
+# The plain door's: VDOORSPEED, heard as it opens and as its wait ends.
+def Sim.door.plain(raise: Bool, +i: U32, shuts: Bool, +s: S.State) -> S.State:
+  Sim.door(raise, i, shuts, 131072, Sim.noise.door(Sn.Sound.doropn(), Sn.Sound.dorcls()), s)
+
+# Doom's EV_VerticalDoor on a locked door: a thing that is no player is
+# turned away; the player without the key is refused with the door's
+# message and a grunt from nobody; with it, the door is the plain one.
+def Sim.door.locked(player: Bool, key: Bool, +refusal: U32, raise: Bool, +i: U32, s: S.State) -> S.State:
+  match player key:
+    case False{} _:
+      s
+    case True{} False{}:
+      S.Sim.sound(Sn.Sound.oof(), Sn.Nobody{}, S.State.says(refusal, s))
+    case True{} True{}:
+      Sim.door.plain(raise, i, True{}, s)
+
+# Doom's EV_DoDoor for a sector of a tag, at VDOORSPEED: an opening door
+# is heard unless it is at its top already, and one that closes again
+# closes aloud once its wait is over.
+def Sim.door.tagged(raise: Bool, +level: L.Level, +sector: U32, s: S.State) -> S.State:
+  +top = Sim.door.top(level, sector)
+  Sim.door.begin(raise, sector, top, 131072,
+    Sim.noise.door(Bool.pick(U32, U32.is_eq(top, L.Level.ceil(level, sector)), 0, Sn.Sound.doropn()),
+      Sn.Sound.dorcls()), s)
+
+# vld_open, which stays open.
+def Sim.door.open(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.door.tagged(False{}, level, sector, s)
+
+# vld_normal, which closes again.
+def Sim.door.raise(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.door.tagged(True{}, level, sector, s)
+
+# vld_close30ThenOpen: the door closes aloud from where it is, stays shut
+# for 30 seconds of tics, and opens aloud back there.
+def Sim.door.close30(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.mover.begin(sector, True{}, 131072, [S.Travel{True{}, L.Level.floor(level, sector)}, S.Hold{1050},
+    S.Travel{False{}, L.Level.ceil(level, sector)}], Sim.noise.door(Sn.Sound.dorcls(), Sn.Sound.doropn()), s)
 
 # Switches and tagged movers
 # --------------------------
@@ -494,11 +561,6 @@ def Sim.switch(again: Bool, line: U32, +s: S.State) -> S.State:
   +slot = Sim.switch.slot(S.State.level(s), S.State.sidetex(s), (side * 3 : U32))
   Sim.switch.swap(U32.is_eq(slot, 3), again, side, slot, s)
 
-# A line that works once has no special afterwards.
-def Sim.once(line: U32, s: S.State) -> S.State:
-  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  S.State{player, L.Level.special.put(level, line, 0), things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
-
 # Doom's G_ExitLevel and G_SecretExitLevel: the level ends the way
 # given, and the tic it ends on runs on.
 def State.end(how: S.Sim.Exit, s: S.State) -> S.State:
@@ -535,15 +597,6 @@ def Sim.lift(+level: L.Level, +sector: U32, s: S.State) -> S.State:
 # Walk-over lines
 # ---------------
 
-def Sim.door.open.to(+sector: U32, +top: U32, ceil: U32, s: S.State) -> S.State:
-  Sim.mover.begin(sector, True{}, 131072, [S.Travel{False{}, top}],
-    S.Noise{Bool.pick(U32, U32.is_eq(top, ceil), 0, Sn.Sound.doropn()), 0, 0, 0, 0, 0}, s)
-
-# Doom's EV_DoDoor open: up to the door's top, where it stays, heard
-# unless it is there already.
-def Sim.door.open(+level: L.Level, +sector: U32, s: S.State) -> S.State:
-  Sim.door.open.to(sector, Sim.door.top(level, sector), L.Level.ceil(level, sector), s)
-
 # Doom's turboLower: 4 a tic down to the highest floor around, plus 8
 # when that is not the floor's own height. A travel down to a height
 # above lands at once, as Doom's does.
@@ -555,17 +608,24 @@ def Sim.floor.turbo(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}],
     Sim.noise.floor(), s)
 
-# Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
-# work once lose their special whether or not a sector started; the
-# lift's line works every time.
+# Doom's P_CrossSpecialLine. Those that work once lose their special
+# whether or not a sector started; the others work every time.
 def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
   match special:
     case 2:
       Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
+    case 16:
+      Sim.once(line, Sim.start(~Sim.door.close30, Sim.tagged(s, line), s))
     case 36:
       Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
+    case 76:
+      Sim.start(~Sim.door.close30, Sim.tagged(s, line), s)
+    case 86:
+      Sim.start(~Sim.door.open, Sim.tagged(s, line), s)
     case 88:
       Sim.start(~Sim.lift, Sim.tagged(s, line), s)
+    case 90:
+      Sim.start(~Sim.door.raise, Sim.tagged(s, line), s)
     case _:
       s
 
@@ -585,37 +645,75 @@ def Sim.cross(lines: List<&2, S.Sim.Cross>, +s: S.State) -> S.State:
     case S.Cross{line, x, y} <> rest:
       Sim.cross(rest, Sim.cross.one(line, x, y, s))
 
+# Gunfire
+# -------
+
+# Doom's P_ShootSpecialLine: 46 opens the doors of its tag and works its
+# switch again, whether or not a door started. A thing that is not the
+# player may fire 46 alone of vanilla's three, and the shareware maps
+# carry no other.
+def Sim.shoot.special(special: U32, +line: U32, +s: S.State) -> S.State:
+  match special:
+    case 46:
+      Sim.switch(True{}, line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
+    case _:
+      s
+
+# A line a bullet met, by the special it has then.
+def Sim.shoot(+line: U32, +s: S.State) -> S.State:
+  Sim.shoot.special(L.Level.special(S.State.level(s), line), line, s)
+
 # Use
 # ---
 
-# Doom's P_UseSpecialLine for the specials E1M1 carries: the manual door,
-# its blazing twin and its blue locked twin, the switch that lowers
-# floors, the lift's, and the exit. Any special Doom does not know does
-# nothing.
-def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.State:
+# Whether the player holds a card's key.
+def Sim.key(+s: S.State, card: U32) -> Bool:
+  I.Inventory.key(card, S.Player.inv(S.State.player(s)))
+
+# Doom's P_UseSpecialLine, used by the player or by a thing that is not:
+# the manual doors, plain, locked or blazing, that close again (1, 26 to
+# 28, 117) or stay open (31 to 34), and the switches. Any special Doom
+# does not know does nothing.
+def Sim.use.special(special: U32, +i: U32, +player: Bool, +s: S.State) -> S.State:
   match special:
     case 1:
-      Sim.door(L.Level.line(S.State.level(s), i), True{}, 131072, Sim.noise.door(), s)
-    case 117:
-      Sim.door(L.Level.line(S.State.level(s), i), True{}, 524288, Sim.noise.blazing(), s)
+      Sim.door.plain(True{}, i, player, s)
     case 26:
-      Sim.door.locked(I.Inventory.blue(inv), L.Level.line(S.State.level(s), i), s)
+      Sim.door.locked(player, Sim.key(s, I.Inventory.bluecard()), Msg.Message.pd_bluek(), True{}, i, s)
+    case 27:
+      Sim.door.locked(player, Sim.key(s, I.Inventory.yellowcard()), Msg.Message.pd_yellowk(), True{}, i, s)
+    case 28:
+      Sim.door.locked(player, Sim.key(s, I.Inventory.redcard()), Msg.Message.pd_redk(), True{}, i, s)
+    case 31:
+      Sim.door.plain(False{}, i, player, s)
+    case 32:
+      Sim.door.locked(player, Sim.key(s, I.Inventory.bluecard()), Msg.Message.pd_bluek(), False{}, i, s)
+    case 33:
+      Sim.door.locked(player, Sim.key(s, I.Inventory.redcard()), Msg.Message.pd_redk(), False{}, i, s)
+    case 34:
+      Sim.door.locked(player, Sim.key(s, I.Inventory.yellowcard()), Msg.Message.pd_yellowk(), False{}, i, s)
+    case 117:
+      Sim.door(True{}, i, player, 524288, Sim.noise.blazing(), s)
     case 23:
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case 62:
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
+    case 63:
+      Sim.use.again(~Sim.door.raise, Sim.tagged(s, i), i, s)
+    case 103:
+      Sim.use.once(~Sim.door.open, Sim.tagged(s, i), i, s)
     case 11:
       State.end(S.Normal{}, Sim.once(i, Sim.switch(False{}, i, s)))
     case _:
       s
 
 # Only the front of a line answers use.
-def Sim.use.line(back: Bool, +level: L.Level, +i: U32, inv: I.Inventory, s: S.State) -> S.State:
+def Sim.use.line(back: Bool, +level: L.Level, +i: U32, s: S.State) -> S.State:
   match back:
     case True{}:
       s
     case False{}:
-      Sim.use.special(L.Level.special(level, i), i, inv, s)
+      Sim.use.special(L.Level.special(level, i), i, True{}, s)
 
 # What a use trace reaches: a special line, a wall that ends it, or
 # nothing.
@@ -633,7 +731,7 @@ def Sim.use.hit(hit: Sim.Reach, +p: S.Player, +s: S.State) -> S.State:
       S.Sim.sound(Sn.Sound.noway(), Sn.Thing{H.Thing.you()}, s)
     case Special{+i}:
       Sim.use.line(S.Sim.point_side(S.Player.x(p), S.Player.y(p), L.Level.line(S.State.level(s), i)),
-        S.State.level(s), i, S.Player.inv(p), s)
+        S.State.level(s), i, s)
 
 def Sim.use.at(special: Bool, shut: Bool, i: U32) -> S.Sim.Answer<&2, Sim.Reach>:
   match special shut:
@@ -676,26 +774,30 @@ def Sim.secret(+line: L.Level.Line) -> Bool:
   Bool.not(U32.is_zero((flags .&. 32 : U32)))
 
 # Doom's P_UseSpecialLine for a thing that is not the player: the
-# specials it may press. It opens a manual door, special 1, and answers
-# no to every other special either E1M1 carries. The three manual locked
-# doors vanilla also lets a thing press, 32 to 34, are in neither map,
-# and EV_VerticalDoor turns a thing with no player away from them anyway.
+# specials it may press, the manual doors 1 and 32 to 34. EV_VerticalDoor
+# turns it away from the locked three, but the press still counts.
 def Sim.thing.use.special(special: U32) -> Bool:
   match special:
     case 1:
       True{}
+    case 32:
+      True{}
+    case 33:
+      True{}
+    case 34:
+      True{}
     case _:
       False{}
 
-# A thing presses a line it may press unless the line is secret.
+# A thing presses a line it may press unless the line is secret, from
+# whichever side it stands.
 def Sim.thing.use.at(opens: Bool, +i: U32, w: S.Sim.Walk) -> S.Sim.Walk:
   match opens:
     case False{}:
       w
     case True{}:
       S.Walk{ok, id, +s} = w
-      +line = L.Level.line(S.State.level(s), i)
-      S.Walk{True{}, id, Sim.door(line, False{}, 131072, Sim.noise.door(), s)}
+      S.Walk{True{}, id, Sim.use.special(L.Level.special(S.State.level(s), i), i, False{}, s)}
 
 def Sim.thing.use(+i: U32, w: S.Sim.Walk) -> S.Sim.Walk:
   S.Walk{ok, id, +s} = w

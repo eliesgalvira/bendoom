@@ -161,6 +161,25 @@ def blazing() -> IO(Unit):
     watch(~ceiling, "blazing door", [7n, 1n, 150n, 1n, 7n, 1n], Fx.Closed.used(0n, Fx.Closed.east()))
     watch(~running, "blazing door", [], Fx.Closed.used(167n, Fx.Closed.east()))
 
+# vld_close30ThenOpen, as EV_DoDoor begins it for specials 16 and 76, on
+# the door open at 68 beside the west room's player at (32, 64): it
+# closes from where it stands, sfx_dorcls, 21, as it starts, 66 after
+# tic 1 and 0 after tic 34; tic 35 passes the floor, and the door waits
+# shut TICRATE*30, 1050 tics; the count reaches zero on tic 1085, which
+# sounds sfx_doropn, 20, and turns it up; 2 after tic 1086, 68 after
+# tic 1119, and tic 1120 passes the ceiling it started at and ends the
+# thinker.
+def closing() -> S.State:
+  +s = Fx.Closed.at(Fx.Closed.player(2097152, 4194304, 0, 8388608), L.Level.plane.put(Fx.Closed.doors(), 1, True{},
+    4456448), [], [])
+  Sp.Sim.door.close30(S.State.level(s), 1, s)
+
+def close30() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "close30", [1n, 33n, 1n, 1050n, 1n, 33n, 1n], closing())
+    watch(~sounds, "close30", [1085n], closing())
+    watch(~running, "close30", [1n], Fx.Closed.idled(1119n, closing()))
+
 # The west room's floor going down 4 a tic toward -16, with a player
 # standing on it at x.
 def carrying(x: U32) -> S.State:
@@ -184,7 +203,7 @@ def carried() -> IO(Unit):
 # both its faces at (72, 64).
 def crushing() -> S.State:
   Fx.Closed.moving(L.Level.plane.put(Fx.Closed.doors(), 1, True{}, 4456448),
-    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door()},
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door(Sn.Sound.doropn(), Sn.Sound.dorcls())},
     4718592, 4194304, 4456448)
 
 # A door that closes on the player goes back up: 56 after 6 tics; the
@@ -195,6 +214,31 @@ def crushed.door() -> IO(Unit):
   do IO<Unit>:
     watch(~ceiling, "crushed door", [1n, 1n], Fx.Closed.idled(6n, crushing()))
     watch(~running, "crushed door", [], Fx.Closed.idled(7n, crushing()))
+
+# The same door closing for 30 seconds over the player goes back up and
+# no further, T_VerticalDoor's crushed branch for vld_close30ThenOpen:
+# 56 after 6 tics, the 7th undone with its steps its plan from the
+# travel up; 58 after the 8th, 68 after the 13th, and the 14th passes
+# its top and ends it.
+def crushing30() -> S.State:
+  Fx.Closed.moving(L.Level.plane.put(Fx.Closed.doors(), 1, True{}, 4456448),
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}, S.Hold{1050}, S.Travel{False{}, 4456448}],
+      [S.Travel{True{}, 0}, S.Hold{1050}, S.Travel{False{}, 4456448}], Sp.Sim.noise.door(Sn.Sound.dorcls(), Sn.Sound.doropn())},
+    4718592, 4194304, 4456448)
+
+def crushed.close30() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "crushed close30", [1n, 1n, 5n], Fx.Closed.idled(6n, crushing30()))
+    watch(~running, "crushed close30", [7n], Fx.Closed.idled(7n, crushing30()))
+
+# EV_VerticalDoor's vld_open, special 31, used from the west room: up 2
+# a tic, 68 after tic 34, and tic 35 lands on its top and ends it; the
+# line has no special from tic 1.
+def stays.open() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "stays open", [33n, 1n], Fx.Closed.used(0n, Fx.Closed.door(31, Fx.Closed.inv([]))))
+    watch(~running, "stays open", [1n], Fx.Closed.used(33n, Fx.Closed.door(31, Fx.Closed.inv([]))))
+    watch(~special, "stays open", [], Fx.Closed.used(0n, Fx.Closed.door(31, Fx.Closed.inv([]))))
 
 # A walk-over line fires from the move that crosses it, once, and
 # special 36 is vanilla's turboLower: 4 a tic down to the highest floor
@@ -322,6 +366,9 @@ def main() -> IO(Unit):
     blazing()
     carried()
     crushed.door()
+    close30()
+    crushed.close30()
+    stays.open()
     turbo()
     lift()
     lowered()
@@ -358,6 +405,30 @@ def main() -> IO(Unit):
 #|crushed door tic 7 ceiling 56.000000
 #|crushed door tic 8 ceiling 58.000000
 #|crushed door tic 7 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 hold 150 down to 0.000000 plan up to 68.000000 hold 150 down to 0.000000 noise 20 21 0 0 20 0)
+#|close30 tic 0 ceiling 68.000000
+#|close30 tic 1 ceiling 66.000000
+#|close30 tic 34 ceiling 0.000000
+#|close30 tic 35 ceiling 0.000000
+#|close30 tic 1085 ceiling 0.000000
+#|close30 tic 1086 ceiling 2.000000
+#|close30 tic 1119 ceiling 68.000000
+#|close30 tic 1120 ceiling 68.000000
+#|close30 tic 0 sounds (DSDORCLS from sector 1 vol 64 sep 129)
+#|close30 tic 1085 sounds (DSDOROPN from sector 1 vol 64 sep 129)
+#|close30 tic 1119 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan down to 0.000000 hold 1050 up to 68.000000 noise 21 20 0 0 20 0)
+#|close30 tic 1120 thinkers
+#|crushed close30 tic 6 ceiling 56.000000
+#|crushed close30 tic 7 ceiling 56.000000
+#|crushed close30 tic 8 ceiling 58.000000
+#|crushed close30 tic 13 ceiling 68.000000
+#|crushed close30 tic 7 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan down to 0.000000 hold 1050 up to 68.000000 noise 21 20 0 0 20 0)
+#|crushed close30 tic 14 thinkers
+#|stays open tic 1 ceiling 2.000000
+#|stays open tic 34 ceiling 68.000000
+#|stays open tic 35 ceiling 68.000000
+#|stays open tic 34 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan up to 68.000000 noise 20 21 0 0 20 0)
+#|stays open tic 35 thinkers
+#|stays open tic 1 special 0
 #|turbo tic 1 floors 24.000000 12.000000 24.000000
 #|turbo tic 2 floors 24.000000 8.000000 24.000000
 #|turbo tic 3 thinkers
