@@ -1212,7 +1212,7 @@ def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.St
     case True{}:
       mobj_held(cmd, geo, s, h)
     case False{}:
-      held_free(geo, s, Sp.Sim.think(~Tic.Sim.thing, t, s), h)
+      held_free(geo, s, Tic.Sim.think(t, s), h)
 
 def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, Tic.Sim.thinkers.go(fuel, cmd, geo, s)):
