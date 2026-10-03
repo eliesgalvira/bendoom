@@ -234,29 +234,6 @@ def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: S.S
     case False{}:
       S.State.kept(s, S.Button{side, slot, texture, (tics - 1 : U32)})
 
-# A thinker's tic, a mobj's by the think the tic passes. A wait counts
-# down, and the tic it reaches zero sounds the mover's wake and does
-# nothing else, as Doom's doors and lifts turn. A blink turns on the tic
-# its count runs out.
-def Sim.think(~thing: @+id: U32 -> @+s: S.State -> S.State, t: S.Thinker, s: S.State) -> S.State:
-  match t:
-    case S.Mobj{id}:
-      thing(id, s)
-    case S.Mover{sector, ceiling, speed, [], plan, noise}:
-      s
-    case S.Mover{+sector, ceiling, speed, S.Hold{+tics} <> +rest, plan, +noise}:
-      Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(tics, 1), rest,
-        S.Hold{(tics - 1 : U32)} <> rest), plan, noise,
-        S.Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
-    case S.Mover{sector, ceiling, speed, S.Travel{down, dest} <> rest, plan, noise}:
-      Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
-    case S.Button{side, slot, texture, +tics}:
-      Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
-    case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
-      Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
-    case S.Glow{sector, dark, bright, down}:
-      Sim.glow(sector, dark, bright, down, s)
-
 # The sectors across a sector's two-sided lines, as Doom's getNextSector
 # answers them line by line: the back of a line whose front is the
 # sector, else the front.
