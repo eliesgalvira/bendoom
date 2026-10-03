@@ -14,6 +14,7 @@ import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/sim.bend as S
+import ../src/special.bend as Sp
 import ../src/sound.bend as Sn
 import ./fixtures/closed.bend as Fx
 
@@ -164,7 +165,7 @@ def blazing() -> IO(Unit):
 # standing on it at x.
 def carrying(x: U32) -> S.State:
   Fx.Closed.moving(Fx.Closed.doors(),
-    S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}], S.Sim.noise.floor()},
+    S.Mover{0, False{}, 262144, [S.Travel{True{}, 4293918720}], [S.Travel{True{}, 4293918720}], Sp.Sim.noise.floor()},
     x, 4194304, 8388608)
 
 # A moving floor carries the player standing on it, vanilla's
@@ -183,7 +184,7 @@ def carried() -> IO(Unit):
 # both its faces at (72, 64).
 def crushing() -> S.State:
   Fx.Closed.moving(L.Level.plane.put(Fx.Closed.doors(), 1, True{}, 4456448),
-    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], S.Sim.noise.door()},
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door()},
     4718592, 4194304, 4456448)
 
 # A door that closes on the player goes back up: 56 after 6 tics; the
@@ -258,7 +259,7 @@ def lowered() -> IO(Unit):
 # under a player 56 tall.
 def rising() -> S.State:
   Fx.Closed.moving(L.Level.plane.put(L.Level.plane.put(Fx.Closed.doors(), 0, False{}, 4292870144), 0, True{}, 2621440),
-    S.Mover{0, False{}, 262144, [S.Travel{False{}, 0}], [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}], S.Sim.noise.lift()},
+    S.Mover{0, False{}, 262144, [S.Travel{False{}, 0}], [S.Travel{True{}, 4292870144}, S.Hold{105}, S.Travel{False{}, 0}], Sp.Sim.noise.lift()},
     2097152, 4194304, 2621440)
 
 # A lift that rises into a player who does not fit goes back down: -16

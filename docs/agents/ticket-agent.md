@@ -10,7 +10,7 @@ Scratch files and research go in the worktree's ignored `research/`, never `/tmp
 
 One game compile peaks at 12 GB, and the machine has about 19 GB free, so heavy commands share one lock.
 
-- Run these under `flock /tmp/bendoom-heavy.lock`: every Bend compile, including `--check-only`, test files and `tools/frame.bend`; every clang compile; every `nix build`; and the proof, as `flock /tmp/bendoom-heavy.lock nix develop -c bend PROOF.bend`.
+- Run these under the lock, in a memory-capped scope: every Bend compile, including `--check-only`, test files and `tools/frame.bend`; every clang compile; every `nix build`; and the proof, as `flock /tmp/bendoom-heavy.lock systemd-run --user --scope -q -p MemoryMax=15G -p MemorySwapMax=4G -- nix develop -c bend PROOF.bend`. A job that outgrows the cap dies alone; without the scope, the kernel kills T3 Code with it, as a runaway Lean job did twice on 2026-10-03. Report a job the cap kills; never raise the cap.
 - Wait for the lock in one foreground command with your tool's longest timeout, and rerun it if the timeout ends it. Never poll with `pgrep`, and never end your turn while queued.
 - Never run heavy jobs in parallel yourself. Six proofs under `xargs -P 6` rebooted the machine on 2026-09-19.
 - Never run `nix flake check`. The orchestrator runs it on the integration branch.

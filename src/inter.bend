@@ -14,6 +14,7 @@ import ./keys.bend as K
 import ./random.bend as M
 import ./draw.bend as D
 import ./sim.bend as S
+import ./tic.bend as Tic
 import ./sound.bend as Sn
 import ./project.bend as P
 import ./render.bend as R
@@ -772,7 +773,7 @@ type Play.Step is Data:
 
 # A new game on a map: G_InitNew, then G_DoLoadLevel.
 def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
-  Playing{S.State.start(level), map, False{}}
+  Playing{Tic.State.start(level), map, False{}}
 
 # The map G_DoCompleted returns to from map 9 of each episode.
 def Play.back(+episode: U32) -> U32:
@@ -843,7 +844,7 @@ def Play.after(map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
 def Play.reborn(reborn: Bool, +level: L.Level, state: S.State) -> S.State:
   match reborn:
     case True{}:
-      S.State.reloaded(level, state)
+      Tic.State.reloaded(level, state)
     case False{}:
       state
 
@@ -870,7 +871,7 @@ def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Ste
     case Playing{+state, map, didsecret}:
       +ended = S.State.ended(state)
       +reborn = S.State.reborn(state)
-      +after = S.Sim.tic(cmd, Play.reborn(reborn, level, state))
+      +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
       Step{Play.after(map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
     case Showing{+wi, after, trip}:
       +press = Play.pressed(held, cmd)
@@ -909,7 +910,7 @@ def Play.enter(+level: L.Level, play: Play) -> Play:
     case Playing{state, map, didsecret}:
       Playing{state, map, didsecret}
     case Showing{+wi, after, Trip{last, next, didsecret}}:
-      Playing{S.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next, didsecret}
+      Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next, didsecret}
 
 # A play and what it is drawn from: the frame's array, the graphics, the
 # tables and the map as loaded.

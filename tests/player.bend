@@ -78,6 +78,7 @@ import Base
 import ./fixtures/closed.bend as Fx
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/special.bend as Sp
 import ../src/random.bend as M
 import ../src/inventory.bend as I
 import ../src/bar.bend as Y
@@ -108,13 +109,13 @@ def meets(ms: List<&2, S.Sim.Meet>) -> String:
     case S.Meet{frac, isline, what} <> rest:
       " " ++ U32.show(frac) ++ " " ++ Bool.show(isline) ++ " " ++ U32.show(what) ++ meets(rest)
 
-def reach(r: S.Sim.Reach) -> String:
+def reach(r: Sp.Sim.Reach) -> String:
   match r:
-    case S.Special{line}:
+    case Sp.Special{line}:
       "special " ++ U32.show(line)
-    case S.Wall{}:
+    case Sp.Wall{}:
       "wall"
-    case S.Nothing{}:
+    case Sp.Nothing{}:
       "nothing"
 
 def main() -> IO(Unit):

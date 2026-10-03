@@ -5,6 +5,7 @@ import Base
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/inventory.bend as I
 import ../src/fixed.bend as F
 import ../src/inter.bend as N
@@ -44,7 +45,7 @@ def report(+s: S.State) -> IO(Unit):
 
 def loaded(world: Array<U32> & L.Level, cmds: List<&2, K.Cmd>) -> IO(Unit):
   (mem, level) = world
-  report(S.Sim.replay(cmds, S.State.start(level)))
+  report(Tic.Sim.replay(cmds, Tic.State.start(level)))
 
 def main() -> IO(Unit):
   do IO<Unit>:
