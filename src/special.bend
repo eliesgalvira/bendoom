@@ -1,8 +1,11 @@
 # The line and sector specials of the shareware maps: Doom's p_spec.c,
-# p_switch.c, p_doors.c, p_plats.c, p_floor.c and p_lights.c over the
-# sim's state. A crossed line fires through Sim.cross for the player and
+# p_switch.c, p_doors.c, p_plats.c, p_floor.c, p_lights.c and
+# p_telept.c over the sim's state. A crossed line fires through
+# Sim.cross for the player and
 # Sim.thing.crossed for a monster, both by Sim.cross.special's table,
-# which Sim.thing.cross.special filters for a monster; a used line
+# which Sim.thing.cross.special filters for a monster. The player's own
+# move takes it to a teleport's destination, and Sim.teleport makes the
+# rest of EV_Teleport when the crossing fires. A used line
 # through Sim.use for the player, by Sim.use.special's table, and
 # Sim.thing.uses for a monster, by Sim.thing.use.special's. The tic's
 # Sim.think steps the sectors' thinkers here, and the sector under the
@@ -532,6 +535,145 @@ def Sim.lift(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}, S.Hold{105},
     S.Travel{False{}, L.Level.floor(level, sector)}], Sim.noise.lift(), s)
 
+# Teleports
+# ---------
+
+# Doom's MT_TFOG at a place, sounding sfx_telept as it appears.
+def Sim.teleport.fog(+x: U32, +y: U32, +z: U32, +s: S.State) -> S.State:
+  +id = H.Things.count(S.State.things(s))
+  S.Sim.sound(Sn.Sound.telept(), Sn.Thing{id}, S.Sim.spawn(H.Thing.info(H.Thing.tfog()), x, y, z, s))
+
+# EV_Teleport's two fogs: where the mover stood, at its height then, and
+# 20 units ahead of the destination along its facing, at the floor the
+# mover lands on.
+def Sim.teleport.fogs(d: S.Sim.Dest, +x: U32, +y: U32, +z: U32, +s: S.State) -> S.State:
+  S.Dest{+dx, +dy, +angle} = d
+  +level = S.State.level(s)
+  +f = A.Angle.fine(angle)
+  Sim.teleport.fog((dx + 20 * A.Angle.cos(L.Level.sine(level), f) : U32),
+    (dy + 20 * A.Angle.sin(L.Level.sine(level), f) : U32), L.Level.floor(level, L.Level.sector_at(level, dx, dy)),
+    Sim.teleport.fog(x, y, z, s))
+
+# PIT_StompThing's test of a mobj against a mover of radius r landing at
+# (x, y): another mobj, shootable, whose box meets the mover's, whatever
+# their heights. A dead player is shootable no more.
+def Sim.teleport.meets(m: Maybe<&2, S.Sim.Body>, +who: U32, +you: U32, +live: Bool, +x: U32, +y: U32, +r: U32) ->
+  Bool:
+  match m:
+    case None{}:
+      False{}
+    case Some{S.Body{+id, tx, ty, tz, tr, th, flags}}:
+      Bool.and(S.Sim.overlap(tr, tx, ty, x, y, r), Bool.and(Bool.not(U32.is_eq(id, who)),
+        Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))), Bool.or(Bool.not(U32.is_eq(id, you)), live))))
+
+def Sim.teleport.met(ids: List<&2, U32>, +s: S.State, +who: U32, +x: U32, +y: U32, +r: U32) -> List<&2, U32>:
+  match ids:
+    case []:
+      []
+    case +id <> rest:
+      V.Vec.keep(~U32, Sim.teleport.meets(S.Sim.body(S.State.things(s), S.State.player(s), id), who,
+        H.Things.you(S.State.things(s)), Bool.not(S.Player.dead(S.State.player(s))), x, y, r), id,
+        Sim.teleport.met(rest, s, who, x, y, r))
+
+# What stands in the way of a mover of radius r landing at a
+# destination, in the blockmap's order, as P_TeleportMove meets it.
+def Sim.teleport.way(+who: U32, +r: U32, d: S.Sim.Dest, +s: S.State) -> List<&2, U32>:
+  S.Dest{+x, +y, angle} = d
+  Sim.teleport.met(S.Sim.near(S.State.level(s), S.State.things(s), x, y, r), s, who, x, y, r)
+
+# PIT_StompThing for the player: everything in its way takes 10000
+# damage from it.
+def Sim.teleport.stomp(ids: List<&2, U32>, +s: S.State) -> S.State:
+  match ids:
+    case []:
+      s
+    case +id <> rest:
+      +you = H.Things.you(S.State.things(s))
+      Sim.teleport.stomp(rest, S.Sim.damage.raw(id, 10000, you, you, s))
+
+# EV_Teleport for the player, whose own move has put it at the
+# destination already: the stomp, dealt from where the player crossed
+# the line, then the fogs, heard from the destination with the facing
+# the player had before EV_Teleport turned it.
+def Sim.teleport.you(m: Maybe<&2, S.Sim.Dest>, +x: U32, +y: U32, +z: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{S.Dest{+dx, +dy, +angle}}:
+      +stomped = Sim.teleport.stomp(Sim.teleport.way(H.Things.you(S.State.things(s)), S.Sim.radius(),
+        S.Dest{dx, dy, angle}, s), s)
+      Sim.teleport.fogs(S.Dest{dx, dy, angle}, x, y, z,
+        S.State.player.put(stomped, S.Player.located(S.State.player(stomped), dx, dy)))
+
+# P_TeleportMove and EV_Teleport on a thing: at the destination, on the
+# floor and under the ceiling of the sector there with no line
+# consulted, facing the destination's way, still.
+def Sim.teleport.landed(th: H.Thing, +level: L.Level, d: S.Sim.Dest) -> H.Thing:
+  H.Thing{id, kind, ox, oy, oz, floorz, ceilz, was, sector, state, tics, momz, +hurt} = th
+  S.Dest{+x, +y, angle} = d
+  +at = L.Level.sector_at(level, x, y)
+  +floor = L.Level.floor(level, at)
+  H.Thing{id, kind, x, y, floor, floor, L.Level.ceil(level, at), angle, at, state, tics, 0,
+    V.Vec.set(V.Vec.set(hurt, H.Thing.hurt.momx(), 0), H.Thing.hurt.momy(), 0)}
+
+def Sim.teleport.moved(+th: H.Thing, d: S.Sim.Dest, s: S.State) -> S.State:
+  S.State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, level, H.Things.moved(things, L.Level.blockmap_of(level), th, Sim.teleport.landed(th, level, d)),
+    sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+
+# A thing teleports only where nothing stands in its way, since only the
+# player stomps outside MAP30.
+def Sim.teleport.clear(way: List<&2, U32>, +th: H.Thing, +d: S.Sim.Dest, +x: U32, +y: U32, +z: U32, +s: S.State) ->
+  S.State:
+  match way:
+    case []:
+      Sim.teleport.fogs(d, x, y, z, Sim.teleport.moved(th, d, s))
+    case _:
+      s
+
+def Sim.teleport.thing.to(m: Maybe<&2, S.Sim.Dest>, +th: H.Thing, +who: U32, +x: U32, +y: U32, +z: U32,
+  +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+d}:
+      Sim.teleport.clear(Sim.teleport.way(who, V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.radius()), d, s), th, d, x,
+        y, z, s)
+
+# EV_Teleport for a thing, which never takes a missile.
+def Sim.teleport.thing(m: Maybe<&2, H.Thing>, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      S.Cross{+line, +x, +y, +z, angle} = c
+      Sim.teleport.thing.to(S.Sim.teleport.if(Bool.not(H.Thing.flagged(th, 65536)), S.State.level(s), line, x, y),
+        th, who, x, y, z, s)
+
+def Sim.teleport.of(you: Bool, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
+  match you:
+    case True{}:
+      S.Cross{+line, +x, +y, +z, angle} = c
+      Sim.teleport.you(S.Sim.teleport.to(S.State.level(s), line, x, y), x, y, z, s)
+    case False{}:
+      Sim.teleport.thing(S.State.thing(who, s), who, c, s)
+
+# Doom's EV_Teleport for the mobj who that crossed a teleport line where
+# the crossing says, coming from the line's front: to the destination in
+# the line's tagged sector, with a fog and sfx_telept at both ends.
+def Sim.teleport(+who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
+  Sim.teleport.of(U32.is_eq(who, H.Things.you(S.State.things(s))), who, c, s)
+
+# The monsters' teleports, 125 and 126: the player crossing one is not
+# taken and leaves 125's special as it was.
+def Sim.teleport.monster(you: Bool, once: Bool, +line: U32, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
+  match you:
+    case True{}:
+      s
+    case False{}:
+      +taken = Sim.teleport(who, c, s)
+      Bool.pick(S.State, once, Sim.once(line, taken), taken)
+
 # Walk-over lines
 # ---------------
 
@@ -555,10 +697,11 @@ def Sim.floor.turbo(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}],
     Sim.noise.floor(), s)
 
-# Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
-# work once lose their special whether or not a sector started; the
-# lift's line works every time.
-def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
+# Doom's P_CrossSpecialLine for the specials the shareware maps carry,
+# fired by the mobj who where the crossing says. The ones that work once
+# lose their special whether or not a sector started or the mover was
+# taken; the lift's line and the teleports 97 and 126 work every time.
+def Sim.cross.special(special: U32, +line: U32, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
   match special:
     case 2:
       Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
@@ -566,15 +709,28 @@ def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
       Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
     case 88:
       Sim.start(~Sim.lift, Sim.tagged(s, line), s)
+    case 39:
+      Sim.once(line, Sim.teleport(who, c, s))
+    case 97:
+      Sim.teleport(who, c, s)
+    case 125:
+      Sim.teleport.monster(U32.is_eq(who, H.Things.you(S.State.things(s))), True{}, line, who, c, s)
+    case 126:
+      Sim.teleport.monster(U32.is_eq(who, H.Things.you(S.State.things(s))), False{}, line, who, c, s)
     case _:
       s
 
-# Fire a crossing from the part of the move where vanilla fired it,
-# while preserving the player's final position for the rest of the tic.
-def Sim.cross.one(+line: U32, +x: U32, +y: U32, +s: S.State) -> S.State:
+# Fire a crossing from the part of the move where vanilla fired it, the
+# player standing and facing as it did there, then put the player back
+# where and as its whole move left it. What the special did to the rest
+# of the player, a telefrag's kill counted, stays.
+def Sim.cross.one(c: S.Sim.Cross, +s: S.State) -> S.State:
+  S.Cross{+line, +x, +y, +z, +angle} = c
   +p = S.State.player(s)
-  S.State.player.put(Sim.cross.special(L.Level.special(S.State.level(s), line), line,
-    S.State.player.put(s, S.Player.located(p, x, y))), p)
+  +fired = Sim.cross.special(L.Level.special(S.State.level(s), line), line, H.Things.you(S.State.things(s)),
+    S.Cross{line, x, y, z, angle}, S.State.player.put(s, S.Player.located(S.Player.facing(p, angle), x, y)))
+  S.State.player.put(fired, S.Player.located(S.Player.facing(S.State.player(fired), S.Player.angle(p)),
+    S.Player.x(p), S.Player.y(p)))
 
 # The lines the player's moves crossed this tic, each by the special it
 # has when its turn comes.
@@ -582,8 +738,8 @@ def Sim.cross(lines: List<&2, S.Sim.Cross>, +s: S.State) -> S.State:
   match lines:
     case []:
       s
-    case S.Cross{line, x, y} <> rest:
-      Sim.cross(rest, Sim.cross.one(line, x, y, s))
+    case c <> rest:
+      Sim.cross(rest, Sim.cross.one(c, s))
 
 # Use
 # ---
@@ -710,26 +866,50 @@ def Sim.thing.uses(lines: List<&2, U32>, w: S.Sim.Walk) -> S.Sim.Walk:
       Sim.thing.uses(rest, Sim.thing.use(i, w))
 
 # The walk-over specials a thing that is not the player may fire. Doom's
-# P_CrossSpecialLine allows seven, and the lift's retrigger, special 88,
-# is the one of those either E1M1 carries.
+# P_CrossSpecialLine allows seven: the lift's retrigger, 88, and the
+# four teleports, 39, 97, 125 and 126, are those the shareware maps
+# carry.
 def Sim.thing.cross.special(special: U32) -> Bool:
   match special:
     case 88:
+      True{}
+    case 39:
+      True{}
+    case 97:
+      True{}
+    case 125:
+      True{}
+    case 126:
       True{}
     case _:
       False{}
 
 # A crossed line fires its special when a thing may fire it, else none.
-def Sim.thing.cross.one(+special: U32, +line: U32, +s: S.State) -> S.State:
-  Sim.cross.special(Bool.pick(U32, Sim.thing.cross.special(special), special, 0), line, s)
+def Sim.thing.cross.one(+special: U32, +line: U32, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
+  Sim.cross.special(Bool.pick(U32, Sim.thing.cross.special(special), special, 0), line, who, c, s)
 
-# The walk-over specials a thing's move crossed.
-def Sim.thing.crossed(lines: List<&2, U32>, +s: S.State) -> S.State:
-  match lines:
-    case []:
+# Whether a thing no longer stands where its move put it: a teleport
+# took it.
+def Sim.thing.away(m: Maybe<&2, H.Thing>, +x: U32, +y: U32) -> Bool:
+  match m:
+    case None{}:
+      True{}
+    case Some{+th}:
+      Bool.not(Bool.and(U32.is_eq(H.Thing.x(th), x), U32.is_eq(H.Thing.y(th), y)))
+
+# The walk-over specials a thing's move to (x, y) crossed, each fired
+# from there with the thing's height and facing before the move, until
+# one teleports it, since P_TeleportMove empties spechit.
+def Sim.thing.crossed(lines: List<&2, U32>, away: Bool, +id: U32, +x: U32, +y: U32, +z: U32, +angle: U32,
+  +s: S.State) -> S.State:
+  match lines away:
+    case [] _:
       s
-    case +line <> rest:
-      Sim.thing.crossed(rest, Sim.thing.cross.one(L.Level.special(S.State.level(s), line), line, s))
+    case _ True{}:
+      s
+    case +line <> rest False{}:
+      +after = Sim.thing.cross.one(L.Level.special(S.State.level(s), line), line, id, S.Cross{line, x, y, z, angle}, s)
+      Sim.thing.crossed(rest, Sim.thing.away(S.State.thing(id, after), x, y), id, x, y, z, angle, after)
 
 # The sector's special
 # --------------------

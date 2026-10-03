@@ -115,6 +115,9 @@ def Sound.bdcls() -> U32:
 def Sound.getpow() -> U32:
   93
 
+def Sound.telept() -> U32:
+  35
+
 # A row of S_sfx: the sound's number, its lump, and its priority, where
 # less is more important.
 type Sound.Sfx is Data:
@@ -132,7 +135,7 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
     Sfx{2, "DSSHOTGN", 64}, Sfx{16, "DSFIRSHT", 70}, Sfx{17, "DSFIRXPL", 70}, Sfx{55, "DSCLAW", 70}, Sfx{83, "DSPUNCH", 64},
     Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}, Sfx{43, "DSBRSSIT", 94},
-    Sfx{67, "DSBRSDTH", 32}]
+    Sfx{67, "DSBRSDTH", 32}, Sfx{35, "DSTELEPT", 32}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
