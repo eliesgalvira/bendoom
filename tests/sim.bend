@@ -1864,9 +1864,7 @@ def sighting(tag: String, ids: List<&2, U32>, n: Nat, x: U32, y: U32, degrees: U
 # A_Look over Freedoom's monsters. First REJECT, read from the lump in
 # nushell: Freedoom's E1M1 has 182 sectors, so the lump is 4141 bytes
 # and its last one holds the pairs (181, 178) to (181, 181), which the
-# loader would lose if it read the lump as whole words. It keeps the
-# bytes after the sector tags in one store, since a record's width is a
-# budget the whole program shares.
+# loader would lose if it read the lump as whole words.
 # Sector 36's demon, record 92, stands
 # at (-48, 1616) facing east and is deaf; the player 96 units due east
 # of it is dead ahead, so it wakes on its first look, the tic its spawn
