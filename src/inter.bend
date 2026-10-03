@@ -578,7 +578,7 @@ def Inter.Trip.next(t: Inter.Trip) -> L.Level.Name:
 
 # A map's name, the patch WILV00 for E1M1.
 def Inter.name(+map: U32) -> String:
-  "WILV0" ++ U32.show((map - 1 : U32))
+  G.Gfx.wi.level() ++ U32.show((map - 1 : U32))
 
 # WI_drawLF: the name of the map left at the top, and "Finished!" a name
 # and a quarter under it.
@@ -839,8 +839,7 @@ def Play.after(map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   Play.ended(S.State.ended(after), map, didsecret, after)
 
 # G_DoReborn ahead of the tic: a death that asked for the level again
-# has the map as loaded reloaded, and the player G_PlayerReborn makes
-# has not done E1M9.
+# has the map as loaded reloaded.
 def Play.reborn(reborn: Bool, +level: L.Level, state: S.State) -> S.State:
   match reborn:
     case True{}:
@@ -865,7 +864,8 @@ def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
 
 # A tic of the play on the map as loaded: the level's tic while it
 # runs, then the tally's. Held is a key outside the command that
-# accelerates the tally, which the level pays no heed.
+# accelerates the tally, which the level pays no heed. A reload makes
+# the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
     case Playing{+state, map, didsecret}:
@@ -903,8 +903,8 @@ def Play.wants(play: Play) -> Maybe<&2, L.Level.Name>:
       Play.wants.if(Inter.over(wi), Inter.Trip.next(trip))
 
 # G_DoWorldDone on the map the tally asked for, as loaded. G_WorldDone
-# also marks E1M9 done after the secret exit, which nothing reads before
-# leaving E1M9 marks it again.
+# also marks E1M9 done after the secret exit; that is left out, since
+# leaving E1M9 marks it again before anything reads it.
 def Play.enter(+level: L.Level, play: Play) -> Play:
   match play:
     case Playing{state, map, didsecret}:
