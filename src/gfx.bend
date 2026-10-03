@@ -1034,11 +1034,10 @@ def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
       List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
 
 def Gfx.wi.names() -> List<&2, String>:
-  List.append(&2, String,
-    ["WIMAP0", "WILV00", "WILV01", "WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR",
-      "WISUCKS", "WIPCNT", "WICOLON", "WINUM0", "WINUM1", "WINUM2", "WINUM3", "WINUM4", "WINUM5",
-      "WINUM6", "WINUM7", "WINUM8", "WINUM9", "WISPLAT", "WIURH0", "WIURH1"],
-    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0))
+  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, "WILV0", 0),
+    ["WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR", "WISUCKS", "WIPCNT", "WICOLON"],
+    Gfx.bar.numbered(10n, "WINUM", 0), ["WISPLAT", "WIURH0", "WIURH1"],
+    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0)])
 
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),

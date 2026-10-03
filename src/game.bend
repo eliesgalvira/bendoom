@@ -136,15 +136,16 @@ def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
 def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   Game{level, gfx, tables, +play, input, again, last, owed, mem, demo, music} = g
   match play:
-    case I.Playing{+state, +map}:
+    case I.Playing{+state, +map, +didsecret}:
       do IO<Bool & Game>:
         moved : Maybe<M.Stream> <- M.Stream.update(~S.State,
           ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music)
-        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map}), moved)
-        return (quit, Game{level, gfx, tables, I.Playing{state, map}, input, again, last, owed, mem, demo, playing})
-    case I.Showing{+wi, +after, +next}:
-      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(I.Showing{wi, after, next}), music),
-        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi, after, next}, input, again, last, owed,
+        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map, didsecret}), moved)
+        return (quit, Game{level, gfx, tables, I.Playing{state, map, didsecret}, input, again, last, owed, mem, demo,
+          playing})
+    case I.Showing{+wi, +after, +trip}:
+      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(I.Showing{wi, after, trip}), music),
+        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi, after, trip}, input, again, last, owed,
           mem, demo, playing})))
 
 def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
