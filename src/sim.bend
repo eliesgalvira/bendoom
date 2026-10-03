@@ -114,6 +114,12 @@ def Sim.radius() -> U32:
 def Sim.height() -> U32:
   3670016
 
+# MT_PLAYER's flags: solid, shootable, free to drop off ledges and to
+# pick things up, and not in deathmatch. It is in a blockmap cell and in
+# its sector's list.
+def Sim.flags() -> U32:
+  33557510
+
 def Sim.maxmove() -> U32:
   1966080
 
@@ -683,8 +689,9 @@ def Sim.twosided(+line: L.Level.Line) -> Bool:
   Bool.not(U32.is_zero((flags .&. 4 : U32)))
 
 # Doom's P_LineOpening leaves no opening in a line with one side. A line
-# flagged two-sided with no back sector is one, and neither E1M1 has
-# one, so vanilla's stale opening after such a line is never read.
+# flagged two-sided with no back sector is one, and no first-episode map
+# of DOOM1.WAD or Freedoom has one, so vanilla's stale opening after such
+# a line is never read.
 def Sim.shut(+level: L.Level, +line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, flags, front, +back} = line
   Bool.or(U32.is_eq(back, L.Level.none()),
@@ -812,10 +819,9 @@ def Sim.near(+level: L.Level, things: H.Things, +x: U32, +y: U32, +r: U32) -> Li
 # Things
 # ------
 
-# The player's mobj, MT_PLAYER: solid, shootable, free to drop off
-# ledges and to pick things up.
+# The player's mobj, MT_PLAYER.
 def Player.body(+p: Player, id: U32) -> Sim.Body:
-  Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), 33557510}
+  Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), Sim.flags()}
 
 # A thing's live body, including the dimensions a crushed corpse loses.
 def Sim.body.of(th: H.Thing) -> Sim.Body:
@@ -1127,8 +1133,8 @@ def Sim.spechit(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32) -> List<
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
 def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, +y: U32) -> H.Things:
-  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), 0, H.Things.you(things), ox, oy,
-    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), 0, H.Things.you(things), x, y,
+  H.Things.link(H.Things.unlink(things, L.Level.blockmap_of(level), Sim.flags(), H.Things.you(things), ox, oy,
+    L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), Sim.flags(), H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
 def Sim.crossed.at(lines: List<&2, U32>, +x: U32, +y: U32) -> List<&2, Sim.Cross>:
@@ -2641,8 +2647,7 @@ def Sim.damage.taken(hurt: I.Inventory & U32, +source: U32, +s: State) -> State:
 # health the rest, which kills where the health it leaves runs out,
 # since vanilla holds the player's health at 0 exactly there. The god
 # and skill branches are left out, since no cheat is ported and the game
-# is Hurt Me Plenty, and so is the hack for sectors with special 11,
-# which neither map carries.
+# is Hurt Me Plenty, and so is the hack for sectors with special 11.
 def Sim.damage.player(+damage: U32, +source: U32, +s: State) -> State:
   Sim.damage.taken(I.Inventory.hurt(Player.inv(State.player(s)), damage), source, s)
 
@@ -2745,7 +2750,7 @@ def Sim.blow.thing(+target: U32, +th: H.Thing, +damage: U32, +inflictor: U32, +s
 
 # A thing in the state a blow sends it to, for that state's tics: the
 # state half of Doom's P_SetMobjState. The row's action does not run
-# here, since no pain or death row of any type either map spawns carries
+# here, since no pain or death row of any type the game spawns carries
 # one on entry: A_Pain, A_Scream, A_XScream, A_Fall and A_Explode all
 # sit on rows the state cycle reaches, where the thinker runs them
 # through the general P_SetMobjState, which a blow cannot reach without
@@ -3351,8 +3356,7 @@ def Sim.shot.met(isline: Bool, +level: L.Level, +what: U32, +frac: U32, sh: Sim.
     case False{}:
       Sim.shot.thing(what, frac, sh)
 
-# Doom's PTR_ShootTraverse. P_ShootSpecialLine is left out: no line in
-# either E1M1 fires on a gunshot.
+# Doom's PTR_ShootTraverse, without P_ShootSpecialLine.
 def Sim.shot.visit(+level: L.Level, m: Sim.Meet, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   Meet{frac, isline, what} = m
   Sim.shot.met(isline, level, what, frac, sh)
@@ -4418,9 +4422,10 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # started.
 def State.entered.you(s: State) -> State:
   State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), 0, H.Things.you(things),
-    Player.x(player), Player.y(player), L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex,
-    thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, Mobj{H.Things.you(things)})
+  State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), Sim.flags(),
+    H.Things.you(things), Player.x(player), Player.y(player),
+    L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex, thinkers, rnd, clock, ended, usedown,
+    sounds, mrnd, reborn, secrets}, Mobj{H.Things.you(things)})
 
 # Whether the player's mobj enters before the first of some things: its
 # record comes before theirs, or none is left.
