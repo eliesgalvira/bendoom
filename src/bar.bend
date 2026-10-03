@@ -271,7 +271,6 @@ def Bar.palette.of(+cnt: U32, +bonus: U32) -> U32:
 # ST_doPaletteStuff: which of PLAYPAL's fourteen palettes the frame is
 # shown in. Red by the damage count or the berserk fade, whichever is
 # larger; gold by the pickup flash where no red is due; the plain
-# palette otherwise. RADIATIONPAL, the radiation suit's, is not picked
-# yet.
+# palette otherwise.
 def Bar.palette(+damage: U32, +strength: U32, +bonus: U32) -> U32:
   Bar.palette.of(U32.max(damage, Bar.fade(strength)), bonus)
