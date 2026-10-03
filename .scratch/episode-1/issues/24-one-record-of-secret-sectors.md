@@ -10,4 +10,4 @@ Since ticket 08 a sector's special is sim state, so `State.secrets`, a per-secto
 
 - [ ] `State.secrets` and its copy are deleted; finding a secret sets the sector's special to 0, as vanilla does.
 - [ ] The secret total is counted once when the level loads and carried to the tally, as `totalsecret`.
-- [ ] Every test passes unchanged on both backends and the tally of E1M1 matches `tools/oracle.nu --tally`.
+- [ ] Every test passes unchanged on both backends and the tally of E1M1 matches `tools/oracle.nu --screen tally`.
