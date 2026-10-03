@@ -923,6 +923,28 @@ def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
 def Sim.thing(+id: U32, +s: S.State) -> S.State:
   Sim.thing.tic(H.Things.get(S.State.things(s), id), id, s)
 
+# A thinker's tic. A wait counts down, and the tic it reaches zero
+# sounds the mover's wake and does nothing else, as Doom's doors and
+# lifts turn. A blink turns on the tic its count runs out.
+def Sim.think(t: S.Thinker, s: S.State) -> S.State:
+  match t:
+    case S.Mobj{id}:
+      Sim.thing(id, s)
+    case S.Mover{sector, ceiling, speed, [], plan, noise}:
+      s
+    case S.Mover{+sector, ceiling, speed, S.Hold{+tics} <> +rest, plan, +noise}:
+      Sp.Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(tics, 1), rest,
+        S.Hold{(tics - 1 : U32)} <> rest), plan, noise,
+        S.Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sp.Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
+    case S.Mover{sector, ceiling, speed, S.Travel{down, dest} <> rest, plan, noise}:
+      Sp.Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
+    case S.Button{side, slot, texture, +tics}:
+      Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
+    case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
+      Sp.Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
+    case S.Glow{sector, dark, bright, down}:
+      Sp.Sim.glow(sector, dark, bright, down, s)
+
 # The tic
 # -------
 
@@ -999,7 +1021,7 @@ def Sim.turn(mine: Bool, t: S.Thinker, cmd: K.Cmd, +geo: L.Level.Geo, +s: S.Stat
     case False{}:
       +x = S.Player.x(S.State.player(s))
       +y = S.Player.y(S.State.player(s))
-      State.held(geo, x, y, Sp.Sim.think(~Sim.thing, t, s))
+      State.held(geo, x, y, Sim.think(t, s))
 
 # One run down the thinkers due, its fuel the list of them as it began:
 # each in turn, in the order they were started. Those started meanwhile
