@@ -19,7 +19,8 @@
 # "count,forward,side,turn,buttons" (tools/demo.nu), played on --map
 # (E1M1 when not given) from a copy of the IWAD whose player 1 starts
 # at x, y facing angle; the default script idles 20 tics, past the
-# pistol's rise. `demo` takes a demo lump of the IWAD, such as DEMO1, or
+# pistol's rise. G_PlayerReborn leaves use and attack held, so either
+# on the first tic does nothing. `demo` takes a demo lump of the IWAD, such as DEMO1, or
 # a .lmp file, and plays its first tics on the map its header names.
 # Bendoom plays Hurt Me Plenty with player 1 alone and no options, and
 # a header that asks for anything else is refused. Either way --things
@@ -53,6 +54,7 @@
 #   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
 #   tools/oracle.nu -363 1316 180 "1,0,0,16,0 5,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --tally
 #   tools/oracle.nu -224 -624 90 --map E1M5 --wad doom1.wad
+#   tools/oracle.nu 1920 -2304 0 "1,0,0,0,0 1,0,0,0,1 300,0,0,0,0 1,0,0,0,1 5,0,0,0,0" --map E1M7 --wad doom1.wad --entering
 #   tools/oracle.nu demo DEMO3 300 --wad doom1.wad
 #   tools/oracle.nu demo run.lmp 1000
 
