@@ -39,6 +39,7 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/project.bend as P
 import ../src/game.bend as M
@@ -140,10 +141,10 @@ def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
 # A player killed where it stands in the nukage of sector 173, which
 # five health a blow would take 609 tics to do.
 def killed.at(+s: S.State) -> S.State:
-  S.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
+  Tic.Sim.damage(H.Things.you(S.State.things(s)), 100, H.Thing.you(), H.Thing.you(), s)
 
 def killed(level: L.Level) -> S.State:
-  killed.at(S.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
+  killed.at(Tic.State.at(level, L.Start{F.Fixed.of_map(1600), F.Fixed.of_map(1000), A.Angle.of_thing(90)}))
 
 
 def warped.at(at: L.Level.Name) -> String:
@@ -155,14 +156,14 @@ def warped(args: List<String>) -> String:
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
-  +beside = S.Sim.replay(route(), S.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
+  +beside = Tic.Sim.replay(route(), Tic.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
     A.Angle.of_thing(180)}))
   do IO<Unit>:
     IO.print("warp" ++ warped([]) ++ warped(["-warp", "1", "5"]) ++ warped(["-WARP", "2"]) ++ warped(["-warp"])
       ++ warped(["-nomonsters", "-warp", "1", "9", "-warp", "1", "2"]) ++ warped(["-warp", "15", "37"]))
-    IO.print(line("start", S.State.start(level)))
+    IO.print(line("start", Tic.State.start(level)))
     IO.print(line("beside", beside))
-    IO.print(clicked(S.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
+    IO.print(clicked(Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
       P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
