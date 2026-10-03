@@ -912,6 +912,7 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
   +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
+  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.tfog()), n, marks)
   +marks = Gfx.sprite.hurt(H.Thing.fireball(), n, marks)
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, marks))
 

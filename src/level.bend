@@ -364,10 +364,18 @@ def Level.tanto(+l: Level) -> V.Vec:
     sectors, specials, heard} = l
   tanto
 
-def Level.nthings(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, Things{words, count}, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
+# The map's THINGS records, which read the geometry alone.
+def Level.records(+l: Level) -> Level.Things:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
     sectors, specials, heard} = l
+  things
+
+def Level.Things.count(t: Level.Things) -> U32:
+  Things{words, count} = t
   count
+
+def Level.nthings(+l: Level) -> U32:
+  Level.Things.count(Level.records(l))
 
 def Level.things.record(+t: Level.Things, +i: U32) -> Level.Thing:
   Things{+words, count} = t
@@ -376,9 +384,7 @@ def Level.things.record(+t: Level.Things, +i: U32) -> Level.Thing:
 
 # THINGS record i, as the map gives it.
 def Level.thing(+l: Level, +i: U32) -> Level.Thing:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches},
-    sectors, specials, heard} = l
-  Level.things.record(things, i)
+  Level.things.record(Level.records(l), i)
 
 def Level.is_start(t: Level.Thing) -> Bool:
   Thing{x, y, angle, kind, options} = t

@@ -117,14 +117,14 @@ def Sim.chase.placed(+th: H.Thing, +level: L.Level, +x: U32, +y: U32, +floor: U3
     Sim.chase.landed(th, level, x, y, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds,
     mrnd, reborn, secrets}
 
-def Sim.chase.step.fin(taken: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32,
+def Sim.chase.step.fin(taken: Bool, +th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32,
   +y: U32, +r: U32, +floor: U32, +ceil: U32, s: S.State) -> S.Sim.Walk:
   match taken:
     case False{}:
       S.Walk{False{}, id, s}
     case True{}:
-      S.Walk{True{}, id, Sp.Sim.thing.crossed(S.Sim.crossings(level, ox, oy, x, y, r),
-        Sim.chase.placed(th, level, x, y, floor, ceil, s))}
+      S.Walk{True{}, id, Sp.Sim.thing.crossed(S.Sim.crossings(level, ox, oy, x, y, r), False{}, id, x, y,
+        H.Thing.z(th), H.Thing.angle(th), Sim.chase.placed(th, level, x, y, floor, ceil, s))}
 
 def Sim.chase.step.fit(+z: U32, +height: U32, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32,
   +x: U32, +y: U32, +r: U32, f: S.Sim.Fit, s: S.State) -> S.Sim.Walk:
