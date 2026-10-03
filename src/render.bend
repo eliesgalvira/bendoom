@@ -122,7 +122,7 @@ def Render.palette(+p: S.Player) -> U32:
 def Render.paletted(+palette: U32, mem: Array<U32>) -> Array<U32> & U32:
   (mem, palette)
 
-# The sectors' heights and light come from the state's level, the
+# The sectors' heights, flats and light come from the state's level, the
 # sides' textures from the state, and the animations' frames and the
 # walls' scroll from its clock. The view fills the frame's first 168
 # rows and the status bar the 32 under it. The message line is drawn

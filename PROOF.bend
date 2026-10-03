@@ -1066,7 +1066,7 @@ def cond_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, 
   {S.Sim.line_ok(L.Level{geo, sa, pa, ha}, x, y, r, mask, i) == S.Sim.line_ok(L.Level{geo, sb, pb, hb}, x, y, r, mask, i)
     : Bool}:
   match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}:
       {==}
 
 # Past a line the box does not stop, the verdict is True in any level.
@@ -1126,7 +1126,7 @@ def lines_same(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec,
   {S.Sim.lines(L.Level{geo, sa, pa, ha}, x0, y0, x1, y1) == S.Sim.lines(L.Level{geo, sb, pb, hb}, x0, y0, x1, y1)
     : List<&2, U32>}:
   match geo:
-    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}:
       {==}
 
 # Free is the same in two levels of one geometry: the lines gathered are
