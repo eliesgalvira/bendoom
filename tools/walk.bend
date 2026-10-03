@@ -16,6 +16,7 @@ import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/keys.bend as K
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ./script.bend as T
@@ -49,12 +50,12 @@ def Walk.go(runs: List<&2, List<&2, K.Cmd>>, +which: List<&2, String>, +first: S
     case run <> rest:
       do IO<Unit>:
         IO.print(Walk.line(which, first, s))
-        Walk.go(rest, which, first, S.Sim.replay(run, s))
+        Walk.go(rest, which, first, Tic.Sim.replay(run, s))
 
 def Walk.start(place: L.Level.Start, runs: List<&2, List<&2, K.Cmd>>, which: List<&2, String>,
   p: Array<U32> & L.Level) -> IO(Unit):
   (a, +level) = p
-  +first = S.State.at(level, place)
+  +first = Tic.State.at(level, place)
   Walk.go(runs, which, first, first)
 
 def main() -> IO(Unit):
