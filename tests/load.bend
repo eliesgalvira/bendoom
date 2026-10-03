@@ -79,8 +79,9 @@ def names(xs: List<&2, String>) -> String:
 def sector(+level: L.Level, +gfx: G.Gfx, +i: U32, s: L.Level.Sector) -> String:
   L.Sector{floor, ceil, light} = s
   "sector " ++ U32.show(i) ++ " floor " ++ F.Fixed.show(floor) ++ " ceil " ++ F.Fixed.show(ceil)
-    ++ " light " ++ U32.show(light) ++ " flats " ++ names(L.Level.flat_names(level, i))
-    ++ " sky " ++ Bool.show(U32.is_eq(G.Gfx.ceilpic(gfx, i), G.Gfx.sky(gfx)))
+    ++ " light " ++ U32.show(light) ++ " flats " ++ names([L.Level.flat.name(level, L.Level.floorpic(level, i)),
+      L.Level.flat.name(level, L.Level.ceilpic(level, i))])
+    ++ " sky " ++ Bool.show(U32.is_eq(G.Gfx.ceilpic(gfx, level, i), G.Gfx.sky(gfx)))
 
 def side(+level: L.Level, +i: U32, s: L.Level.Side) -> String:
   L.Side{xoff, yoff, sector} = s
@@ -99,12 +100,12 @@ def show(xs: List<&2, U32>) -> String:
 
 # The palette at 4, 176 and 255; four colormap entries; the floor flat
 # of sector 9 and the ceiling flat of sector 140 at texels 0 and 2077.
-def peeks(+gfx: G.Gfx) -> List<&2, U32>:
+def peeks(+gfx: G.Gfx, +level: L.Level) -> List<&2, U32>:
   [(G.Gfx.palette() + 4 : U32), (G.Gfx.palette() + 176 : U32), (G.Gfx.palette() + 255 : U32),
     (G.Gfx.colormap() + 4 : U32), (G.Gfx.colormap() + 16 * 256 + 4 : U32),
     (G.Gfx.colormap() + 31 * 256 + 176 : U32), (G.Gfx.colormap() + 32 * 256 + 4 : U32),
-    G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 9)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 9)) + 2077 : U32),
-    G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 140)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 140)) + 2077 : U32)]
+    G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, level, 9)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, level, 9)) + 2077 : U32),
+    G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, level, 140)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, level, 140)) + 2077 : U32)]
 
 def texture(+gfx: G.Gfx, name: String, +t: U32) -> String:
   "texture " ++ name ++ " " ++ U32.show(G.Gfx.tex.width(gfx, t)) ++ "x"
@@ -134,8 +135,8 @@ def texels(+gfx: G.Gfx) -> List<&2, U32>:
     from(G.Gfx.column(gfx, G.Gfx.mid(gfx, 216), 0), [0, 1, 3])])
 
 # What the four animated names show at a clock.
-def animated(+gfx: G.Gfx) -> String:
-  show([G.Gfx.floorpic(gfx, 23), G.Gfx.ceilpic(gfx, 36), G.Gfx.mid(gfx, 203), G.Gfx.mid(gfx, 932)])
+def animated(+gfx: G.Gfx, +level: L.Level) -> String:
+  show([G.Gfx.floorpic(gfx, level, 23), G.Gfx.ceilpic(gfx, level, 36), G.Gfx.mid(gfx, 203), G.Gfx.mid(gfx, 932)])
 
 def at(gfx: G.Gfx, +level: L.Level, clock: U32) -> G.Gfx:
   G.Gfx.of_state(gfx, L.Level.sidetex(level), clock)
@@ -146,9 +147,9 @@ def bar(+gfx: G.Gfx, k: U32) -> List<&2, U32>:
   +p = G.Gfx.bar(gfx, k)
   [p, (p + 2 : U32)]
 
-def moving(+gfx: G.Gfx) -> List<&2, U32>:
-  [G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, 23)) + 2077 : U32),
-    G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, 36)) + 2077 : U32)]
+def moving(+gfx: G.Gfx, +level: L.Level) -> List<&2, U32>:
+  [G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, level, 23)), (G.Gfx.flat(gfx, G.Gfx.floorpic(gfx, level, 23)) + 2077 : U32),
+    G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, level, 36)), (G.Gfx.flat(gfx, G.Gfx.ceilpic(gfx, level, 36)) + 2077 : U32)]
 
 # How many of the first n lines carry a special.
 def carrying(n: Nat, +level: L.Level, +special: U32, +i: U32) -> U32:
@@ -281,11 +282,11 @@ def report.go(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(texture(gfx, "SW2GRAY", L.Level.switch(level, G.Gfx.mid(gfx, 615))))
     IO.print("switches " ++ show([G.Gfx.mid(gfx, 1166), L.Level.switch(level, G.Gfx.mid(gfx, 1166)),
       L.Level.switch(level, L.Level.switch(level, G.Gfx.mid(gfx, 1166))), L.Level.switch(level, G.Gfx.mid(gfx, 1386))]))
-    IO.print("animations " ++ String.join([animated(at(gfx, level, 0)), animated(at(gfx, level, 1)),
-      animated(at(gfx, level, 8)), animated(at(gfx, level, 9)), animated(at(gfx, level, 41))], ", "))
+    IO.print("animations " ++ String.join([animated(at(gfx, level, 0), level), animated(at(gfx, level, 1), level),
+      animated(at(gfx, level, 8), level), animated(at(gfx, level, 9), level), animated(at(gfx, level, 41), level)], ", "))
     read : Array<U32> <- peeked("palette colormap flats texels",
-      B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx), texels(gfx), moving(at(gfx, level, 0)),
-        moving(at(gfx, level, 1)), sprite(gfx)]), mem))
+      B.Bytes.each(~U32, ~B.Bytes.at, List.concat(&2, U32, [peeks(gfx, level), texels(gfx), moving(at(gfx, level, 0), level),
+        moving(at(gfx, level, 1), level), sprite(gfx)]), mem))
     IO.print("bar patches " ++ show(Pair.snd(Array<U32>, List<&2, U32>,
       B.Bytes.each(~U32, ~B.Bytes.u16, List.concat(&2, U32, [bar(gfx, 0), bar(gfx, 1), bar(gfx, 10),
         bar(gfx, 20), bar(gfx, 21), bar(gfx, 24), bar(gfx, 27), bar(gfx, 33), bar(gfx, 34)]), read))))
