@@ -499,8 +499,8 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
 # 2022 to 2026, and the item's for the rest.
 def Inventory.sound(+kind: U32) -> U32:
   Bool.pick(U32, Bool.and(U32.is_ge(kind, 2001), U32.is_le(kind, 2005)), Sn.Sound.wpnup(),
-    Bool.pick(U32, Bool.and(U32.is_ge(kind, 2022), U32.is_le(kind, 2026)) || U32.is_eq(kind, 2013)
-      || U32.is_eq(kind, 2045), Sn.Sound.getpow(), Sn.Sound.itemup()))
+    Bool.pick(U32, Bool.or(Bool.and(U32.is_ge(kind, 2022), U32.is_le(kind, 2026)),
+      Bool.or(U32.is_eq(kind, 2013), U32.is_eq(kind, 2045))), Sn.Sound.getpow(), Sn.Sound.itemup()))
 
 # The end of P_TouchSpecialThing for a thing taken: the tally counts an
 # item flagged for it, and the flash grows by 6.
@@ -515,13 +515,22 @@ def Inventory.power.tic(+powers: V.Vec, +power: U32, +step: U32) -> V.Vec:
   +n = V.Vec.get(powers, power)
   V.Vec.set(powers, power, (n + step * Inventory.on(n) : U32))
 
-# P_PlayerThink's counters, with HU_Ticker's: strength counts up once
-# on, the timed powers run down, the flash fades by one a tic, and so
-# does the heads-up line's counter, which goes out at zero.
+# A timed power's step a tic, -1.
+def Inventory.down() -> U32:
+  4294967295
+
+# P_PlayerThink's power counters: strength counts up once on, and the
+# timed powers run down.
+def Inventory.powers.tic(+powers: V.Vec) -> V.Vec:
+  +strong = Inventory.power.tic(powers, Inventory.pw_strength(), 1)
+  +unseen = Inventory.power.tic(strong, Inventory.pw_invisibility(), Inventory.down())
+  +lit = Inventory.power.tic(unseen, Inventory.pw_infrared(), Inventory.down())
+  Inventory.power.tic(lit, Inventory.pw_ironfeet(), Inventory.down())
+
+# P_PlayerThink's counters, with HU_Ticker's: the powers', the flash's,
+# which fades by one a tic, and the heads-up line's, which does too and
+# goes out at zero.
 def Inventory.tic(inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, +bonus, +line, kills, secrets} = inv
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-    Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(powers, Inventory.pw_strength(), 1),
-      Inventory.pw_invisibility(), 4294967295), Inventory.pw_infrared(), 4294967295), Inventory.pw_ironfeet(),
-      4294967295), items,
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, Inventory.powers.tic(powers), items,
     (bonus - Inventory.on(bonus) : U32), (line - Inventory.on((line .&. 255 : U32)) : U32), kills, secrets}
