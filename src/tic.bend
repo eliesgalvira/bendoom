@@ -348,9 +348,7 @@ def Sim.chase.newdir(w: S.Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level)
   Sim.chase.newdir.at(S.Walk{ok, id, s}, deltax, deltay,
     S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.movedir()), level)
 
-# Doom's A_FaceTarget: the thing turns to face its target. Vanilla's
-# shadow branch, which spreads the turn at a target flagged MF_SHADOW, a
-# spectre or an invisible player, is not here yet.
+# Doom's A_FaceTarget: the thing turns to face its target.
 def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
   H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, +ai} = th
   H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),

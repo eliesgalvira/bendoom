@@ -670,16 +670,16 @@ def Sim.use(press: Bool, +s: S.State) -> S.State:
 # ---------------
 
 # Doom's ML_SECRET: a thing that is not the player never opens a door on
-# a line marked secret. Each E1M1 has one such door.
+# a line marked secret.
 def Sim.secret(+line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, +flags, front, back} = line
   Bool.not(U32.is_zero((flags .&. 32 : U32)))
 
 # Doom's P_UseSpecialLine for a thing that is not the player: the
 # specials it may press. It opens a manual door, special 1, and answers
-# no to every other special either E1M1 carries. The three manual locked
-# doors vanilla also lets a thing press, 32 to 34, are in neither map,
-# and EV_VerticalDoor turns a thing with no player away from them anyway.
+# no to every other special. Vanilla also lets a thing press the three
+# manual locked doors, 32 to 34, but EV_VerticalDoor turns a thing with
+# no player away from them.
 def Sim.thing.use.special(special: U32) -> Bool:
   match special:
     case 1:
@@ -711,7 +711,7 @@ def Sim.thing.uses(lines: List<&2, U32>, w: S.Sim.Walk) -> S.Sim.Walk:
 
 # The walk-over specials a thing that is not the player may fire. Doom's
 # P_CrossSpecialLine allows seven, and the lift's retrigger, special 88,
-# is the one of those either E1M1 carries.
+# is the one ported.
 def Sim.thing.cross.special(special: U32) -> Bool:
   match special:
     case 88:
@@ -744,8 +744,7 @@ def Sim.sector.hurt(due: Bool, +s: S.State) -> S.State:
 # Doom's P_PlayerInSpecialSector on the sector under the player: special
 # 7 is nukage, which takes 5 health every 32 tics of the level's clock
 # while the player's feet are at that sector's floor. It is the only
-# special either map carries that hurts, so the switch is the one test.
-# The radiation suit's protection is not here yet.
+# special ported that hurts, so the switch is the one test.
 def Sim.sector(+level: L.Level, +clock: U32, +s: S.State) -> S.State:
   +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
   Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(S.State.level(s), sector), 7),
