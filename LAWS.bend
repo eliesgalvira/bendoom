@@ -7,6 +7,8 @@ import ./src/vec.bend as V
 import ./src/level.bend as L
 import ./src/keys.bend as K
 import ./src/sim.bend as S
+import ./src/special.bend as Sp
+import ./src/tic.bend as Tic
 import ./src/things.bend as H
 import ./src/inventory.bend as I
 import ./src/sound.bend as Sn
@@ -77,9 +79,9 @@ law tic_rest:
   for +level: L.Level
   for +x: U32
   for +y: U32
-  {(S.Player.x(S.State.player(S.Sim.tic(K.Cmd.idle(),
+  {(S.Player.x(S.State.player(Tic.Sim.tic(K.Cmd.idle(),
       Fx.Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, level, 0)))),
-    S.Player.y(S.State.player(S.Sim.tic(K.Cmd.idle(),
+    S.Player.y(S.State.player(Tic.Sim.tic(K.Cmd.idle(),
       Fx.Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, level, 0)))))
     == (x, y) : U32 & U32}
 
@@ -99,8 +101,8 @@ law tic_counts:
   for +level: L.Level
   for +clock: U32
   for +secret: Bool
-  {(S.State.clock(S.Sim.tic(cmd, Fx.Closed.state(p, level, clock))),
-    S.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+  {(S.State.clock(Tic.Sim.tic(cmd, Fx.Closed.state(p, level, clock))),
+    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
     == ((clock + 1 : U32),
       S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
     : U32 & S.State}
@@ -136,7 +138,7 @@ law use_fires_once:
   for reborn: Bool
   for secrets: V.Vec
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
-  {S.Sim.pressed(next, S.State.usedown(S.Sim.tic(K.Cmd{forward, side, turn, buttons},
+  {Tic.Sim.pressed(next, S.State.usedown(Tic.Sim.tic(K.Cmd{forward, side, turn, buttons},
     S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, secrets}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
@@ -144,7 +146,7 @@ law use_fires_once:
 law once_clears:
   for +line: U32
   for s: S.State
-  {L.Level.special(S.State.level(S.Sim.once(line, s)), line) == 0 : U32}
+  {L.Level.special(S.State.level(Sp.Sim.once(line, s)), line) == 0 : U32}
 
 # The door level of tests/fixtures/closed.bend with an exit switch: line
 # 0's special is 11, the middle texture of its front side is numbered 1,
@@ -155,7 +157,7 @@ def Exit.level() -> L.Level:
 
 # The west room's player after two idle tics and then a tic of use.
 def Exit.used() -> S.State:
-  S.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
+  Tic.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Fx.Closed.player(2097152, 4194304, 0, 8388608), Exit.level(), Fx.Closed.none(), L.Level.sidetex(Exit.level()),
       S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
 
@@ -163,7 +165,7 @@ def Exit.used() -> S.State:
 # the state once.
 def Exit.ended(+cmd: K.Cmd, +s: S.State) -> Type:
   {(S.State.ended(s), S.State.clock(s), L.Level.special(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2),
-    S.Sim.tic(cmd, s))
+    Tic.Sim.tic(cmd, s))
     == (S.Normal{}, 3, 0, 2, s) : S.Sim.Exit & U32 & U32 & U32 & S.State}
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
@@ -180,7 +182,7 @@ law replay_append:
   for a: List<&2, K.Cmd>
   for b: List<&2, K.Cmd>
   for s: S.State
-  {S.Sim.replay(List.append(&2, K.Cmd, a, b), s) == S.Sim.replay(b, S.Sim.replay(a, s)) : S.State}
+  {Tic.Sim.replay(List.append(&2, K.Cmd, a, b), s) == Tic.Sim.replay(b, Tic.Sim.replay(a, s)) : S.State}
 
 # LAW: free is pinned to the geometry: when a position is free, every
 # line listed in the blockmap cells its box touches satisfies the
@@ -205,7 +207,7 @@ law free_pins_lines:
 law tic_keeps_geometry:
   for +cmd: K.Cmd
   for +s: S.State
-  {L.Level.geo(S.State.level(S.Sim.tic(cmd, s))) == L.Level.geo(S.State.level(s)) : L.Level.Geo}
+  {L.Level.geo(S.State.level(Tic.Sim.tic(cmd, s))) == L.Level.geo(S.State.level(s)) : L.Level.Geo}
 
 # A state whose player passes its level's line check: no solid line
 # crosses its box.
@@ -219,7 +221,7 @@ law tic_keeps_free:
   for +cmd: K.Cmd
   for +s: S.State
   for free: Free(s)
-  Free(S.Sim.tic(cmd, s))
+  Free(Tic.Sim.tic(cmd, s))
 
 # LAW: the wall law: replaying any script from a free state, the start
 # included, leaves the player free.
@@ -227,7 +229,7 @@ law replay_keeps_free:
   for script: List<&2, K.Cmd>
   for +s: S.State
   for free: Free(s)
-  Free(S.Sim.replay(script, s))
+  Free(Tic.Sim.replay(script, s))
 
 # LAW: the freedom law, for every mobj: a place passes P_CheckPosition
 # only when no mobj near stops the box, whatever is moved, among any
@@ -270,7 +272,7 @@ law thing_move_is_checked:
   for +ts: H.Things
   for +p: S.Player
   for s: S.State
-  for taken: {True{} == S.Sim.Walk.ok(S.Sim.chase.step.met(m, th, id, level, x, y,
+  for taken: {True{} == S.Sim.Walk.ok(Tic.Sim.chase.step.met(m, th, id, level, x, y,
     S.Sim.met(level, ts, p, S.Sim.Body.at(m, x, y)), s)) : Bool}
   {True{} == S.Sim.Fit.ok(S.Sim.check(level, ts, p, S.Sim.Body.at(m, x, y), 3)) : Bool}
 
@@ -305,7 +307,7 @@ law lasting_stays:
   for +y: U32
   for +z: U32
   for s: S.State
-  {S.Sim.thing.step(H.Thing.lasting(Fx.Closed.thing(id, kind, x, y, z)),
+  {Tic.Sim.thing.step(H.Thing.lasting(Fx.Closed.thing(id, kind, x, y, z)),
     H.Thing.over(Fx.Closed.thing(id, kind, x, y, z)), Fx.Closed.thing(id, kind, x, y, z), id, s) == s : S.State}
 
 # Sight

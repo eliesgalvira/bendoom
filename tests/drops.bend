@@ -6,6 +6,8 @@
 import Base
 import ../src/level.bend as L
 import ../src/sim.bend as S
+import ../src/special.bend as Sp
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/vec.bend as V
@@ -14,10 +16,10 @@ import ../src/fixed.bend as F
 import ../src/keys.bend as K
 
 def spawned(kind: U32) -> S.State:
-  S.Sim.spawn(H.Thing.info(kind), 4194304, 0, H.Thing.onfloor(), S.State.start(L.Level.room(0, 128)))
+  S.Sim.spawn(H.Thing.info(kind), 4194304, 0, H.Thing.onfloor(), Tic.State.start(L.Level.room(0, 128)))
 
 def killed(kind: U32) -> S.State:
-  S.Sim.damage(0, 100, H.Thing.you(), H.Thing.you(), spawned(kind))
+  Tic.Sim.damage(0, 100, H.Thing.you(), H.Thing.you(), spawned(kind))
 
 def drop(m: Maybe<&2, H.Thing>) -> String:
   match m:
@@ -27,10 +29,10 @@ def drop(m: Maybe<&2, H.Thing>) -> String:
       U32.show(H.Thing.kind(th)) ++ " dropped " ++ Bool.show(H.Thing.flagged(th, 131072))
 
 def clipped(+id: U32, +s: S.State) -> S.Sim.Try:
-  S.Sim.change.thing(S.State.thing(id, s), id, L.Level.room(0, 8), True{}, S.State.player(s), S.State.things(s))
+  Sp.Sim.change.thing(S.State.thing(id, s), id, L.Level.room(0, 8), True{}, S.State.player(s), S.State.things(s))
 
 def lifted(+s: S.State) -> S.Sim.Try:
-  S.Sim.change.thing(S.State.thing(1, s), 1, L.Level.room(120, 128), True{}, S.State.player(s), S.State.things(s))
+  Sp.Sim.change.thing(S.State.thing(1, s), 1, L.Level.room(120, 128), True{}, S.State.player(s), S.State.things(s))
 
 def things(t: S.Sim.Try) -> H.Things:
   S.Try{ok, p, things} = t
@@ -93,7 +95,7 @@ def opening(ts: List<&2, S.Thinker>) -> Bool:
 # Chocolate Doom reopens door 80 on tic 6 when its 54-unit gap would
 # crush the living zombieman. The WAD starts this door at height -72.
 def reopened(level: L.Level) -> S.State:
-  S.Sim.replay([K.Cmd.idle(), K.Cmd.demo(0, 0, 0, 2), K.Cmd.idle(), K.Cmd.demo(0, 0, 0, 2),
+  Tic.Sim.replay([K.Cmd.idle(), K.Cmd.demo(0, 0, 0, 2), K.Cmd.idle(), K.Cmd.demo(0, 0, 0, 2),
     K.Cmd.idle(), K.Cmd.idle()], C.Combat.door(L.Level.plane.put(level, 80, True{}, 4290248704)))
 
 def living(+s: S.State) -> String:
@@ -105,13 +107,13 @@ def living(+s: S.State) -> String:
 # demon 184 by (24009, 5246), but its box spans floors 136 and 64.
 # P_XYMovement refuses that drop and clears both momentum components.
 def ledge.moved(+th: H.Thing, +s: S.State) -> S.State:
-  S.Sim.thing.xy.with(~S.Sim.damage.enter.acted, 184, th, S.State.thing.put(184, th, s))
+  S.Sim.thing.xy.with(~Tic.Sim.damage.enter.acted, 184, th, S.State.thing.put(184, th, s))
 
 def ledge.at(+level: L.Level, +flags: U32) -> S.State:
   +th = H.Thing.mobj(H.Thing.info(3002), level, 184, 104767616, 4268374368, 8912896, 0)
   ledge.moved(S.Sim.thing.mom(H.Thing.hurting(th,
       V.Vec.set(H.Thing.hurt(th), H.Thing.hurt.flags(), flags)), 24009, 5246),
-    S.State.thing.moved(184, 104767616, 4268374368, S.State.start(level)))
+    S.State.thing.moved(184, 104767616, 4268374368, Tic.State.start(level)))
 
 def ledge(level: L.Level, flags: U32) -> S.State:
   ledge.at(L.Level.plane.put(level, 103, False{}, 4194304), flags)
@@ -148,8 +150,8 @@ def actual(w: Array<U32> & L.Level) -> IO(Unit):
     IO.print(fought(C.Combat.fought(level)))
     IO.print(crushed(C.Combat.crushed(level)))
     IO.print(living(reopened(level)))
-    IO.print(opened(S.Sim.replay(List.replicate(K.Cmd, 100n, K.Cmd.idle()), chasing(
-      S.State.at(C.Combat.isolated(level, 265, 448, 2128, 3004), L.Start{29360128, 134217728, 1073741824})))))
+    IO.print(opened(Tic.Sim.replay(List.replicate(K.Cmd, 100n, K.Cmd.idle()), chasing(
+      Tic.State.at(C.Combat.isolated(level, 265, 448, 2128, 3004), L.Start{29360128, 134217728, 1073741824})))))
     IO.print("ledge push " ++ pushed(S.State.thing(184, ledge(level, 4194310))))
     IO.print("dropoff push " ++ pushed(S.State.thing(184, ledge(level, 4195334))))
 
@@ -157,7 +159,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     IO.print("pain retaliation " ++ Bool.show(Maybe.default(&2, Bool,
       Maybe.map(&2, H.Thing, Bool, th => H.Thing.flagged(th, 64),
-        S.State.thing(0, S.Sim.damage(0, 5, H.Thing.you(), H.Thing.you(), spawned(3004)))), False{})))
+        S.State.thing(0, Tic.Sim.damage(0, 5, H.Thing.you(), H.Thing.you(), spawned(3004)))), False{})))
     IO.print("zombieman " ++ drop(S.State.thing(1, killed(3004))) ++ " draws " ++ U32.show(S.State.rnd(killed(3004))))
     IO.print("shotgun guy " ++ drop(S.State.thing(1, killed(9))) ++ " draws " ++ U32.show(S.State.rnd(killed(9))))
     IO.print("clip " ++ taken(killed(3004), I.Inventory.am_clip()))

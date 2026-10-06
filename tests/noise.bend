@@ -8,6 +8,7 @@ import Base
 import ../src/level.bend as L
 import ../src/vec.bend as V
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/keys.bend as K
 import ../src/things.bend as H
 
@@ -22,8 +23,8 @@ def heard(+s: S.State) -> U32:
   count(U32.to_nat(L.Level.nsectors(S.State.level(s))), 0, S.State.level(s))
 
 def shot(level: L.Level) -> S.State:
-  S.Sim.tic(K.Cmd.demo(0, 0, 0, 1),
-    S.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), S.State.start(level)))
+  Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 1),
+    Tic.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), Tic.State.start(level)))
 
 def sleeping(m: Maybe<&2, H.Thing>) -> Bool:
   match m:
@@ -48,11 +49,11 @@ def next_room(s: S.State) -> U32:
 
 def corridor(base: L.Level, first: U32, second: U32) -> L.Level:
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames,
-    sine, tanto, boxes, nlines, nsectors, sectags, sidetex, switches}, sectors, specials, heard} = base
+    sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = base
   L.Level{L.Geo{V.Vec.of([0, 0, first, 0, 1, 0, 0, second, 2, 3]),
     V.Vec.of([0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2]), verts, segs, subs, nodes, root, blockmap,
-    things, texnames, flatnames, sine, tanto, boxes, 2, 3, sectags, sidetex, switches},
-    V.Vec.of([0, 8388608, 160, 0, 8388608, 160, 0, 8388608, 160]), specials, V.Vec.of_list([], 3)}
+    things, texnames, flatnames, sine, tanto, boxes, 2, 3, reject, sidetex, switches},
+    V.Vec.of([0, 8388608, 0, 0, 160, 0, 0, 0, 8388608, 0, 0, 160, 0, 0, 0, 8388608, 0, 0, 160, 0, 0]), specials, V.Vec.of_list([], 3)}
 
 def closed(s: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
@@ -62,15 +63,15 @@ def closed(s: S.State) -> S.State:
 def run(w: Array<U32> & L.Level) -> IO(Unit):
   (mem, +level) = w
   do IO<Unit>:
-    IO.print("unfired " ++ U32.show(heard(S.State.start(level))))
+    IO.print("unfired " ++ U32.show(heard(Tic.State.start(level))))
     IO.print("closed door " ++ U32.show(heard(shot(level))))
     IO.print("open door " ++ U32.show(heard(shot(L.Level.plane.put(level, 100, True{}, 8388608)))))
     IO.print("closed again " ++ U32.show(heard(S.Sim.alert(closed(shot(L.Level.plane.put(level, 100, True{}, 8388608)))))))
-    IO.print(ambush(S.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(level))))
+    IO.print(ambush(Tic.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(level))))
     IO.print("next room closed target " ++ U32.show(next_room(
-      S.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(level)))))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(level)))))
     IO.print("next room open target " ++ U32.show(next_room(
-      S.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(L.Level.plane.put(level, 100, True{}, 8388608))))))
+      Tic.Sim.replay(List.replicate(K.Cmd, 20n, K.Cmd.idle()), shot(L.Level.plane.put(level, 100, True{}, 8388608))))))
     IO.print("one sound block " ++ U32.show(heard(shot(corridor(L.Level.room(0, 128), 68, 4)))))
     IO.print("two sound blocks " ++ U32.show(heard(shot(corridor(L.Level.room(0, 128), 68, 68)))))
 

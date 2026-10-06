@@ -17,3 +17,5 @@ The chain landed on episode-1 (merge 096ffaa): `-warp`, exit kinds, vanilla's ne
 - [ ] `Inventory.finished` names its masks (`16711680`, `4278190080`) and shares `Inventory.start`'s powers literal; the face slot holding weapons owned at `ST_Start` gets a name that says so.
 - [ ] `nix/tests.nix` has a narrating comment in `buildPhase` that repeats `docs/bend.md`; delete it. The `docs/bend.md` note says "32 MB stack" while `BUN_JSC_maxPerThreadStackUsage` is 16 MB (32 MB is the ulimit), and its "about 20000 on bun" depth is stale. `tools/frame.bend`'s header has an unwrapped line.
 - [ ] `State.carried` feeds one value to both use-down and attack-down; vanilla's `WI_checkForAccelerate` tracks them apart (matters once the rocket launcher lands).
+
+**Where it stopped (2026-10-03, 17:45):** stopped by Elies. Worktree `../bendoom-e1-06b` (branch `e1-06b`, at 1e5662f) holds about 290 uncommitted lines on 19 files toward this list; nothing is committed or verified. It was on the inventory carry and the face slot name.

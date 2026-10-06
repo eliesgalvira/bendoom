@@ -11,3 +11,5 @@
 - [ ] For each special, a scripted demo on a map that has it compares with Chocolate Doom at rest after the move, with zero differing pixels, including the changed floor texture for 20 and 22 and both moved sectors for the donut.
 - [ ] Standing on a moving floor carries the player as vanilla's does (compare a frame mid-move).
 - [ ] The laws still check.
+
+**Where it stopped (2026-10-03, 16:15):** paused when Elies cut the night to tier 1. Worktree `../bendoom-e1-10` (branch `e1-10`, at 2a8fb63) holds ~260 lines of uncommitted work on 5 files; nothing is committed or verified. It was fixing a linearity error. Resume from that worktree: finish the evidence the acceptance list asks for, merge episode-1, then review on both axes before landing.

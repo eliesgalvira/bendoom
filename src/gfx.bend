@@ -29,12 +29,13 @@ type Gfx.Anim is Data:
 type Gfx.Anims is Data:
   Anims{flats: Gfx.Anim, texs: Gfx.Anim, clock: U32}
 
-# flats: a flat number's index in the array. pics: a sector's floor and
-# ceiling flat numbers, two a sector. sky: the sky flat's number. texs:
-# five words a texture (width, height, patch count, width mask, first
-# column), texture 0 being none. cols: every texture's columns, each the
-# index of its texels in the array. sidetex: a side's top, bottom and
-# middle texture numbers, three a side. skytex: the sky's texture.
+# flats: a flat number's index in the array. pics: the flat number of
+# each of the level's flats, as L.Level numbers them. sky: the sky
+# flat's number. texs: five words a texture (width, height, patch count,
+# width mask, first column), texture 0 being none. cols: every
+# texture's columns, each the index of its texels in the array. sidetex:
+# a side's top, bottom and middle texture numbers, three a side. skytex:
+# the sky's texture.
 # sprites: for each rotation of each state row loaded, six words: the
 # index of its lump's patch, the patch's width, left offset and top
 # offset in fixed point (Doom's spritewidth, spriteoffset and
@@ -1032,12 +1033,15 @@ def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
     case 1n+m:
       List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
 
+# The prefix of episode 1's map names, from WILV00 for E1M1 to WILV08.
+def Gfx.wi.level() -> String:
+  "WILV0"
+
 def Gfx.wi.names() -> List<&2, String>:
-  List.append(&2, String,
-    ["WIMAP0", "WILV00", "WILV01", "WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR",
-      "WISUCKS", "WIPCNT", "WICOLON", "WINUM0", "WINUM1", "WINUM2", "WINUM3", "WINUM4", "WINUM5",
-      "WINUM6", "WINUM7", "WINUM8", "WINUM9", "WISPLAT", "WIURH0", "WIURH1"],
-    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0))
+  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, Gfx.wi.level(), 0),
+    ["WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR", "WISUCKS", "WIPCNT", "WICOLON"],
+    Gfx.bar.numbered(10n, "WINUM", 0), ["WISPLAT", "WIURH0", "WIURH1"],
+    Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0)])
 
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
@@ -1423,16 +1427,16 @@ def Gfx.flat(+g: Gfx, pic: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar, font} = g
   V.Vec.get(flats, pic)
 
-# The flat a sector's floor or ceiling shows.
-def Gfx.pic(+g: Gfx, at: U32) -> U32:
+# The flat a level's flat number shows.
+def Gfx.pic(+g: Gfx, pic: U32) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, Anims{Anim{rows, first, shown}, texanim, clock}, bar, font} = g
-  V.Vec.get(shown, V.Vec.get(pics, at))
+  V.Vec.get(shown, V.Vec.get(pics, pic))
 
-def Gfx.floorpic(+g: Gfx, sector: U32) -> U32:
-  Gfx.pic(g, (sector * 2 : U32))
+def Gfx.floorpic(+g: Gfx, +level: L.Level, sector: U32) -> U32:
+  Gfx.pic(g, L.Level.floorpic(level, sector))
 
-def Gfx.ceilpic(+g: Gfx, sector: U32) -> U32:
-  Gfx.pic(g, (sector * 2 + 1 : U32))
+def Gfx.ceilpic(+g: Gfx, +level: L.Level, sector: U32) -> U32:
+  Gfx.pic(g, L.Level.ceilpic(level, sector))
 
 def Gfx.sky(+g: Gfx) -> U32:
   Gfx{flats, pics, sky, texs, cols, sidetex, skytex, sprites, anims, bar, font} = g

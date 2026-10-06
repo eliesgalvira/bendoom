@@ -10,5 +10,5 @@
 
 - [ ] Each light special compares with Chocolate Doom at two or more tics of its cycle: zero differing pixels.
 - [ ] Standing on a 20% floor on E1M3 hurts as vanilla's: the health and the pain flash match at a chosen tic.
-- [ ] Pressing E1M3's secret exit leads to the tally and then to E1M9, matching vanilla's frames.
+- [ ] Pressing E1M3's secret exit leads to the tally and then to E1M9, matching vanilla's frames: `tools/oracle.nu --screen tally` and `--screen entering` from E1M3 (ticket 07 tested the secret path only at its seam, an ended state of kind Secret).
 - [ ] The proof checks; report how LAWS.bend changed.

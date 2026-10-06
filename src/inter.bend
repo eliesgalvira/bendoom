@@ -14,6 +14,7 @@ import ./keys.bend as K
 import ./random.bend as M
 import ./draw.bend as D
 import ./sim.bend as S
+import ./tic.bend as Tic
 import ./sound.bend as Sn
 import ./project.bend as P
 import ./render.bend as R
@@ -100,9 +101,9 @@ def Inter.frames() -> U32:
 def Inter.period() -> U32:
   11
 
-# E1M1's par, g_game.c's pars[1][1] in seconds.
-def Inter.par() -> U32:
-  30
+# A map's par in seconds, g_game.c's pars[1] for episode 1.
+def Inter.par(+map: U32) -> U32:
+  V.Vec.head(List.drop(&2, U32, [0, 30, 75, 120, 90, 165, 180, 180, 30, 165], U32.to_nat(map)))
 
 # Where each count stands among the five: WI_updateStats counts them up
 # in this order, a pause between.
@@ -146,24 +147,24 @@ def Inter.anims.init(n: Nat, +bcnt: U32, r: Inter.Rolled) -> Inter.Rolled:
     case 1n+m:
       Inter.anims.init(m, bcnt, Inter.anims.one(bcnt, r))
 
-def Inter.start.of(t: S.Sim.Tally, down: Bool, r: Inter.Rolled) -> Inter:
+def Inter.start.of(t: S.Sim.Tally, par: U32, down: Bool, r: Inter.Rolled) -> Inter:
   S.Tally{kills, items, secrets, maxkills, maxitems, maxsecret, time} = t
   Rolled{anims, mrnd} = r
   Inter{Count{1}, 35, 0,
     V.Vec.of_list([Inter.none(), Inter.none(), Inter.none(), Inter.none(), Inter.none()], 5),
     V.Vec.of_list([Inter.percent(kills, maxkills), Inter.percent(items, maxitems),
-      Inter.percent(secrets, maxsecret), (time / 35 : U32), Inter.par()], 5), anims, mrnd, down}
+      Inter.percent(secrets, maxsecret), (time / 35 : U32), par], 5), anims, mrnd, down}
 
-# Doom's WI_Start for one player: WI_initStats, on the counts
-# G_DoCompleted hands it. Every count starts unshown, the first pause
+# Doom's WI_Start for one player: WI_initStats, on the counts and the
+# par G_DoCompleted hands it. Every count starts unshown, the first pause
 # lasts a second, and the animations are laid out from a background
 # counter of zero, one draw of M_Random each; the index is the one the
 # level left, since the intermission draws from the same table. Use
 # counts as down when the level ended with it down, as the player's
 # usedown flag does, so the press that took the exit does not also skip
 # the first pause.
-def Inter.start(t: S.Sim.Tally, +mrnd: U32, down: Bool) -> Inter:
-  Inter.start.of(t, down, Inter.anims.init(Inter.nanims(), 0, Rolled{[], mrnd}))
+def Inter.start(t: S.Sim.Tally, par: U32, +mrnd: U32, down: Bool) -> Inter:
+  Inter.start.of(t, par, down, Inter.anims.init(Inter.nanims(), 0, Rolled{[], mrnd}))
 
 # The tic
 # -------
@@ -566,23 +567,36 @@ def Inter.back.go(anims: List<&2, Inter.Anim>, spots: List<&2, G.Gfx.Spot>, +gfx
 def Inter.back(+gfx: G.Gfx, anims: List<&2, Inter.Anim>, mem: Array<U32>) -> Array<U32>:
   Inter.back.go(anims, G.Gfx.wi.spots(), gfx, 0, Inter.patch(gfx, "WIMAP0", 0, 0, mem))
 
-# WI_drawLF: the level's name at the top, and "Finished!" a name and a
-# quarter under it.
+# What G_DoCompleted hands WI_Start for the map screen, its wminfo: the
+# map left, the map to come, and whether E1M9 is done.
+type Inter.Trip is Data:
+  Trip{last: L.Level.Name, next: L.Level.Name, didsecret: Bool}
+
+def Inter.Trip.next(t: Inter.Trip) -> L.Level.Name:
+  Trip{last, next, didsecret} = t
+  next
+
+# A map's name, the patch WILV00 for E1M1.
+def Inter.name(+map: U32) -> String:
+  G.Gfx.wi.level() ++ U32.show((map - 1 : U32))
+
+# WI_drawLF: the name of the map left at the top, and "Finished!" a name
+# and a quarter under it.
 def Inter.finished.of(+gfx: G.Gfx, p: Array<U32> & U32) -> Array<U32>:
   (mem, +h) = p
   Inter.centre(gfx, "WIF", (2 + 5 * h / 4 : U32), mem)
 
-def Inter.finished(+gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Inter.finished.of(gfx, Inter.word(gfx, "WILV00", 2, Inter.centre(gfx, "WILV00", 2, mem)))
+def Inter.finished(+gfx: G.Gfx, +name: String, mem: Array<U32>) -> Array<U32>:
+  Inter.finished.of(gfx, Inter.word(gfx, name, 2, Inter.centre(gfx, name, 2, mem)))
 
-# WI_drawEL: "Entering" at the top, and the name of the level to come
-# under it, drawn as E1M2's whatever the map.
-def Inter.entering.of(+gfx: G.Gfx, p: Array<U32> & U32) -> Array<U32>:
+# WI_drawEL: "Entering" at the top, and the name of the map to come
+# under it.
+def Inter.entering.of(+gfx: G.Gfx, name: String, p: Array<U32> & U32) -> Array<U32>:
   (mem, +h) = p
-  Inter.centre(gfx, "WILV01", (2 + 5 * h / 4 : U32), mem)
+  Inter.centre(gfx, name, (2 + 5 * h / 4 : U32), mem)
 
-def Inter.entering(+gfx: G.Gfx, mem: Array<U32>) -> Array<U32>:
-  Inter.entering.of(gfx, Inter.word(gfx, "WILV01", 2, Inter.centre(gfx, "WIENTER", 2, mem)))
+def Inter.entering(+gfx: G.Gfx, +name: String, mem: Array<U32>) -> Array<U32>:
+  Inter.entering.of(gfx, name, Inter.word(gfx, name, 2, Inter.centre(gfx, "WIENTER", 2, mem)))
 
 # The counts' three rows, each a word on the left and a percentage on
 # the right, a line and a half of digits apart.
@@ -615,9 +629,9 @@ def Inter.stats.draw.fw(+gfx: G.Gfx, +wi: Inter, p: Array<U32> & U32) -> Array<U
 
 # WI_drawStats: the background and its animations, the level's name over
 # "Finished!", the three counts, and the time beside the par.
-def Inter.stats.draw(+gfx: G.Gfx, +wi: Inter, mem: Array<U32>) -> Array<U32>:
+def Inter.stats.draw(+gfx: G.Gfx, +wi: Inter, +name: String, mem: Array<U32>) -> Array<U32>:
   Inter.stats.draw.fw(gfx, wi, Inter.word(gfx, "WINUM0", 0,
-    Inter.finished(gfx, Inter.back(gfx, Inter.anims(wi), mem))))
+    Inter.finished(gfx, name, Inter.back(gfx, Inter.anims(wi), mem))))
 
 # WI_drawOnLnode's fit: a patch fits when its box, its offsets taken
 # off, is inside the screen.
@@ -681,62 +695,85 @@ def Inter.lnode(names: List<&2, String>, +gfx: G.Gfx, +x: U32, +y: U32, mem: Arr
     case +name <> rest:
       Inter.lnode.first.of(gfx, name, rest, x, y, Inter.fits(gfx, name, x, y, mem))
 
-# wi_stuff.c's lnodes for episode 1: where E1M1 and E1M2 stand on the
-# map. The seven levels after them have places of their own, not drawn
-# yet.
+# wi_stuff.c's lnodes[0]: where each map of episode 1 stands on WIMAP0.
 def Inter.lnodes() -> List<&2, G.Gfx.Spot>:
-  [G.Spot{185, 164}, G.Spot{148, 143}]
+  [G.Spot{185, 164}, G.Spot{148, 143}, G.Spot{69, 122}, G.Spot{209, 102}, G.Spot{116, 89},
+    G.Spot{166, 55}, G.Spot{71, 56}, G.Spot{135, 29}, G.Spot{71, 24}]
 
-def Inter.pointer(on: Bool, +gfx: G.Gfx, +spot: G.Gfx.Spot, mem: Array<U32>) -> Array<U32>:
-  match on:
-    case False{}:
-      mem
-    case True{}:
-      Inter.lnode(["WIURH0", "WIURH1"], gfx, G.Gfx.Spot.x(spot), G.Gfx.Spot.y(spot), mem)
-
-def Inter.here(+gfx: G.Gfx, on: Bool, spots: List<&2, G.Gfx.Spot>, mem: Array<U32>) -> Array<U32>:
+def Inter.on.at(names: List<&2, String>, +gfx: G.Gfx, spots: List<&2, G.Gfx.Spot>, mem: Array<U32>) ->
+  Array<U32>:
   match spots:
-    case +last <> +next <> rest:
-      Inter.pointer(on, gfx, next,
-        Inter.lnode(["WISPLAT"], gfx, G.Gfx.Spot.x(last), G.Gfx.Spot.y(last), mem))
-    case _:
+    case []:
       mem
+    case +spot <> rest:
+      Inter.lnode(names, gfx, G.Gfx.Spot.x(spot), G.Gfx.Spot.y(spot), mem)
 
-# WI_drawShowNextLoc: the background, a splat on the level just left, the
-# pointer on the one to come while it shows, and its name.
-def Inter.next.draw(+gfx: G.Gfx, +wi: Inter, on: Bool, mem: Array<U32>) -> Array<U32>:
-  Inter.entering(gfx, Inter.here(gfx, on, Inter.lnodes(), Inter.back(gfx, Inter.anims(wi), mem)))
+# WI_drawOnLnode on a map of the episode, at its place.
+def Inter.on(names: List<&2, String>, +gfx: G.Gfx, +map: U32, mem: Array<U32>) -> Array<U32>:
+  Inter.on.at(names, gfx, List.drop(&2, G.Gfx.Spot, Inter.lnodes(), U32.to_nat((map - 1 : U32))), mem)
 
-def Inter.frame.of(s: Inter.Screen, +gfx: G.Gfx, +wi: Inter, mem: Array<U32>) -> Array<U32>:
+# A splat on each of n maps from a map on.
+def Inter.splats(n: Nat, +gfx: G.Gfx, +map: U32, mem: Array<U32>) -> Array<U32>:
+  match n:
+    case 0n:
+      mem
+    case 1n+m:
+      Inter.splats(m, gfx, (map + 1 : U32), Inter.on(["WISPLAT"], gfx, map, mem))
+
+# The patches to try on a place while they show, and none while not.
+def Inter.showing(shows: Bool, names: List<&2, String>) -> List<&2, String>:
+  Bool.pick(List<&2, String>, shows, names, [])
+
+# WI_drawShowNextLoc's marks: a splat on every map up to the one left,
+# or up to the one before the map to come when the one left is E1M9; a
+# splat on E1M9 once it is done; and the pointer on the map to come
+# while it shows.
+def Inter.marks(+gfx: G.Gfx, +last: U32, +next: U32, didsecret: Bool, on: Bool, mem: Array<U32>) ->
+  Array<U32>:
+  Inter.on(Inter.showing(on, ["WIURH0", "WIURH1"]), gfx, next,
+    Inter.on(Inter.showing(didsecret, ["WISPLAT"]), gfx, 9,
+      Inter.splats(U32.to_nat(Bool.pick(U32, U32.is_eq(last, 9), (next - 1 : U32), last)), gfx, 1, mem)))
+
+# WI_drawShowNextLoc: the background, the marks, and the name of the
+# map to come.
+def Inter.next.draw(+gfx: G.Gfx, +wi: Inter, trip: Inter.Trip, on: Bool, mem: Array<U32>) -> Array<U32>:
+  Trip{L.Name{e, +last}, L.Name{f, +next}, didsecret} = trip
+  Inter.entering(gfx, Inter.name(next), Inter.marks(gfx, last, next, didsecret, on,
+    Inter.back(gfx, Inter.anims(wi), mem)))
+
+def Inter.frame.of(s: Inter.Screen, +gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, mem: Array<U32>) ->
+  Array<U32>:
   match s:
     case Count{sp}:
-      Inter.stats.draw(gfx, wi, mem)
+      Trip{L.Name{e, +last}, next, didsecret} = trip
+      Inter.stats.draw(gfx, wi, Inter.name(last), mem)
     case Next{}:
-      Inter.next.draw(gfx, wi, U32.is_lt((Inter.cnt(wi) .&. 31 : U32), 20), mem)
+      Inter.next.draw(gfx, wi, trip, U32.is_lt((Inter.cnt(wi) .&. 31 : U32), 20), mem)
     case Last{}:
-      Inter.next.draw(gfx, wi, True{}, mem)
+      Inter.next.draw(gfx, wi, trip, True{}, mem)
 
-# WI_Drawer: the counting screen, the one that names the next level with
-# its pointer flashing, and the last, which holds that pointer on.
-def Inter.frame(+gfx: G.Gfx, +wi: Inter, mem: Array<U32>) -> Array<U32>:
-  Inter.frame.of(Inter.screen(wi), gfx, wi, mem)
+# WI_Drawer: the counting screen, the one that names the map to come
+# with its pointer flashing, and the last, which holds that pointer on.
+def Inter.frame(+gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, mem: Array<U32>) -> Array<U32>:
+  Inter.frame.of(Inter.screen(wi), gfx, wi, trip, mem)
 
 # The play
 # --------
 
 # The game's two modes, Doom's GS_LEVEL and GS_INTERMISSION: a map's
-# level playing, or the tally an exit leads to, beside the level as it
-# ended, whose player crosses into the map named next.
+# level playing, with the player's didsecret, whether E1M9 is done; or
+# the tally an exit leads to, beside the level as it ended, whose player
+# crosses into the map the trip names next.
 type Play is Data:
-  Playing{state: S.State, map: L.Level.Name}
-  Showing{inter: Inter, after: S.State, next: L.Level.Name}
+  Playing{state: S.State, map: L.Level.Name, didsecret: Bool}
+  Showing{inter: Inter, after: S.State, trip: Inter.Trip}
 
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
 
 # A new game on a map: G_InitNew, then G_DoLoadLevel.
 def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
-  Playing{S.State.start(level), map}
+  Playing{Tic.State.start(level), map, False{}}
 
 # The map G_DoCompleted returns to from map 9 of each episode.
 def Play.back(+episode: U32) -> U32:
@@ -772,35 +809,41 @@ def Play.next(secret: Bool, at: L.Level.Name) -> Maybe<&2, L.Level.Name>:
   L.Name{+episode, +map} = at
   Play.next.if(U32.is_eq(map, 8), secret, episode, map)
 
+def Play.shown(+last: L.Level.Name, next: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  L.Name{e, +map} = last
+  Showing{Inter.start(S.Sim.tally(after), Inter.par(map), S.State.mrnd(after), S.State.usedown(after)), after,
+    Trip{last, next, Bool.or(didsecret, U32.is_eq(map, 9))}}
+
 # G_DoCompleted on the tic a level ends: an exit to another map hands
-# the tally its counts, the totals and the time. Vanilla follows map 8
-# with the episode's finale and no tally; until the finale is drawn,
-# its level stands still where it ended.
-def Play.completed(next: Maybe<&2, L.Level.Name>, map: L.Level.Name, +after: S.State) -> Play:
+# the tally its counts, the totals, the time and the map's par, and the
+# map screen the trip, leaving E1M9 marking it done. Vanilla follows
+# map 8 with the episode's finale and no tally; until the finale is
+# drawn, its level stands still where it ended.
+def Play.completed(next: Maybe<&2, L.Level.Name>, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   match next:
     case None{}:
-      Playing{after, map}
+      Playing{after, map, didsecret}
     case Some{name}:
-      Showing{Inter.start(S.Sim.tally(after), S.State.mrnd(after), S.State.usedown(after)), after, name}
+      Play.shown(map, name, didsecret, after)
 
-def Play.ended(how: S.Sim.Exit, +map: L.Level.Name, after: S.State) -> Play:
+def Play.ended(how: S.Sim.Exit, +map: L.Level.Name, didsecret: Bool, after: S.State) -> Play:
   match how:
     case S.Unended{}:
-      Playing{after, map}
+      Playing{after, map, didsecret}
     case S.Normal{}:
-      Play.completed(Play.next(False{}, map), map, after)
+      Play.completed(Play.next(False{}, map), map, didsecret, after)
     case S.Secret{}:
-      Play.completed(Play.next(True{}, map), map, after)
+      Play.completed(Play.next(True{}, map), map, didsecret, after)
 
-def Play.after(map: L.Level.Name, +after: S.State) -> Play:
-  Play.ended(S.State.ended(after), map, after)
+def Play.after(map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  Play.ended(S.State.ended(after), map, didsecret, after)
 
 # G_DoReborn ahead of the tic: a death that asked for the level again
 # has the map as loaded reloaded.
 def Play.reborn(reborn: Bool, +level: L.Level, state: S.State) -> S.State:
   match reborn:
     case True{}:
-      S.State.reloaded(level, state)
+      Tic.State.reloaded(level, state)
     case False{}:
       state
 
@@ -821,17 +864,19 @@ def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
 
 # A tic of the play on the map as loaded: the level's tic while it
 # runs, then the tally's. Held is a key outside the command that
-# accelerates the tally, which the level pays no heed.
+# accelerates the tally, which the level pays no heed. A reload makes
+# the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
-    case Playing{+state, map}:
+    case Playing{+state, map, didsecret}:
       +ended = S.State.ended(state)
-      +after = S.Sim.tic(cmd, Play.reborn(S.State.reborn(state), level, state))
-      Step{Play.after(map, after), Play.sounds(ended, after)}
-    case Showing{+wi, after, next}:
+      +reborn = S.State.reborn(state)
+      +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
+      Step{Play.after(map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
+    case Showing{+wi, after, trip}:
       +press = Play.pressed(held, cmd)
       +ticked = Inter.tic(press, wi)
-      Step{Showing{ticked, after, next}, Inter.sound(press, wi, ticked)}
+      Step{Showing{ticked, after, trip}, Inter.sound(press, wi, ticked)}
 
 def Play.Step.play(step: Play.Step) -> Play:
   Step{play, sounds} = step
@@ -852,18 +897,20 @@ def Play.wants.if(over: Bool, next: L.Level.Name) -> Maybe<&2, L.Level.Name>:
 # which loads before the next tic.
 def Play.wants(play: Play) -> Maybe<&2, L.Level.Name>:
   match play:
-    case Playing{state, map}:
+    case Playing{state, map, didsecret}:
       None{}
-    case Showing{+wi, after, next}:
-      Play.wants.if(Inter.over(wi), next)
+    case Showing{+wi, after, trip}:
+      Play.wants.if(Inter.over(wi), Inter.Trip.next(trip))
 
-# G_DoWorldDone on the map the tally asked for, as loaded.
+# G_DoWorldDone on the map the tally asked for, as loaded. G_WorldDone
+# also marks E1M9 done after the secret exit; that is left out, since
+# leaving E1M9 marks it again before anything reads it.
 def Play.enter(+level: L.Level, play: Play) -> Play:
   match play:
-    case Playing{state, map}:
-      Playing{state, map}
-    case Showing{+wi, after, next}:
-      Playing{S.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next}
+    case Playing{state, map, didsecret}:
+      Playing{state, map, didsecret}
+    case Showing{+wi, after, Trip{last, next, didsecret}}:
+      Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next, didsecret}
 
 # A play and what it is drawn from: the frame's array, the graphics, the
 # tables and the map as loaded.
@@ -937,9 +984,9 @@ def Play.run(cmds: List<&2, K.Cmd>, +held: Bool, run: Play.Run) -> IO(Play.Run):
 # Whether the level is still running, which the demo is recorded for.
 def Play.playing(play: Play) -> Bool:
   match play:
-    case Playing{state, map}:
+    case Playing{state, map, didsecret}:
       True{}
-    case Showing{inter, after, next}:
+    case Showing{inter, after, trip}:
       False{}
 
 # The scene's song, as S_Start and WI_Start name it: the map's own,
@@ -947,9 +994,9 @@ def Play.playing(play: Play) -> Bool:
 # which is D_ before the map's name, or D_INTER through the tally.
 def Play.song(play: Play) -> String:
   match play:
-    case Playing{state, L.Name{episode, map}}:
+    case Playing{state, L.Name{episode, map}, didsecret}:
       "D_" ++ L.Level.marker(episode, map)
-    case Showing{inter, after, next}:
+    case Showing{inter, after, trip}:
       "D_INTER"
 
 # The songs a scene of the episode can name.
@@ -960,7 +1007,7 @@ def Play.songs() -> List<&2, String>:
 # tally, both in the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
-    case Playing{+state, map}:
+    case Playing{+state, map, didsecret}:
       R.Render.frame(tables, gfx, state, messages, mem)
-    case Showing{+wi, after, next}:
-      (Inter.frame(gfx, wi, mem), 0)
+    case Showing{+wi, after, trip}:
+      (Inter.frame(gfx, wi, trip, mem), 0)
