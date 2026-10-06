@@ -9,6 +9,7 @@ import ../src/bytes.bend as B
 import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/project.bend as P
 import ../src/render.bend as R
 import ../src/show.bend as V
@@ -31,7 +32,7 @@ def Bench.peek(p: Array<U32> & U32) -> U32:
 def Bench.frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (+gfx, +level) = gl
   IO.print("centre " ++ U32.show(Bench.peek(B.Bytes.at(Bench.go(100n, P.Project.tables(level), gfx,
-    S.State.start(level), mem), (84 * 320 + 160 : U32)))))
+    Tic.State.start(level), mem), (84 * 320 + 160 : U32)))))
 
 def Bench.start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w

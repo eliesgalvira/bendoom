@@ -14,6 +14,7 @@ import ../src/fixed.bend as F
 import ../src/vec.bend as V
 import ../src/level.bend as L
 import ../src/sim.bend as S
+import ../src/tic.bend as Tic
 import ../src/things.bend as H
 import ../src/inventory.bend as I
 import ../src/message.bend as Msg
@@ -434,7 +435,7 @@ def spawn_phase(+s: S.State) -> IO(Unit):
 # first state S_REDTORCH, row 244: 1 + 222 mod 4 = 3 tics. The index is
 # 4, and only the torch is shown and in the cell.
 def unseen() -> S.State:
-  S.State.at(Fx.Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 14, 7, 16, 96, 0, 46, 7], 15), 3),
+  Tic.State.at(Fx.Closed.level(0, V.Vec.of_list([32, 64, 0, 1, 7, 16, 32, 0, 14, 7, 16, 96, 0, 46, 7], 15), 3),
     L.Start{2097152, 4194304, 0})
 
 def shown_ids(ths: List<&2, H.Thing>) -> List<&2, U32>:

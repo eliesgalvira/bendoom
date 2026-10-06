@@ -24,6 +24,11 @@ def lumps []: binary -> table<name: string, pos: int, size: int> {
   }
 }
 
+# Where the last lump of a name starts, the one W_GetNumForName finds.
+def lump-pos [name: string]: binary -> int {
+  $in | lumps | where name == $name | last | get pos
+}
+
 # The lump of a name after a map's marker.
 def map-lump [map: string, name: string]: binary -> record<name: string, pos: int, size: int> {
   let all = $in | lumps | enumerate | flatten
@@ -318,7 +323,7 @@ def posts [wad: binary]: int -> table<delta: int, length: int, pixels: int> {
 # The pixels a patch covers when drawn at x, y, its offsets taken off as
 # V_DrawPatch takes them: each one's frame index and colour.
 def patch-pixels [wad: binary, name: string, x: int, y: int]: nothing -> table<at: int, colour: string> {
-  let patch = $wad | lumps | where name == $name | last | get pos
+  let patch = $wad | lump-pos $name
   let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
   let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
   let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
@@ -344,7 +349,7 @@ def hu-line [text: string]: binary -> table<at: int, colour: string> {
     let u = $c | str uppercase | into binary | bytes at 0..0 | into int
     let glyph = $u >= 33 and $u <= 95
     let name = $"STCFN0($u)"
-    let w = if $glyph { $wad | word ($wad | lumps | where name == $name | last | get pos) } else { 4 }
+    let w = if $glyph { $wad | word ($wad | lump-pos $name) } else { 4 }
     let fits = $st.x + $w <= 320
     if $st.stop {
       $st
