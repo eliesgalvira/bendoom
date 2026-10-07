@@ -90,7 +90,7 @@ def Film.go(outros: Nat, cmds: List<&2, K.Cmd>, world: I.Play.World, deck: Sg.So
     case _ cmd <> rest:
       I.World{play, mem, +gfx, +tables, +level} = world
       C.Bank{frames, +sounds} = bank
-      +step = I.Play.step(level, cmd, False{}, play)
+      +step = I.Play.step(level, cmd, play)
       +events = I.Play.Step.sounds(step)
       +next = I.Play.Step.play(step)
       Film.mixed(audio, M.Stream.window(1260, Sg.Song.Deck.change(I.Play.song(next), deck),

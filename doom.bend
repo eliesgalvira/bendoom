@@ -4,7 +4,7 @@
 # E1M1, or the one -warp names as Chocolate Doom's does. The scene's
 # song plays from the same WAD, synthesized as Chocolate Doom's OPL
 # music plays it. RECORD names a demo to record, as vanilla's -record
-# does, until the level ends or the game quits; film.bend makes a video
+# does, until the game quits; film.bend makes a video
 # of it. This binary writes the demo as hex text, and the launcher makes
 # the .lmp of it.
 import Base
