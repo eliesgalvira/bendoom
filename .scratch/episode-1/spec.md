@@ -163,7 +163,6 @@ The work lands in tiers. Each tier is a coherent build to play, and the overnigh
 
 ## Further Notes
 
-- **Decided without Elies:** the teleport exception to the wall law. Elies was asleep when it was made, and he reviews it in the morning; it can be reversed.
 - **Measured headroom.** On 2026-10-01 every shareware map loaded in 0.11 to 0.23 s. Each rendered its start view in 3.4 to 7.2 ms and ran a tic in 0.33 to 3.4 ms, against 28.6 ms per tic, at about 130 MB. Freedoom's largest maps reach 12 to 15 ms per tic, which matters only beyond this scope.
 - **Absorbed ticket.** The open ticket "Render audio from the opened WAD" is folded into this spec and deleted.
 - **The milestone after this one:** cheats, then menus, save/load, the automap and the title loop, then Freedoom's episodes 2 to 4.
