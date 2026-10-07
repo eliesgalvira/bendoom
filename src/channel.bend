@@ -27,14 +27,6 @@ type Channel.Sound is Data:
 type Channel.Bank is Type:
   Bank{frames: Array<U32>, sounds: List<&2, Channel.Sound>}
 
-# The lumps of the table's rows.
-def Channel.lumps(rows: List<&2, Sn.Sound.Sfx>) -> List<&2, String>:
-  match rows:
-    case []:
-      []
-    case Sn.Sfx{id, lump, priority} <> rest:
-      lump <> Channel.lumps(rest)
-
 def Channel.length(m: Maybe<&2, X.Sfx.Sound>) -> U32:
   match m:
     case None{}:
