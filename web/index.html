@@ -140,7 +140,7 @@
     noInitialRun: true,
     arguments: ['--threads', '1'],
     preRun: [() => Object.assign(Module.ENV, {
-      BENDOOM_IWAD: '/doom1.wad', BENDOOM_SOUNDS: '/sounds'
+      BENDOOM_IWAD: '/doom1.wad'
     })],
     setStatus(text) {
       const [, loaded, total] = text.match(/\((\d+)\/(\d+)\)/) || [];
