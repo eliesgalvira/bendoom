@@ -304,7 +304,7 @@ def Sim.face.mrnd() -> U32:
 def Sim.face.attackdown() -> U32:
   7
 
-def Sim.face.armed() -> U32:
+def Sim.face.startweapons() -> U32:
   8
 
 # ST_initData at a fresh game, with M_Random's index where the caller
@@ -323,7 +323,7 @@ def Sim.Face.start(+mrnd: U32) -> V.Vec:
 def Sim.Face.restart(+weapons: U32, attackdown: Bool, +mrnd: U32, f: V.Vec) -> V.Vec:
   V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(f, Sim.face.index(), 0), Sim.face.oldhealth(),
     4294967295), Sim.face.weapons(), weapons), Sim.face.mrnd(), mrnd), Sim.face.attackdown(),
-    Bool.to_u32(attackdown)), Sim.face.armed(), weapons)
+    Bool.to_u32(attackdown)), Sim.face.startweapons(), weapons)
 
 def Sim.Face.index(+f: V.Vec) -> U32:
   V.Vec.get(f, Sim.face.index())
@@ -338,8 +338,8 @@ def Sim.Face.attackdown(+f: V.Vec) -> Bool:
   Bool.not(U32.is_zero(V.Vec.get(f, Sim.face.attackdown())))
 
 # The weapons whose arms numbers stand as ST_Start drew them.
-def Sim.Face.armed(+f: V.Vec) -> U32:
-  V.Vec.get(f, Sim.face.armed())
+def Sim.Face.startweapons(+f: V.Vec) -> U32:
+  V.Vec.get(f, Sim.face.startweapons())
 
 # The vector once a sound has drawn its pitch from M_Random, and as it
 # was where that sound drew none.
@@ -2188,21 +2188,18 @@ type Thinker is Data:
 type Thinkers is Data:
   Thinkers{ran: List<&2, Thinker>, due: List<&2, Thinker>}
 
-# How the level has ended: not yet, by G_ExitLevel, or by
-# G_SecretExitLevel, whose secretexit G_DoCompleted reads.
+# How the level has ended: not yet, or by G_ExitLevel or
+# G_SecretExitLevel, as G_DoCompleted reads secretexit.
 type Sim.Exit is Data:
   Unended{}
-  Normal{}
-  Secret{}
+  Ended{secret: Bool}
 
 def Sim.Exit.show(e: Sim.Exit) -> String:
   match e:
     case Unended{}:
       "none"
-    case Normal{}:
-      "normal"
-    case Secret{}:
-      "secret"
+    case Ended{secret}:
+      Bool.pick(String, secret, "secret", "normal")
 
 # Everything a tic changes, in one value: the player, the level (its
 # sectors' words and its lines' specials), the things alive and their

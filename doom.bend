@@ -8,20 +8,32 @@
 # of it. This binary writes the demo as hex text, and the launcher makes
 # the .lmp of it.
 import Base
+import ./src/wad.bend as W
 import ./src/level.bend as L
 import ./src/gfx.bend as G
 import ./src/keys.bend as K
 import ./src/demo.bend as D
-import ./src/inter.bend as I
 import ./src/game.bend as M
 
-def main() -> IO(Unit):
+def play(+map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   do IO<Unit>:
-    args : List<String> <- IO.args()
-    +map : L.Level.Name = M.Game.warp(args)
-    world : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
     record : Result<&1, &1, U32 & String, String> <- IO.get_env("RECORD")
     demo : Maybe<D.Demo.Rec> <- D.Demo.open(record, map)
     now : Nat <- IO.now()
     dry : Maybe<U32> <- M.Game.start(U32.to_nat(4294967295), K.Input{K.Keys.none(), 0}, [], demo, now, map, world)
     return Unit{}
+
+def load(+map: L.Level.Name, dir: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  L.Name{+episode, +number} = map
+  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(episode, number, dir)),
+    world => play(map, world))
+
+def warp(args: List<String>, dir: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  (bytes, +lumps) = dir
+  load(M.Game.warp(lumps, args), (bytes, lumps))
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    dir : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    warp(args, dir)

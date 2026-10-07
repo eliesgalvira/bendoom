@@ -26,7 +26,16 @@
 # 48, with the inventory G_PlayerFinishLevel leaves, P_Random's index
 # carried on (which no G_InitNew clears), and S_Start's song for it,
 # D_E1M2; a death there and a held use reload E1M2 from a pistol start
-# on the next tic. The indices are regression pins. Then G_DoCompleted's
+# on the next tic. The indices are regression pins. A player that took
+# a shotgun, a box of shells, green armour, a soul sphere, the blue card
+# and invisibility before the route leaves E1M1 with 200 health, 100
+# green armour, 28 shells, the shotgun pending while the pistol
+# rises, invisibility 7 tics down from 2100, the two counted items and
+# 11 of flash: P_GiveCard sets it to 6, the card and invisibility each
+# add 6, and the route fades 7. G_PlayerFinishLevel takes the card, the
+# power and the flash, P_SetupLevel the item count, and P_SpawnPlayer
+# brings the pistol up again with nothing pending, so E1M2 begins with
+# the rest. Then G_DoCompleted's
 # next map from each E1 map by each exit and its par, g_game.c's
 # pars[1]; the secret exit's seam on E1M3, which leads to E1M9's tally
 # with E1M9 not done; E1M8's exit, which vanilla follows with the
@@ -201,24 +210,70 @@ def killed(play: W.Play) -> W.Play:
     case other:
       other
 
-# E1M2 from the WAD after the tally: its first tic, and a death there
-# with use held seven tics, then a tic of none.
-def arrived.gl(play: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
-  (gfx, +next) = gl
-  +entered = W.Play.Step.play(W.Play.step(next, K.Cmd.idle(), False{}, W.Play.enter(next, play)))
-  do IO<Unit>:
-    IO.print(on("entered", entered) ++ " song " ++ W.Play.song(entered))
-    IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
-      killed(entered))))
+# A thing taken as P_TouchSpecialThing takes it, counted as an item or
+# not.
+def picked(kind: U32, counted: Bool, +inv: I.Inventory) -> I.Inventory:
+  I.Inventory.took(counted, Maybe.default(&2, I.Inventory, I.Inventory.grant(kind, False{}, inv), inv))
 
-def arrived(play: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+def armed.of(+s: S.State, +p: S.Player) -> S.State:
+  S.State.player.put(s, S.Player.holding(p, picked(2024, True{}, picked(5, False{}, picked(2013, True{},
+    picked(2018, False{}, picked(2049, False{}, picked(2001, False{}, S.Player.inv(p)))))))))
+
+# The player beside the switch with a shotgun, a box of shells, green
+# armour, a soul sphere, the blue card and invisibility.
+def armed(+level: L.Level) -> S.State:
+  +s = Tic.State.at(level, beside())
+  armed.of(s, S.State.player(s))
+
+def weapon(+inv: I.Inventory) -> String:
+  " ready " ++ U32.show(I.Inventory.ready(inv)) ++ " pending " ++ U32.show(I.Inventory.pending(inv))
+
+def carries(tag: String, play: W.Play) -> String:
+  match play:
+    case W.Playing{+state, L.Name{episode, map}, didsecret}:
+      +inv = S.Player.inv(S.State.player(state))
+      tag ++ " " ++ L.Level.marker(episode, map) ++ " " ++ I.Inventory.show(inv) ++ weapon(inv)
+    case W.Showing{wi, +after, trip}:
+      +inv = S.Player.inv(S.State.player(after))
+      tag ++ " tally " ++ I.Inventory.show(inv) ++ weapon(inv)
+
+# G_DoWorldDone on the map the tally names, as loaded, then a tic.
+def entered(+level: L.Level, play: W.Play) -> W.Play:
+  match play:
+    case W.Showing{wi, after, trip}:
+      W.Play.Step.play(W.Play.step(level, K.Cmd.idle(), False{}, W.Play.enter(level, wi, after, trip)))
+    case playing:
+      playing
+
+# E1M2 from the WAD after the tally: its first tic, and a death there
+# with use held seven tics, then a tic of none; then the armed player's
+# exit and first tic there.
+def arrived.gl(play: W.Play, +carrying: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
+  (gfx, +next) = gl
+  +arrival = entered(next, play)
+  do IO<Unit>:
+    IO.print(on("entered", arrival) ++ " song " ++ W.Play.song(arrival))
+    IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
+      killed(arrival))))
+    IO.print(carries("carrying", carrying))
+    IO.print(carries("carried", entered(next, carrying)))
+
+def arrived(play: W.Play, carrying: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = opened
-  arrived.gl(play, gl)
+  arrived.gl(play, carrying, gl)
+
+# The map G_WorldDone asks for once the tally is over.
+def wants(play: W.Play) -> String:
+  match play:
+    case W.Showing{+wi, after, W.Trip{last, L.Name{episode, map}, didsecret}}:
+      Bool.pick(String, W.Inter.over(wi), L.Level.marker(episode, map), "none")
+    case _:
+      "none"
 
 # The tally, and the map it asks to load.
 def asked(tag: String, +play: W.Play) -> IO(W.Play):
   do IO<W.Play>:
-    IO.print(line(tag, play) ++ " wants " ++ marker(W.Play.wants(play)))
+    IO.print(line(tag, play) ++ " wants " ++ wants(play))
     return play
 
 def intermission(+level: L.Level) -> IO(Unit):
@@ -231,7 +286,7 @@ def intermission(+level: L.Level) -> IO(Unit):
     p5 : W.Play <- asked("nine tics on", run(9n, level, p4))
     p6 : W.Play <- asked("ten tics on", run(1n, level, p5))
     opened : Array<U32> & G.Gfx & L.Level <- W.Play.open(L.Name{1, 2})
-    arrived(p6, opened)
+    arrived(p6, W.Play.after(L.Name{1, 1}, False{}, Tic.Sim.replay(route(), armed(level))), opened)
 
 # G_DoCompleted's next map from each map of episode 1, by a normal exit
 # and by a secret one.
@@ -240,8 +295,8 @@ def nexts.go(n: Nat, +map: U32) -> String:
     case 0n:
       ""
     case 1n+m:
-      L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(False{}, L.Name{1, map})) ++ " "
-        ++ marker(W.Play.next(True{}, L.Name{1, map})) ++ " par " ++ U32.show(W.Inter.par(map)) ++ "\n"
+      L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(S.Ended{False{}}, L.Name{1, map})) ++ " "
+        ++ marker(W.Play.next(S.Ended{True{}}, L.Name{1, map})) ++ " par " ++ U32.show(W.Inter.par(map)) ++ "\n"
         ++ nexts.go(m, (map + 1 : U32))
 
 # The seam the secret exit line fires: E1M3 ended by a secret exit shows
@@ -251,7 +306,7 @@ def nexts.go(n: Nat, +map: U32) -> String:
 def seams(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, False{}, Sp.State.end(S.Secret{}, took))))
+    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, False{}, Sp.State.end(True{}, took))))
     IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, False{}, took)))
     IO.print(on("E1M9 normal", W.Play.after(L.Name{1, 9}, False{}, took)))
     IO.print(on("E1M4 normal", W.Play.after(L.Name{1, 4}, True{}, took)))
@@ -283,6 +338,16 @@ def secrets(+level: L.Level) -> IO(Unit):
     s3 : S.State <- secret("back north", level, Tic.Sim.replay(back(), s2))
     return Unit{}
 
+# WI_checkForAccelerate permits a new attack while use stays held,
+# then a new use while attack stays held; neither held button repeats.
+def buttons() -> String:
+  +wi = W.Inter.start(S.Tally{0, 0, 0, 1, 1, 1, 0}, 30, 0, W.Inter.buttons(False{}, True{}))
+  +both = W.Inter.tic(W.Inter.buttons(True{}, True{}), wi)
+  +attack = W.Inter.tic(W.Inter.buttons(True{}, False{}), both)
+  "buttons " ++ Bool.show(W.Inter.pressed(3, wi)) ++ " " ++ Bool.show(W.Inter.pressed(3, both))
+    ++ " " ++ Bool.show(W.Inter.pressed(1, both)) ++ " " ++ Bool.show(W.Inter.pressed(3, attack))
+    ++ " down " ++ Bool.show(W.Inter.attackdown(attack)) ++ " " ++ Bool.show(W.Inter.usedown(attack))
+
 def play(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     summary(level)
@@ -291,6 +356,7 @@ def play(+level: L.Level) -> IO(Unit):
     didsecret(level)
     soundcheck(level)
     secrets(level)
+    IO.print(buttons())
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -327,6 +393,8 @@ def main() -> IO(Unit):
 #|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93 wants E1M2
 #|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 3 didsecret False song D_E1M2
 #|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 199 didsecret False
+#|carrying tally inventory health 200 armour 100 type 1 cards 1 ammo 50 28 0 0 caps 200 50 300 50 backpack False weapons 7 powers 0 0 2093 0 0 0 items 2 flash 11 ready 1 pending 2
+#|carried E1M2 inventory health 200 armour 100 type 1 cards 0 ammo 50 28 0 0 caps 200 50 300 50 backpack False weapons 7 powers 0 0 0 0 0 0 items 0 flash 0 ready 1 pending 255
 #|E1M1 E1M2 E1M9 par 30
 #|E1M2 E1M3 E1M9 par 75
 #|E1M3 E1M4 E1M9 par 120
@@ -350,3 +418,5 @@ def main() -> IO(Unit):
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1
 #|out south tic 24 at 400.037475 1935.800521 sector 87 special 0 left 0 counted 1
 #|back north tic 48 at 400.011810 1994.541183 sector 86 special 9 left 0 counted 1
+
+#|buttons True False False True down True False
