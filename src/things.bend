@@ -213,6 +213,7 @@ type Thing.Action is Data:
   SPosAttack{}
   TroopAttack{}
   SargAttack{}
+  BruisAttack{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -233,7 +234,7 @@ type Thing.Row is Data:
 # barrel's explosion 176 to 180; blood 181 to 183; the imp's fireball
 # 196 to 200; the shotgun 201 to 214, the fist 215 to 222, the chainsaw
 # 223 to 229 and the chaingun 230 to 237; vanilla's S_NULL 238, which
-# the teleport destination stands in; and the baron 261 to 279. A
+# the teleport destination stands in; and the baron 261 to 279 and 292 to 294, its ball 295 to 299. A
 # monster's second pain row leads back to its see state. Only player
 # sprites' rows have 0 tics: the A_ReFire that ends the chainsaw's and
 # the chaingun's attacks, and S_LIGHTDONE, which carries A_Light0 in
@@ -390,7 +391,12 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"TFOG", 2, True{}, 6, 285, Null{}, 0}, Row{"TFOG", 3, True{}, 6, 286, Null{}, 0},
     Row{"TFOG", 4, True{}, 6, 287, Null{}, 0}, Row{"TFOG", 5, True{}, 6, 288, Null{}, 0},
     Row{"TFOG", 6, True{}, 6, 289, Null{}, 0}, Row{"TFOG", 7, True{}, 6, 290, Null{}, 0},
-    Row{"TFOG", 8, True{}, 6, 291, Null{}, 0}, Row{"TFOG", 9, True{}, 6, 4294967295, Null{}, 0}]
+    Row{"TFOG", 8, True{}, 6, 291, Null{}, 0}, Row{"TFOG", 9, True{}, 6, 4294967295, Null{}, 0},
+    Row{"BOSS", 4, False{}, 8, 293, Face{}, 0}, Row{"BOSS", 5, False{}, 8, 294, Face{}, 0},
+    Row{"BOSS", 6, False{}, 8, 263, BruisAttack{}, 0},
+    Row{"BAL7", 0, True{}, 4, 296, Null{}, 0}, Row{"BAL7", 1, True{}, 4, 295, Null{}, 0},
+    Row{"BAL7", 2, True{}, 6, 298, Null{}, 0}, Row{"BAL7", 3, True{}, 6, 299, Null{}, 0},
+    Row{"BAL7", 4, True{}, 6, 4294967295, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -550,7 +556,7 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{13, 241, 20, 16, 33554433}, Def{14, 238, 20, 16, 24}, Def{34, 243, 20, 16, 0}, Def{46, 244, 16, 16, 2},
     Def{58, 67, 30, 56, 4456454}, Def{2024, 248, 20, 16, 8388609}, Def{2025, 252, 20, 16, 1},
     Def{2026, 253, 20, 16, 8388609}, Def{2045, 259, 20, 16, 8388609}, Def{3003, 261, 24, 64, 4194310},
-    Def{4294967292, 280, 20, 16, 528}]
+    Def{4294967292, 280, 20, 16, 528}, Def{4294967291, 295, 6, 8, 328208}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -565,6 +571,9 @@ def Thing.blood() -> U32:
 
 def Thing.fireball() -> U32:
   4294967293
+
+def Thing.baronball() -> U32:
+  4294967291
 
 # MT_TFOG, the teleport fog, which only a teleport spawns.
 def Thing.tfog() -> U32:
@@ -603,10 +612,10 @@ def Thing.Def.flags(d: Thing.Def) -> U32:
 # sound A_Scream starts, the map units a chasing thing walks a move tic,
 # the mass a thrust divides by, and the call a chasing thing makes on a
 # draw under 3. A state the type has none of is 0 for the see, melee and
-# missile states and S_NULL for the others, and silence is 0. The baron's
-# melee and missile states are 0 until its attack rows exist, which keeps
-# its A_Chase from attacking. The fireball's sight sound is P_SpawnMissile's,
-# which the sim starts itself. Every other type is scenery at vanilla's
+# missile states and S_NULL for the others, and silence is 0. Projectile
+# speed is fixed-point, walking speed is whole map units; projectile damage
+# follows the active sound. P_SpawnMissile starts the projectile's sight
+# sound. Every other type is scenery at vanilla's
 # default health of 1000 and mass of 100, which no blow reaches, since
 # nothing that is not shootable is ever damaged.
 def Thing.fight.row(kind: U32) -> List<&2, U32>:
@@ -620,11 +629,13 @@ def Thing.fight.row(kind: U32) -> List<&2, U32>:
     case 3002:
       [150, 113, 41, 52, 168, 180, 26, 193, 0, 170, 4294967295, 64, 10, 400, 77]
     case 3003:
-      [1000, 263, 43, 0, 271, 50, 26, 0, 0, 273, 4294967295, 67, 8, 1000, 77]
+      [1000, 263, 43, 0, 271, 50, 26, 292, 292, 273, 4294967295, 67, 8, 1000, 77]
     case 2035:
       [20, 0, 0, 0, 4294967295, 0, 0, 0, 0, 176, 4294967295, 82, 0, 100, 0]
     case 4294967293:
-      [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 198, 4294967295, 17, 0, 100, 0]
+      [1000, 0, 16, 0, 4294967295, 0, 0, 0, 0, 198, 4294967295, 17, 655360, 100, 0, 3]
+    case 4294967291:
+      [1000, 0, 16, 0, 4294967295, 0, 0, 0, 0, 297, 4294967295, 17, 983040, 100, 0, 8]
     case _:
       [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 4294967295, 4294967295, 0, 0, 100, 0]
 
@@ -677,6 +688,9 @@ def Thing.mass(+kind: U32) -> U32:
 
 def Thing.activesound(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 14)
+
+def Thing.damage(+kind: U32) -> U32:
+  V.Vec.get(Thing.fight(kind), 15)
 
 # Doom's mobj_t as P_SpawnMobj leaves it: the type's spawn health, no
 # target, vanilla's reaction time of 8, no threshold, no momentum, the
