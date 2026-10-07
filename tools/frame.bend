@@ -53,7 +53,7 @@ def Frame.draw(messages: Bool, ran: I.Play.Run) -> IO(Unit):
 def Frame.load(messages: Bool, script: List<&2, K.Cmd>, +map: L.Level.Name) -> IO(Unit):
   do IO<Unit>:
     w : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
-    ran : I.Play.Run <- I.Play.run(script, False{}, I.Ran{I.Play.World.start(map, w), []})
+    ran : I.Play.Run <- I.Play.run(script, I.Ran{I.Play.World.start(map, w), []})
     Frame.draw(messages, ran)
 
 def Frame.demo(messages: Bool, +demo: List<&2, U32>) -> IO(Unit):
