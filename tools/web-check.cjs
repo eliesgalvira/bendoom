@@ -20,14 +20,11 @@ function fnv(words) {
   return words.reduce((h, w) => Math.imul(h ^ w, 16777619) >>> 0, 2166136261);
 }
 
-// DOOM1.WAD's E1M1 song as Chocolate Doom plays it: the hash of its
-// first 1024 frames other than silence, each a word with the left sample
-// in its low half, from a capture (tools/listen.nu --keep):
-//   open --raw capture.raw | chunks 4 | each { into int --endian little } | where $it != 0 | first 1024
-//     | reduce --fold 2166136261 {|x, h| (($h | bits xor $x) * 16777619) mod 4294967296 }
-// Silence is left out on both sides, so a buffer the browser found empty
-// cannot shift the frames compared.
-const firstNotes = 3238671547;
+// Freedoom 0.13.0 D_E1M1, Chocolate Doom capture with an explicit IWAD:
+// tools/listen.nu --wad freedoom1.wad --length 3sec --keep
+// FNV-1a over the first 1024 nonzero stereo words, left in the low half.
+// IWAD SHA256 f02a511c0f99ce67645d734c387b7b462542228badc54f2f57a25898f50be2fc.
+const firstNotes = 1348322204;
 
 // A WAD control with the pistol alone audible, preserving every lump's size.
 function pistolWad(wad) {
