@@ -2240,84 +2240,84 @@ def Sim.Exit.show(e: Sim.Exit) -> String:
 type State is Data:
   State{player: Player, level: L.Level, things: H.Things, sidetex: V.Vec,
     thinkers: Thinkers, rnd: U32, clock: U32, ended: Sim.Exit, usedown: Bool,
-    sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, secrets: V.Vec}
+    sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, totalsecret: U32}
 
 def State.player(s: State) -> Player:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   player
 
 def State.level(s: State) -> L.Level:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   level
 
 def Sim.alert(s: State) -> State:
-  State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, N.Noise.alert(level, L.Level.sector_at(level, Player.x(player), Player.y(player))),
-    things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def State.things(s: State) -> H.Things:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   things
 
 def State.sidetex(s: State) -> V.Vec:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   sidetex
 
 def State.thinkers.of(s: State) -> Thinkers:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   thinkers
 
 # The thinkers in the order they were started.
 def State.thinkers(s: State) -> List<&2, Thinker>:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   List.append(&2, Thinker, List.reverse(&2, Thinker, ran), due)
 
 def State.rnd(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   rnd
 
 def State.clock(s: State) -> U32:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   clock
 
 def State.ended(s: State) -> Sim.Exit:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   ended
 
 def State.usedown(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   usedown
 
 def State.sounds(s: State) -> List<&2, Sn.Sound.Event>:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   sounds
 
 # ST_Ticker's and M_Random's own state, which Sim.Face lays out.
 def State.face(s: State) -> V.Vec:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   mrnd
 
 def State.mrnd(s: State) -> U32:
   Sim.Face.mrnd(State.face(s))
 
 def State.attacking(+attack: Bool, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    V.Vec.set(mrnd, Sim.face.attackdown(), Bool.to_u32(attack)), reborn, secrets}
+    V.Vec.set(mrnd, Sim.face.attackdown(), Bool.to_u32(attack)), reborn, totalsecret}
 
 def State.reborn(s: State) -> Bool:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   reborn
 
-def State.secrets(s: State) -> V.Vec:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  secrets
+def State.totalsecret(s: State) -> U32:
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  totalsecret
 
 # The state with the random table's index somewhere, for a draw whose
 # answer was read before it was written back.
 def State.rnd.put(+rnd: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{player, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The mobj an id names among the things, none for the player's, which is
 # no thing.
@@ -2327,35 +2327,35 @@ def State.thing(+id: U32, +s: State) -> Maybe<&2, H.Thing>:
 # The state with a thing written back where it stands, its links as they
 # were: right for everything but a move.
 def State.thing.put(+id: U32, th: H.Thing, s: State) -> State:
-  State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, level, H.Things.put(things, id, Some{th}), sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    mrnd, reborn, secrets}
+    mrnd, reborn, totalsecret}
 
 def State.thing.moved.at(m: Maybe<&2, H.Thing>, +x: U32, +y: U32, player: Player, +level: L.Level,
   +things: H.Things, sidetex: V.Vec, thinkers: Thinkers, rnd: U32, clock: U32, ended: Sim.Exit, usedown: Bool,
-  sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, secrets: V.Vec) -> State:
+  sounds: List<&2, Sn.Sound.Event>, mrnd: V.Vec, reborn: Bool, totalsecret: U32) -> State:
   match m:
     case None{}:
-      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+      State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
     case Some{+was}:
       +now = H.Thing.at(was, level, x, y)
       State{player, level, H.Things.moved(things, L.Level.blockmap_of(level), was, now), sidetex, thinkers, rnd,
-        clock, ended, usedown, sounds, mrnd, reborn, secrets}
+        clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def State.thing.moved(+id: U32, +x: U32, +y: U32, s: State) -> State:
-  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State.thing.moved.at(H.Things.get(things, id), x, y, player, level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn, secrets)
+    usedown, sounds, mrnd, reborn, totalsecret)
 
 # The state with another player, which the player's think leaves.
 def State.player.put(s: State, p: Player) -> State:
-  State{was, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{was, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The state holding the sprites a tic left.
 def State.showing(ps: Psprites, s: State) -> State:
-  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{Player.showing(player, ps), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{Player.showing(player, ps), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # Messages
 # --------
@@ -2374,15 +2374,15 @@ def State.says(msg: U32, +s: State) -> State:
 
 # The state with a thinker started, last to run.
 def State.thinking(s: State, t: Thinker) -> State:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, level, things, sidetex, Thinkers{ran, List.append(&2, Thinker, due, [t])}, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn, secrets}
+    usedown, sounds, mrnd, reborn, totalsecret}
 
 # The state with the thinker whose turn it was kept, to run again next
 # tic.
 def State.kept(s: State, t: Thinker) -> State:
-  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{player, level, things, sidetex, Thinkers{t <> ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{player, level, things, sidetex, Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{player, level, things, sidetex, Thinkers{t <> ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # Sounds
 # ------
@@ -2390,9 +2390,9 @@ def State.kept(s: State, t: Thinker) -> State:
 # The state after the tic reports an event: a start draws from M_Random
 # as S_StartSound does.
 def State.heard(+e: Sn.Sound.Event, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown,
-    List.append(&2, Sn.Sound.Event, sounds, [e]), Sim.Face.drew(Sn.Sound.Event.draws(e), mrnd), reborn, secrets}
+    List.append(&2, Sn.Sound.Event, sounds, [e]), Sim.Face.drew(Sn.Sound.Event.draws(e), mrnd), reborn, totalsecret}
 
 def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
   match events:
@@ -2403,9 +2403,9 @@ def State.told.go(events: List<&2, Sn.Sound.Event>, s: State) -> State:
 
 # The state once it has reported what its things were heard doing.
 def State.told(s: State) -> State:
-  State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State.told.go(heard, State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd,
-    clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 def Sim.sound.spot(xy: U32 & U32) -> Sn.Sound.Source:
   (x, y) = xy
@@ -2470,10 +2470,10 @@ def Sim.sound(sfx: U32, source: Sn.Sound.Source, s: State) -> State:
 # its thinker started.
 def State.entered(th: H.Thing, s: State) -> State:
   H.Thing{+id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt} = th
-  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State.thinking(State{player, level, H.Things.entered(things, L.Level.blockmap_of(level),
     H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}), sidetex, thinkers,
-    rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, Mobj{id})
+    rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, Mobj{id})
 
 # Doom's P_SpawnMobj in play: a thing of a type at (x, y) and z, or on
 # the floor or under the ceiling for H.Thing.onfloor and
@@ -2482,11 +2482,11 @@ def State.entered(th: H.Thing, s: State) -> State:
 # last, so it first thinks the same tic if the thinkers' run is not over,
 # as one added to the tail of Doom's list does.
 def Sim.spawn(d: H.Thing.Def, x: U32, y: U32, z: U32, s: State) -> State:
-  State{player, +level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, +level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drawn = M.Random.next(rnd)
   State.entered(H.Thing.mobj(d, level, H.Things.count(things), x, y, z, (M.Random.at(drawn) % 4 : U32)),
     State{player, level, H.Things.fresh(things), sidetex, thinkers, drawn, clock, ended, usedown, sounds,
-      mrnd, reborn, secrets})
+      mrnd, reborn, totalsecret})
 
 def Sim.missile.thing(th: H.Thing, +angle: U32, +momx: U32, +momy: U32, +momz: U32, +source: U32) -> H.Thing:
   H.Thing{id, kind, x, y, z, floorz, ceilz, was, sector, state, tics, old, +hurt} = th
@@ -2521,9 +2521,9 @@ def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
     case None{}:
       s
     case Some{th}:
-      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+      State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
       State{player, level, H.Things.removed(things, L.Level.blockmap_of(level), th), sidetex, thinkers, rnd, clock,
-        ended, usedown, sounds, mrnd, reborn, secrets}
+        ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # Doom's P_RemoveMobj: the thing unlinked and gone, its id never given
 # again, its sound stopped; its thinker ends when its turn comes.
@@ -2536,8 +2536,8 @@ def Sim.remove(id: U32, +s: State) -> State:
 # Doom's P_Random: the state with its index stepped. What it drew is the
 # table at the index it leaves, M.Random.at(State.rnd(s)).
 def Sim.drawn(s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{player, level, things, sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{player, level, things, sidetex, thinkers, M.Random.next(rnd), clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def Sim.blamed.if(nobody: Bool, +things: H.Things, +p: Player, +id: U32) -> Maybe<&2, Sim.Body>:
   match nobody:
@@ -2693,13 +2693,13 @@ def Sim.blow.forwards(+damage: U32, +health: U32, +z: U32, +iz: U32) -> Bool:
 
 # The push, once the roll is known: the index stands where it was drawn.
 def Sim.blow.push(rolls: Bool, +ix: U32, +iy: U32, +damage: U32, +i: U32, s: State) -> State:
-  State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +back = Bool.and(rolls, Bool.not(U32.is_zero((M.Random.at(i) .&. 1 : U32))))
   State{Sim.thrust(level, player,
       Sim.blow.angle(A.Angle.of(L.Level.tanto(level), (Player.x(player) - ix : U32),
         (Player.y(player) - iy : U32)), back),
       Sim.blow.thrust(Sim.thrust.of(damage, 100), back)),
-    level, things, sidetex, thinkers, i, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    level, things, sidetex, thinkers, i, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def Sim.blow.roll(+rolls: Bool, +ix: U32, +iy: U32, +damage: U32, +s: State) -> State:
   Sim.blow.push(rolls, ix, iy, damage,
@@ -3389,16 +3389,16 @@ def Sim.puff.tics(m: Maybe<&2, H.Thing>, +id: U32, +drawn: U32, s: State) -> Sta
     case None{}:
       s
     case Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector, state, +tics, momz, hurt}}:
-      State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+      State{player, level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
       State{player, level, H.Things.put(things, id, Some{H.Thing{i, kind, x, y, z, floorz, ceilz, angle, sector,
         state, F.Fixed.max(1, (tics - (drawn .&. 3 : U32) : U32)), F.Fixed.unit(), hurt}}), sidetex, thinkers, rnd, clock,
-        ended, usedown, sounds, mrnd, reborn, secrets}
+        ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def Sim.puff.drawn(+id: U32, s: State) -> State:
-  State{player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drew = M.Random.next(rnd)
   Sim.puff.tics(H.Things.get(things, id), id, M.Random.at(drew), State{player, level, things, sidetex, thinkers,
-    drew, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    drew, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 def Sim.puff.at(+x: U32, +y: U32, +z: U32, +s: State) -> State:
   Sim.puff.drawn(H.Things.count(State.things(s)), Sim.spawn(H.Thing.info(H.Thing.puff()), x, y, z, s))
@@ -3408,11 +3408,11 @@ def Sim.puff.at(+x: U32, +y: U32, +z: U32, +s: State) -> State:
 # first state. The spark state is for a punch alone, whose attack range
 # no shot has.
 def Sim.puff(+x: U32, +y: U32, +z: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +a = M.Random.next(rnd)
   +b = M.Random.next(a)
   Sim.puff.at(x, y, (z + ((M.Random.at(a) - M.Random.at(b) : U32) << 10n) : U32),
-    State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # The blood once it stands where P_SpawnBlood put it: it rises two
 # units a tic and gravity pulls it back, and its first state is
@@ -3441,10 +3441,10 @@ def Sim.blood.frame(+id: U32, +damage: U32, s: State) -> State:
   Sim.blood.state(Bool.and(U32.is_le(damage, 12), U32.is_ge(damage, 9)), U32.is_lt(damage, 9), id, s)
 
 def Sim.blood.drawn(+id: U32, +damage: U32, s: State) -> State:
-  State{player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drew = M.Random.next(rnd)
   Sim.blood.frame(id, damage, Sim.blood.tics(H.Things.get(things, id), id, M.Random.at(drew),
-    State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn, secrets}))
+    State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))
 
 def Sim.blood.at(+x: U32, +y: U32, +z: U32, +damage: U32, +s: State) -> State:
   Sim.blood.drawn(H.Things.count(State.things(s)), damage,
@@ -3455,11 +3455,11 @@ def Sim.blood.at(+x: U32, +y: U32, +z: U32, +damage: U32, +s: State) -> State:
 # last draw shortens its first state, and a wound of 12 or less shows a
 # later frame of it.
 def Sim.blood(+x: U32, +y: U32, +z: U32, +damage: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +a = M.Random.next(rnd)
   +b = M.Random.next(a)
   Sim.blood.at(x, y, (z + ((M.Random.at(a) - M.Random.at(b) : U32) << 10n) : U32), damage,
-    State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # A mobj the bullet hit takes a puff where it does not bleed, as vanilla
 # gives an MF_NOBLOOD thing, and blood where it does.
@@ -3534,18 +3534,18 @@ def Sim.gunshot.spread.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U3
     case True{}:
       Sim.gunshot.fired.with(~enter, angle, damage, slope, s)
     case False{}:
-      State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+      State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
       +a = M.Random.next(rnd)
       +b = M.Random.next(a)
       Sim.gunshot.fired.with(~enter, (angle + ((M.Random.at(a) - M.Random.at(b) : U32) << 18n) : U32), damage, slope,
-        State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+        State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # Doom's P_GunShot: the damage is drawn first, whoever takes it.
 def Sim.gunshot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, accurate: Bool, +slope: U32, s: State) -> State:
-  State{+player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drew = M.Random.next(rnd)
   Sim.gunshot.spread.with(~enter, accurate, Player.angle(player), (5 * ((M.Random.at(drew) % 3 : U32) + 1 : U32) : U32), slope,
-    State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # The player sprites
 # ------------------
@@ -3584,14 +3584,14 @@ def Sim.ready.bob(psp: Psprite, +sine: V.Vec, +clock: U32, +bob: U32, s: State) 
 
 # The state with another count of shots the held attack has taken.
 def State.firing(+refire: U32, s: State) -> State:
-  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{Player.firing(player, refire), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{Player.firing(player, refire), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # One round spent, Doom's DecreaseAmmo.
 def Sim.spent(+ammo: U32, s: State) -> State:
-  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{Player.holding(player, I.Inventory.spend(ammo, 1, Player.inv(player))), level, things,
-    sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def Sim.fire.shot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +s: State) -> State:
   +p = State.player(s)
@@ -3687,7 +3687,7 @@ def Sim.melee.sound(+saw: Bool, +hit: Bool, +s: State) -> State:
 
 def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
   +saw: Bool, +psp: Psprite, +s: State) -> Sim.Entering:
-  State{+player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +damage = M.Random.next(rnd)
   +left = M.Random.next(damage)
   +right = M.Random.next(left)
@@ -3700,7 +3700,7 @@ def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> 
     H.Things.you(things), angle, range, Sim.Aim.slope(aim),
     (2 * ((M.Random.at(damage) % 10 : U32) + 1 : U32) * Bool.pick(U32, saw, 1,
       Bool.pick(U32, U32.is_zero(I.Inventory.strength(Player.inv(player))), 1, 10)) : U32),
-    State{player, level, things, sidetex, thinkers, right, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    State{player, level, things, sidetex, thinkers, right, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
   Entering{None{}, None{}, psp, Sim.melee.turn(saw, target,
     Sim.melee.sound(saw, Bool.not(Maybe.is_none(&2, U32, target)), hurt))}
 
@@ -3974,8 +3974,8 @@ def Sim.psprites.start(+s: State) -> State:
 # The state with a try's player and things, in a level.
 def State.moved(t: Sim.Try, level: L.Level, s: State) -> State:
   Try{ok, p, got} = t
-  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{p, level, got, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # One of the counts a thing's hunt keeps, written back where the
 # population still has the thing, and read back with 0 for one gone.
@@ -4052,11 +4052,11 @@ def Sim.look.count(+first: U32) -> U32:
     Bool.pick(U32, U32.is_eq(first, Sn.Sound.bgsit1()), 2, 1))
 
 def Sim.look.sound(+first: U32, +count: U32, +id: U32, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drawn = Bool.pick(U32, U32.is_eq(count, 1), rnd, M.Random.next(rnd))
   Sim.sound(Bool.pick(U32, U32.is_eq(count, 1), first, (first + (M.Random.at(drawn) % count : U32) : U32)),
     Sn.Thing{id},
-    State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # What a state's action asks of the mobj it ran for: a state to enter
 # next, if any, and the state the action left.
@@ -4118,9 +4118,9 @@ def Sim.thing.mom(+th: H.Thing, momx: U32, momy: U32) -> H.Thing:
 
 def Sim.thing.relink(+id: U32, was: H.Thing, now: H.Thing, fit: Sim.Fit, s: State) -> State:
   Fit{ok, +floor, +ceil, drop} = fit
-  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State{player, level, H.Things.moved(things, L.Level.blockmap_of(level), was,
-      H.Thing.between(now, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+      H.Thing.between(now, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 def Sim.missile.burst.entered(entered: H.Thing, +tics: U32) -> H.Thing:
   H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, was, momz, +hurt} = entered
@@ -4442,11 +4442,11 @@ def State.entered.all(things: List<&2, H.Thing>, s: State) -> State:
 # The player's mobj entered: linked where the player stands, its thinker
 # started.
 def State.entered.you(s: State) -> State:
-  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State.thinking(State{player, level, H.Things.link(things, L.Level.blockmap_of(level), Sim.flags(),
     H.Things.you(things), Player.x(player), Player.y(player),
     L.Level.sector_at(level, Player.x(player), Player.y(player))), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd, reborn, secrets}, Mobj{H.Things.you(things)})
+    sounds, mrnd, reborn, totalsecret}, Mobj{H.Things.you(things)})
 
 # Whether the player's mobj enters before the first of some things: its
 # record comes before theirs, or none is left.
@@ -4476,22 +4476,21 @@ def Sim.nothing(bm: L.Level.Blockmap, count: U32, you: U32, nsectors: U32) -> H.
 # Doom spawns a map's records in, so each is linked and thinks as it
 # would had it spawned then.
 def State.populated(+things: List<&2, H.Thing>, count: U32, s: State) -> State:
-  State{player, +level, +old, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  State{player, +level, +old, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   State.populated.go(things, State.you.first(things, H.Things.you(old)), H.Things.you(old),
     State{player, level, Sim.nothing(L.Level.blockmap_of(level), count, H.Things.you(old), L.Level.nsectors(level)),
-      sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+      sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
-# Doom's secret sectors, one word per sector, still 1 until counted.
-def Sim.secrets.go(n: Nat, +sector: U32, +level: L.Level, v: V.Vec) -> V.Vec:
+def Sim.totalsecret.go(n: Nat, +sector: U32, +level: L.Level, +total: U32) -> U32:
   match n:
     case 0n:
-      v
+      total
     case 1n+m:
-      Sim.secrets.go(m, (sector + 1 : U32), level,
-        V.Vec.set(v, sector, Bool.to_u32(U32.is_eq(L.Level.sector.special(level, sector), 9))))
+      Sim.totalsecret.go(m, (sector + 1 : U32), level,
+        (total + Bool.to_u32(U32.is_eq(L.Level.sector.special(level, sector), 9)) : U32))
 
-def Sim.secrets(+level: L.Level) -> V.Vec:
-  Sim.secrets.go(U32.to_nat(L.Level.nsectors(level)), 0, level, V.Vec.of_list([], L.Level.nsectors(level)))
+def Sim.totalsecret(+level: L.Level) -> U32:
+  Sim.totalsecret.go(U32.to_nat(L.Level.nsectors(level)), 0, level, 0)
 
 # Dying
 # -----
@@ -4536,8 +4535,8 @@ def Sim.death.faced(m: Maybe<&2, Sim.Body>, +level: L.Level, +p: Player) -> Play
 # G_DoReborn answers outside the playsim by loading the level, and which
 # holds until it is answered.
 def Sim.death.asked(use: Bool, s: State) -> State:
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, Bool.or(reborn, use), secrets}
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, Bool.or(reborn, use), totalsecret}
 
 # Doom's P_DeathThink for the player alone: the player sprites move, the
 # view sinks and is worked out again, and the facing turns to the
@@ -4550,20 +4549,13 @@ def Sim.death(+level: L.Level, +clock: U32, m: Maybe<&2, Sim.Body>, s: State) ->
 type Sim.Tally is Data:
   Tally{kills: U32, items: U32, secrets: U32, maxkills: U32, maxitems: U32, maxsecret: U32, time: U32}
 
-def Sim.secrets.total(n: Nat, +i: U32, +v: V.Vec, +total: U32) -> U32:
-  match n:
-    case 0n:
-      total
-    case 1n+m:
-      Sim.secrets.total(m, (i + 1 : U32), v, (total + V.Vec.get(v, i) : U32))
-
 def Sim.tally.of(+inv: I.Inventory, t: H.Thing.Totals, +secrets: U32, +time: U32) -> Sim.Tally:
   H.Totals{kills, items} = t
   Tally{I.Inventory.kills(inv), I.Inventory.items(inv), I.Inventory.secrets(inv), kills, items, secrets, time}
 
 def Sim.tally(+s: State) -> Sim.Tally:
   Sim.tally.of(Player.inv(State.player(s)), H.Thing.totals(State.level(s)),
-    Sim.secrets.total(U32.to_nat(L.Level.nsectors(State.level(s))), 0, Sim.secrets(State.level(s)), 0),
+    State.totalsecret(s),
     State.clock(s))
 
 def Sim.Tally.show(t: Sim.Tally) -> String:
