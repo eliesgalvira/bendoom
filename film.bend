@@ -41,7 +41,7 @@ def Film.pcm(words: List<&2, U32>) -> List<&2, U32>:
 
 def Film.channels(play: I.Play, chans: List<Maybe<C.Channel>>) -> IO(List<Maybe<C.Channel>>):
   match play:
-    case I.Playing{+state, map, didsecret}:
+    case I.Playing{+state, map, didsecret, pointer}:
       C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
     case I.Showing{wi, after, trip}:
       IO.pure(List<Maybe<C.Channel>>, chans)
@@ -70,7 +70,7 @@ def Film.outro.of(+wi: I.Inter) -> List<&2, K.Cmd>:
 
 def Film.outro(play: I.Play) -> List<&2, K.Cmd>:
   match play:
-    case I.Playing{state, map, didsecret}:
+    case I.Playing{state, map, didsecret, pointer}:
       []
     case I.Showing{wi, after, trip}:
       Film.outro.of(wi)
