@@ -115,6 +115,9 @@ def Sound.bdcls() -> U32:
 def Sound.getpow() -> U32:
   93
 
+def Sound.telept() -> U32:
+  35
+
 # A row of S_sfx: the sound's number, its lump, and its priority, where
 # less is more important. Left out: pdiehi, which only Doom II plays,
 # tink, the chat message's, and itmbk, a deathmatch item's return.
