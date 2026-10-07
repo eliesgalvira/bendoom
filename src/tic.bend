@@ -930,14 +930,14 @@ def Sim.think(t: S.Thinker, s: S.State) -> S.State:
   match t:
     case S.Mobj{id}:
       Sim.thing(id, s)
-    case S.Mover{sector, ceiling, speed, [], plan, noise}:
-      s
     case S.Mover{+sector, ceiling, speed, S.Hold{+tics} <> +rest, plan, +noise}:
       Sp.Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(tics, 1), rest,
         S.Hold{(tics - 1 : U32)} <> rest), plan, noise,
         S.Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sp.Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
     case S.Mover{sector, ceiling, speed, S.Travel{down, dest} <> rest, plan, noise}:
       Sp.Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
+    case S.Mover{sector, ceiling, speed, steps, plan, noise}:
+      Sp.Sim.mover.kept(sector, ceiling, speed, steps, plan, noise, s)
     case S.Button{side, slot, texture, +tics}:
       Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
     case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
