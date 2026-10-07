@@ -42,24 +42,26 @@ def State.start(+level: L.Level) -> S.State:
   State.at(level, L.Level.start_of(level))
 
 # G_DoLoadLevel after a level that came before, which neither random
-# index restarts from: the map from its start with the player and use
-# as the caller hands them, and ST_Start's bar, whose melt draws M_Random
-# 320 times more.
-def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, +mrnd: U32, face: V.Vec) -> S.State:
+# index restarts from: the map from its start with the player, use and
+# attack as the caller hands them, and ST_Start's bar, whose melt draws
+# M_Random 320 times more.
+def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, attackdown: Bool, +mrnd: U32,
+  face: V.Vec) -> S.State:
   State.at.spawned(level, L.Level.start_of(level), H.Thing.spawn(level, rnd), inv,
-    S.Sim.Face.restart(I.Inventory.weapons(inv), usedown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
+    S.Sim.Face.restart(I.Inventory.weapons(inv), attackdown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
 
 # G_DoReborn's reload: the dead player's map again from a pistol start,
 # as G_PlayerReborn leaves the player.
 def State.reloaded(+level: L.Level, +dead: S.State) -> S.State:
-  State.restarted(level, S.State.rnd(dead), I.Inventory.start(), True{}, S.State.mrnd(dead), S.State.face(dead))
+  State.restarted(level, S.State.rnd(dead), I.Inventory.start(), True{}, True{}, S.State.mrnd(dead),
+    S.State.face(dead))
 
 # G_DoWorldDone's load: the next map, entered with the inventory
 # G_PlayerFinishLevel leaves, M_Random's index where the tally left it,
 # and use and attack down as WI_checkForAccelerate last saw them.
-def State.carried(+level: L.Level, +mrnd: U32, +down: Bool, +after: S.State) -> S.State:
-  State.restarted(level, S.State.rnd(after), I.Inventory.finished(S.Player.inv(S.State.player(after))), down, mrnd,
-    S.State.face(after))
+def State.carried(+level: L.Level, +mrnd: U32, +usedown: Bool, +attackdown: Bool, +after: S.State) -> S.State:
+  State.restarted(level, S.State.rnd(after), I.Inventory.finished(S.Player.inv(S.State.player(after))), usedown,
+    attackdown, mrnd, S.State.face(after))
 
 # Chasing
 # -------

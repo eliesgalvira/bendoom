@@ -15,20 +15,18 @@ type Inventory is Data:
   Inventory{health: U32, armour: U32, armourtype: U32, cards: U32, ammo: V.Vec, caps: V.Vec, backpack: Bool,
     weapons: U32, powers: V.Vec, items: U32, bonus: U32, line: U32, kills: U32, secrets: U32}
 
-# 100 health, the fist and the pistol, fifty bullets, maxammo's caps.
+def Inventory.unpowered() -> V.Vec:
+  V.Vec.of_list([0, 0, 0, 0, 0, 0], 6)
+
+# The line with no message up, a weapon ready and none pending.
+def Inventory.readied(+ready: U32) -> U32:
+  ((ready << 16n : U32) .|. (255 << 24n : U32) : U32)
+
+# 100 health, the fist and the pistol, fifty bullets, maxammo's caps,
+# the pistol ready.
 def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
-    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616, 0, 0}
-
-# What crosses into the next level: G_PlayerFinishLevel takes the keys,
-# the powers and the pickup flash, P_SetupLevel zeroes the counts, and
-# P_SpawnPlayer clears the message and brings the ready weapon up again.
-# Health, armour, ammo, caps, backpack and weapons are kept.
-def Inventory.finished(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills,
-    secrets} = inv
-  Inventory{health, armour, armourtype, 0, ammo, caps, backpack, weapons, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0,
-    0, ((line .&. 16711680 : U32) .|. 4278190080 : U32), 0, 0}
+    Inventory.unpowered(), 0, 0, Inventory.readied(1), 0, 0}
 
 def Inventory.items(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
@@ -125,6 +123,16 @@ def Inventory.owns(+weapon: U32, inv: Inventory) -> Bool:
 
 def Inventory.want(+weapon: U32, +inv: Inventory) -> Inventory:
   Inventory.weaponstate(Inventory.ready(inv), weapon, inv)
+
+# What crosses into the next level: G_PlayerFinishLevel takes the keys,
+# the powers and the pickup flash, P_SetupLevel zeroes the counts, and
+# P_SpawnPlayer clears the message and brings the ready weapon up again.
+# Health, armour, ammo, caps, backpack and weapons are kept.
+def Inventory.finished(+inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills,
+    secrets} = inv
+  Inventory{health, armour, armourtype, 0, ammo, caps, backpack, weapons, Inventory.unpowered(), 0, 0,
+    Inventory.readied(Inventory.ready(inv)), 0, 0}
 
 # The rounds of an ammo type and the cap on them, Doom's ammo[t] and
 # maxammo[t].
