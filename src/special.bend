@@ -26,9 +26,7 @@ import ./sim.bend as S
 def Sim.light(s: S.State, sector: U32) -> U32:
   L.Level.sector.light(S.State.level(s), sector)
 
-# A blink goes dark from its bright level, else bright, for that level's
-# time, or for a random count under it; put is how it joins the
-# thinkers, started or kept.
+# Set a blink's phase and count, then start or retain its thinker.
 def Sim.blink.to(~put: @s: S.State -> @t: S.Thinker -> S.State, +lit: Bool, +sector: U32, +dark: U32, +bright: U32,
   +darktime: U32, +brighttime: U32, +random: Bool, s: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
@@ -38,13 +36,14 @@ def Sim.blink.to(~put: @s: S.State -> @t: S.Thinker -> S.State, +lit: Bool, +sec
     thinkers, i, clock, ended, usedown, sounds, mrnd, reborn, secrets}, S.Blink{sector, Bool.pick(U32, random,
     ((M.Random.at(i) .&. time : U32) + 1 : U32), time), dark, bright, darktime, brighttime, random})
 
-def Sim.blink(turn: Bool, +sector: U32, count: U32, dark: U32, +bright: U32, darktime: U32, brighttime: U32,
-  random: Bool, +s: S.State) -> S.State:
+def Sim.blink(turn: Bool, +sector: U32, count: U32, +dark: U32, +bright: U32, darktime: U32, brighttime: U32,
+  +random: Bool, +s: S.State) -> S.State:
   match turn:
     case False{}:
       S.State.kept(s, S.Blink{sector, count, dark, bright, darktime, brighttime, random})
     case True{}:
-      Sim.blink.to(~S.State.kept, U32.is_eq(Sim.light(s, sector), bright), sector, dark, bright, darktime, brighttime,
+      Sim.blink.to(~S.State.kept, Bool.pick(Bool, random, U32.is_eq(Sim.light(s, sector), bright),
+        Bool.not(U32.is_eq(Sim.light(s, sector), dark))), sector, dark, bright, darktime, brighttime,
         random, s)
 
 # Doom's T_Glow: 8 a tic, and a step that would reach an end is undone
@@ -313,19 +312,34 @@ def Sim.light.low(+s: S.State, +sector: U32) -> U32:
 def Sim.strobe.dark(+low: U32, light: U32) -> U32:
   Bool.pick(U32, U32.is_eq(low, light), 0, low)
 
-# Doom's P_SpawnSpecials for the sector specials E1M1 carries: 1 blinks
-# at random, bright for 1 or 65 tics (the mask is 64) and dark for 1 to
-# 8, its first count drawn here; 8 glows; 12 strobes in step with its
-# kind, 35 tics dark and 5 bright, dark from its first tic.
+def Sim.light.cleared(+sector: U32, s: S.State) -> S.State:
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, L.Level.sector.put(level, sector, 5, 0), things, sidetex, thinkers, rnd, clock, ended,
+    usedown, sounds, mrnd, reborn, secrets}
+
+def Sim.strobe(+sync: Bool, +darktime: U32, +sector: U32, +s: S.State) -> S.State:
+  +rnd = Bool.pick(U32, sync, S.State.rnd(s), M.Random.next(S.State.rnd(s)))
+  S.State.thinking(Sim.light.cleared(sector, S.State.rnd.put(rnd, s)),
+    S.Blink{sector, Bool.pick(U32, sync, 1, ((M.Random.at(rnd) .&. 7 : U32) + 1 : U32)),
+      Sim.strobe.dark(Sim.light.low(s, sector), Sim.light(s, sector)), Sim.light(s, sector), darktime, 5, False{}})
+
+# Light thinkers leave their sector with no gameplay special.
 def Sim.light.spawn(special: U32, +sector: U32, +s: S.State) -> S.State:
   match special:
     case 1:
-      Sim.blink.to(~S.State.thinking, False{}, sector, Sim.light.low(s, sector), Sim.light(s, sector), 7, 64, True{}, s)
+      Sim.light.cleared(sector, Sim.blink.to(~S.State.thinking, False{}, sector,
+        Sim.light.low(s, sector), Sim.light(s, sector), 7, 64, True{}, s))
+    case 2:
+      Sim.strobe(False{}, 15, sector, s)
+    case 3:
+      Sim.strobe(False{}, 35, sector, s)
     case 8:
-      S.State.thinking(s, S.Glow{sector, Sim.light.low(s, sector), Sim.light(s, sector), True{}})
+      Sim.light.cleared(sector, S.State.thinking(s,
+        S.Glow{sector, Sim.light.low(s, sector), Sim.light(s, sector), True{}}))
     case 12:
-      S.State.thinking(s, S.Blink{sector, 1, Sim.strobe.dark(Sim.light.low(s, sector), Sim.light(s, sector)),
-        Sim.light(s, sector), 35, 5, False{}})
+      Sim.strobe(True{}, 35, sector, s)
+    case 13:
+      Sim.strobe(True{}, 15, sector, s)
     case _:
       s
 
@@ -403,19 +417,19 @@ def Sim.door.locked(opens: Bool, line: L.Level.Line, s: S.State) -> S.State:
 # Switches and tagged movers
 # --------------------------
 
-# The sectors of a tag with no mover, in sector order: the ones a tagged
-# special starts, as Doom passes over a sector whose specialdata is set.
-def Sim.tagged.go(n: Nat, +level: L.Level, +thinkers: List<&2, S.Thinker>, +tag: U32, +s: U32) ->
+# Tagged sectors in sector order, optionally excluding occupied movers.
+def Sim.tagged.go(n: Nat, +available: Bool, +level: L.Level, +thinkers: List<&2, S.Thinker>, +tag: U32, +s: U32) ->
   List<&2, U32>:
   match n:
     case 0n:
       []
     case 1n+m:
-      V.Vec.keep(~U32, Bool.and(U32.is_eq(L.Level.sector.tag(level, s), tag), Bool.not(Sim.moving(thinkers, s))), s,
-        Sim.tagged.go(m, level, thinkers, tag, (s + 1 : U32)))
+      V.Vec.keep(~U32, Bool.and(U32.is_eq(L.Level.sector.tag(level, s), tag), Bool.or(Bool.not(available),
+        Bool.not(Sim.moving(thinkers, s)))), s,
+        Sim.tagged.go(m, available, level, thinkers, tag, (s + 1 : U32)))
 
 def Sim.tagged(+s: S.State, line: U32) -> List<&2, U32>:
-  Sim.tagged.go(U32.to_nat(L.Level.nsectors(S.State.level(s))), S.State.level(s), S.State.thinkers(s),
+  Sim.tagged.go(U32.to_nat(L.Level.nsectors(S.State.level(s))), True{}, S.State.level(s), S.State.thinkers(s),
     L.Level.tag(S.State.level(s), line), 0)
 
 # A mover begun for each sector, all against the level as it stood.
@@ -532,6 +546,15 @@ def Sim.lift(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}, S.Hold{105},
     S.Travel{False{}, L.Level.floor(level, sector)}], Sim.noise.lift(), s)
 
+def Sim.light.dark(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  S.State{player, was, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, L.Level.light.put(was, sector, 35), things, sidetex, thinkers, rnd, clock, ended,
+    usedown, sounds, mrnd, reborn, secrets}
+
+def Sim.light.tagged(+s: S.State, line: U32) -> List<&2, U32>:
+  Sim.tagged.go(U32.to_nat(L.Level.nsectors(S.State.level(s))), False{}, S.State.level(s), S.State.thinkers(s),
+    L.Level.tag(S.State.level(s), line), 0)
+
 # Walk-over lines
 # ---------------
 
@@ -555,13 +578,13 @@ def Sim.floor.turbo(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}],
     Sim.noise.floor(), s)
 
-# Doom's P_CrossSpecialLine for the specials E1M1 carries. The two that
-# work once lose their special whether or not a sector started; the
-# lift's line works every time.
+# One-shot crossings consume their special whether or not a sector starts.
 def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
   match special:
     case 2:
       Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
+    case 35:
+      Sim.once(line, Sim.start(~Sim.light.dark, Sim.light.tagged(s, line), s))
     case 36:
       Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
     case 88:
@@ -588,10 +611,7 @@ def Sim.cross(lines: List<&2, S.Sim.Cross>, +s: S.State) -> S.State:
 # Use
 # ---
 
-# Doom's P_UseSpecialLine for the specials E1M1 carries: the manual door,
-# its blazing twin and its blue locked twin, the switch that lowers
-# floors, the lift's, and the exit. Any special Doom does not know does
-# nothing.
+# Player use dispatch, including normal and secret exit switches.
 def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.State:
   match special:
     case 1:
@@ -606,6 +626,8 @@ def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.S
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
     case 11:
       State.end(False{}, Sim.once(i, Sim.switch(False{}, i, s)))
+    case 51:
+      State.end(True{}, Sim.once(i, Sim.switch(False{}, i, s)))
     case _:
       s
 
@@ -734,22 +756,42 @@ def Sim.thing.crossed(lines: List<&2, U32>, +s: S.State) -> S.State:
 # The sector's special
 # --------------------
 
-def Sim.sector.hurt(due: Bool, +s: S.State) -> S.State:
+def Sim.sector.hurt(due: Bool, damage: U32, +s: S.State) -> S.State:
   match due:
     case False{}:
       s
     case True{}:
-      S.Sim.damage.raw(H.Things.you(S.State.things(s)), 5, H.Thing.you(), H.Thing.you(), s)
+      S.Sim.damage.raw(H.Things.you(S.State.things(s)), damage, H.Thing.you(), H.Thing.you(), s)
 
-# Doom's P_PlayerInSpecialSector on the sector under the player: special
-# 7 is nukage, which takes 5 health every 32 tics of the level's clock
-# while the player's feet are at that sector's floor. It is the only
-# special ported that hurts, so the switch is the one test.
-def Sim.sector(+level: L.Level, +clock: U32, +s: S.State) -> S.State:
+def Sim.sector.leak(suit: Bool, +clock: U32, +s: S.State) -> S.State:
+  match suit:
+    case False{}:
+      Sim.sector.hurt(U32.is_zero((clock .&. 31 : U32)), 20, s)
+    case True{}:
+      +drawn = S.Sim.drawn(s)
+      Sim.sector.hurt(Bool.and(U32.is_lt(M.Random.at(S.State.rnd(drawn)), 5),
+        U32.is_zero((clock .&. 31 : U32))), 20, drawn)
+
+# P_PlayerInSpecialSector tests suit leakage before the damage interval.
+def Sim.sector.damage(nukage: Bool, hellslime: Bool, +clock: U32, +s: S.State) -> S.State:
+  match nukage hellslime:
+    case True{} _:
+      Sim.sector.hurt(Bool.and(U32.is_zero(I.Inventory.power.of(I.Inventory.pw_ironfeet(),
+        S.Player.inv(S.State.player(s)))), U32.is_zero((clock .&. 31 : U32))), 5, s)
+    case False{} True{}:
+      Sim.sector.leak(Bool.not(U32.is_zero(I.Inventory.power.of(I.Inventory.pw_ironfeet(),
+        S.Player.inv(S.State.player(s))))), clock, s)
+    case False{} False{}:
+      s
+
+def Sim.sector.grounded(+grounded: Bool, +special: U32, clock: U32, s: S.State) -> S.State:
+  Sim.sector.damage(Bool.and(grounded, U32.is_eq(special, 7)),
+    Bool.and(grounded, U32.is_eq(special, 16)), clock, s)
+
+def Sim.sector(+level: L.Level, clock: U32, +s: S.State) -> S.State:
   +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
-  Sim.sector.hurt(Bool.and(U32.is_eq(L.Level.sector.special(S.State.level(s), sector), 7),
-    Bool.and(U32.is_zero((clock .&. 31 : U32)),
-      U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(level, sector)))), s)
+  Sim.sector.grounded(U32.is_eq(S.Player.z(S.State.player(s)), L.Level.floor(level, sector)),
+    L.Level.sector.special(S.State.level(s), sector), clock, s)
 
 def Sim.sector.secret.count(counts: Bool, +sector: U32, s: S.State) -> S.State:
   match counts:

@@ -383,39 +383,52 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
     S.Sim.eye(L.Level{geo, sectors, specials, heard}, 0,
       S.Sim.move(L.Level{geo, sectors, specials, heard}, K.Cmd.idle(), rest_player(x, y))))
 
-# The think a tic from rest makes, once the nukage's flag is known: a
-# level the law says nothing about leaves that flag stuck, and the blow
-# it may deal writes the health, the wound and the momentum, never the
-# place.
-def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+# Grounded floor damage changes health and pain, never the player's place.
+def rest_think(+nukage: Bool, +hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
-    Tic.Sim.player.thinks(K.Cmd.idle(), Sp.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))))
+    Tic.Sim.player.thinks(K.Cmd.idle(), Sp.Sim.sector.damage(nukage, hellslime, 0,
+      rest_walked(geo, sectors, specials, heard, x, y))))
 
-def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
+def rest_due(nukage: Bool, hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, heard, x, y)))),
+      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))),
     S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, heard, x, y)))))
+      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))))
     == (x, y) : U32 & U32}:
-  match due:
-    case True{}:
+  match nukage hellslime:
+    case True{} _:
       {==}
-    case False{}:
+    case False{} True{}:
       {==}
+    case False{} False{}:
+      {==}
+
+def rest_at(+grounded: Bool, +special: U32, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) ->
+  {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+        geo, sectors, specials, heard, x, y)))),
+    S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+        geo, sectors, specials, heard, x, y)))))
+    == (x, y) : U32 & U32}:
+  rest_due(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+    geo, sectors, specials, heard, x, y)
 
 def Laws.tic_rest(level, x, y):
   match level:
     case L.Level{geo, sectors, specials, heard}:
-      rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials, heard},
+      rest_at(U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+          L.Level.floor(L.Level{geo, sectors, specials, heard},
+            L.Level.sector_at(L.Level{geo, sectors, specials, heard},
+              S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+              S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y)))))),
+        L.Level.sector.special(L.Level{geo, sectors, specials, heard},
           L.Level.sector_at(L.Level{geo, sectors, specials, heard},
             S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))))), 7),
-        Bool.and(U32.is_zero((0 .&. 31 : U32)),
-          U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-            L.Level.floor(L.Level{geo, sectors, specials, heard},
-              L.Level.sector_at(L.Level{geo, sectors, specials, heard},
-                S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-                S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y)))))))),
+            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))))),
         geo, sectors, specials, heard, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock, secret):

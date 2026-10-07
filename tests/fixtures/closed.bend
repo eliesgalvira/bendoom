@@ -205,9 +205,9 @@ def Closed.coincident(starting: Bool) -> U32 & U32:
 # at a light and the door sector, light 160, given the light Doom spawns
 # for a sector special, the random index at 1 as it is once Doom has
 # spawned the player.
-def Closed.lit(special: U32, west: U32) -> S.State:
+def Closed.lit(+special: U32, west: U32) -> S.State:
   Sp.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
-    L.Level.light.put(Closed.doors(), 0, west), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, S.Unended{}, False{},
+    L.Level.sector.put(L.Level.light.put(Closed.doors(), 0, west), 1, 5, special), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, S.Unended{}, False{},
     [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
 
 def Closed.light(s: S.State) -> U32:
