@@ -23,7 +23,4 @@ The spec review questioned that lead. How many buffers Chocolate Doom mixes befo
 
 ## Open: left after review
 
-- The map's song: `Play.song` returned D_E1M1 for every map at merge; ticket 06 was asked to pick `mus_e1m1 + map - 1` from its map state. Check its report.
-- Two WAD readers: `Wad.read` streams lumps beside the Array reader `Gfx.open` uses (the web heap ran out reading the WAD twice). One reader should serve both; ticket 05 reuses the streaming one for sound lumps and is the place to unify them.
 - `Stream.topped`'s `case []:` can never run, since the deck is always a one-element list; a recursive holder type may remove it, if the checker accepts it.
-- `tools/listen.nu` repeats `wait-for` and the Xvfb `-displayfd` launch from `tools/portable-smoke.nu` and `tools/oracle.nu`; a shared Nushell module would hold them.
