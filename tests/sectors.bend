@@ -460,7 +460,7 @@ def secret.exit(+s: S.State) -> String:
 # EV_LightTurnOn ignores specialdata; P_UseSpecialLine51 changes the switch then ends secretly.
 def light.lines() -> IO(Unit):
   do IO<Unit>:
-    IO.print(light.occupied(Sp.Sim.cross.special(35, 0,
+    IO.print(light.occupied(Sp.Sim.cross.special(35, 0, 0, S.Cross{0, 2097152, 4194304, 0, 0},
       Sp.Sim.door.open(Fx.Closed.doors(), 1, Fx.Closed.west()))))
     IO.print(secret.exit(Sp.Sim.use.special(51, 0, True{}, Fx.Closed.switched(51))))
 
