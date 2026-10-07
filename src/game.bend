@@ -14,6 +14,9 @@ import ./project.bend as P
 import ./show.bend as V
 import ./demo.bend as D
 import ./stream.bend as M
+import ./song.bend as Sg
+import ./channel.bend as C
+import ./sound.bend as Sn
 
 # The clock is read each frame; the tics it owes accumulate in
 # thousandths of a tic, and at most eight run per frame, the rest
@@ -201,12 +204,11 @@ def Game.loop(fuel: Nat, window: Window, g: Game) -> IO(Maybe<U32>):
     case 1n+f:
       Game.draw(window, Game.view(g), w => h => Game.loop(f, w, h))
 
-def Game.start.go(frames: Nat, input: K.Input, demo: Maybe<D.Demo.Rec>, now: Nat, steps: I.Play.Run) ->
+def Game.start.go(frames: Nat, input: K.Input, demo: Maybe<D.Demo.Rec>, now: Nat, steps: I.Play.Run, music: Maybe<M.Stream>) ->
   IO(Maybe<U32>):
   I.Ran{I.World{play, mem, gfx, tables, level}, sounds} = steps
   do IO<Maybe<U32>>:
     window : Window <- IO.try(Window, Window.open("Bendoom", 1280, 960))
-    music : Maybe<M.Stream> <- M.Stream.open(I.Play.songs())
     Game.loop(frames, window, Game{level, gfx, tables, play, input, False{}, now, 0n, mem, demo, music})
 
 # The window opened and the loop run for at most so many frames, from
@@ -215,9 +217,29 @@ def Game.start.go(frames: Nat, input: K.Input, demo: Maybe<D.Demo.Rec>, now: Nat
 # song, which starts as vanilla's does at the level's load and the
 # tally's start. It answers what Game.shut does.
 def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level) -> IO(Maybe<U32>):
+  map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level, music: Maybe<M.Stream>) -> IO(Maybe<U32>):
   IO.bind(I.Play.Run, Maybe<U32>, I.Play.run(script, False{}, I.Ran{I.Play.World.start(map, world), []}),
-    steps => Game.start.go(frames, input, demo, now, steps))
+    steps => Game.start.go(frames, input, demo, now, steps, music))
+
+def Game.ready(music: Maybe<M.Stream>, p: Array<U32> & G.Gfx & L.Level) ->
+  Array<U32> & G.Gfx & L.Level & Maybe<M.Stream>:
+  (mem, gfx, level) = p
+  (mem, gfx, level, music)
+
+def Game.load.graphics(+map: L.Level.Name, dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Sg.Song.Deck & C.Channel.Bank) -> IO(Array<U32> & G.Gfx & L.Level & Maybe<M.Stream>):
+  L.Name{episode, number} = map
+  (wad, deck, bank) = p
+  do IO<Array<U32> & G.Gfx & L.Level & Maybe<M.Stream>>:
+    music : Maybe<M.Stream> <- M.Stream.open((deck, bank))
+    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(episode, number, (wad, dir)))
+    return Game.ready(music, world)
+
+# Graphics and audio loaded from one WAD, before the window starts.
+def Game.load(map: L.Level.Name, p: Array<U32> & List<&2, W.Wad.Lump>) ->
+  IO(Array<U32> & G.Gfx & L.Level & Maybe<M.Stream>):
+  (wad, +dir) = p
+  Game.load.graphics(map, dir, M.Stream.read(I.Play.songs(), Sn.Sound.table(), (wad, dir)))
 
 # A number given as the first character of an argument, as d_main.c
 # reads one: its code less '0', in C's int arithmetic, which an empty

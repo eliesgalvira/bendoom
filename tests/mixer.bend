@@ -54,7 +54,7 @@ def Test.slot(c: Maybe<&2, C.Channel>) -> String:
   match c:
     case None{}:
       "-"
-    case Some{C.Chan{at, end, +sfx, source, left, right}}:
+    case Some{C.Chan{at, +sfx, source, left, right, end}}:
       Sn.Sound.lump(Sn.Sound.table(), sfx) ++ "/" ++ Sn.Sound.Source.show(source) ++ "/"
         ++ U32.show(left) ++ "," ++ U32.show(right)
 

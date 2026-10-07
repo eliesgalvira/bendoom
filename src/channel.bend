@@ -16,7 +16,7 @@ import ./wad.bend as W
 # A playing sound: the bank's frames from the one the mixer writes next
 # to the one past its last.
 type Channel is Data:
-  Chan{at: U32, end: U32, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32}
+  Chan{at: U32, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32, end: U32}
 
 # A sound of the table, by its number, and its span of the bank.
 type Channel.Sound is Data:
@@ -151,8 +151,8 @@ def Channel.hush.slot(+source: Sn.Sound.Source, c: Maybe<&2, Channel>) -> Maybe<
   match c:
     case None{}:
       None{}
-    case Some{Chan{at, end, sfx, +was, left, right}}:
-      Channel.kept(Sn.Sound.Source.same(source, was), Chan{at, end, sfx, was, left, right})
+    case Some{Chan{at, sfx, +was, left, right, end}}:
+      Channel.kept(Sn.Sound.Source.same(source, was), Chan{at, sfx, was, left, right, end})
 
 # S_StopSound: the source's channel is freed. A source holds one channel
 # at a time, so there is at most one to free.
@@ -319,7 +319,7 @@ def Channel.key(c: Maybe<&2, Channel>) -> Maybe<&2, Nat>:
   match c:
     case None{}:
       None{}
-    case Some{Chan{at, end, sfx, source, left, right}}:
+    case Some{Chan{at, sfx, source, left, right, end}}:
       Some{U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx))}
 
 def Channel.keys(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Nat>>:
@@ -338,7 +338,7 @@ def Channel.start(s: Channel.Sound, source: Sn.Sound.Source, +left: U32, +right:
   +chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   Sound{+sfx, at, end} = s
   Channel.put(chans, Channel.choice(U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx)), Channel.keys(chans)),
-    Chan{at, end, sfx, source, left, right})
+    Chan{at, sfx, source, left, right, end})
 
 # What the sim reported, played: S_StartSound's tail after the
 # audibility test, where the source's old sound is stopped and the new
@@ -363,17 +363,17 @@ def Channel.hear(+sounds: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Eve
       Channel.hear(sounds, rest, Channel.event(sounds, e, chans))
 
 def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
-  Chan{at, end, sfx, source, left, right} = c
+  Chan{at, sfx, source, left, right, end} = c
   (+vol, +sep) = p
-  Channel.kept(U32.is_zero(vol), Chan{at, end, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep)})
+  Channel.kept(U32.is_zero(vol), Chan{at, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), end})
 
 def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
   c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
       None{}
-    case Some{Chan{at, end, sfx, +source, left, right}}:
-      Channel.moved(Chan{at, end, sfx, source, left, right}, params(ctx, source))
+    case Some{Chan{at, sfx, +source, left, right, end}}:
+      Channel.moved(Chan{at, sfx, source, left, right, end}, params(ctx, source))
 
 # S_UpdateSounds follows the current listener and source positions.
 def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
