@@ -384,7 +384,13 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"BOSS", 8, False{}, 8, 274, Null{}, 0}, Row{"BOSS", 9, False{}, 8, 275, Scream{}, 0},
     Row{"BOSS", 10, False{}, 8, 276, Null{}, 0}, Row{"BOSS", 11, False{}, 8, 277, Fall{}, 0},
     Row{"BOSS", 12, False{}, 8, 278, Null{}, 0}, Row{"BOSS", 13, False{}, 8, 279, Null{}, 0},
-    Row{"BOSS", 14, False{}, 4294967295, 279, Null{}, 0}]
+    Row{"BOSS", 14, False{}, 4294967295, 279, Null{}, 0},
+    Row{"TFOG", 0, True{}, 6, 281, Null{}, 0}, Row{"TFOG", 1, True{}, 6, 282, Null{}, 0},
+    Row{"TFOG", 0, True{}, 6, 283, Null{}, 0}, Row{"TFOG", 1, True{}, 6, 284, Null{}, 0},
+    Row{"TFOG", 2, True{}, 6, 285, Null{}, 0}, Row{"TFOG", 3, True{}, 6, 286, Null{}, 0},
+    Row{"TFOG", 4, True{}, 6, 287, Null{}, 0}, Row{"TFOG", 5, True{}, 6, 288, Null{}, 0},
+    Row{"TFOG", 6, True{}, 6, 289, Null{}, 0}, Row{"TFOG", 7, True{}, 6, 290, Null{}, 0},
+    Row{"TFOG", 8, True{}, 6, 291, Null{}, 0}, Row{"TFOG", 9, True{}, 6, 4294967295, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -543,7 +549,8 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{4294967294, 181, 20, 16, 16}, Def{4294967293, 196, 6, 8, 328208}, Def{6, 239, 20, 16, 33554433},
     Def{13, 241, 20, 16, 33554433}, Def{14, 238, 20, 16, 24}, Def{34, 243, 20, 16, 0}, Def{46, 244, 16, 16, 2},
     Def{58, 67, 30, 56, 4456454}, Def{2024, 248, 20, 16, 8388609}, Def{2025, 252, 20, 16, 1},
-    Def{2026, 253, 20, 16, 8388609}, Def{2045, 259, 20, 16, 8388609}, Def{3003, 261, 24, 64, 4194310}]
+    Def{2026, 253, 20, 16, 8388609}, Def{2045, 259, 20, 16, 8388609}, Def{3003, 261, 24, 64, 4194310},
+    Def{4294967292, 280, 20, 16, 528}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -558,6 +565,10 @@ def Thing.blood() -> U32:
 
 def Thing.fireball() -> U32:
   4294967293
+
+# MT_TFOG, the teleport fog, which only a teleport spawns.
+def Thing.tfog() -> U32:
+  4294967292
 
 def Thing.Def.kind(d: Thing.Def) -> U32:
   Def{kind, state, radius, height, flags} = d
@@ -820,16 +831,19 @@ def Thing.spawn.if(player: Bool, skill: Bool, info: Maybe<&2, Thing.Def>, +level
     case _ _ _:
       s
 
+# Whether a record's options keep it on Hurt Me Plenty with one player:
+# that skill's bit, 2, set and the multiplayer bit, 16, clear.
+def Thing.spawns(+options: U32) -> Bool:
+  Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))), U32.is_zero((options .&. 16 : U32)))
+
 # Doom's P_SpawnMapThing on Hurt Me Plenty with one player: player 1's
 # start spawns the player, who draws a random number too and takes the
 # first such record's index for its name, the start
 # Level.start_of places it at; another record spawns when its options
-# set that skill's bit, 2, and not the multiplayer bit, 16, and its type
-# has a definition.
+# keep it and its type has a definition.
 def Thing.spawn.one(+level: L.Level, id: U32, record: L.Level.Thing, s: Thing.Spawn) -> Thing.Spawn:
   L.Thing{x, y, angle, +kind, +options} = record
-  Thing.spawn.if(U32.is_eq(kind, 1), Bool.and(Bool.not(U32.is_zero((options .&. 2 : U32))),
-    U32.is_zero((options .&. 16 : U32))), Thing.def(kind), level, id, x, y, angle, options, s)
+  Thing.spawn.if(U32.is_eq(kind, 1), Thing.spawns(options), Thing.def(kind), level, id, x, y, angle, options, s)
 
 def Thing.spawn.go(n: Nat, +level: L.Level, +i: U32, s: Thing.Spawn) -> Thing.Spawn:
   match n:
