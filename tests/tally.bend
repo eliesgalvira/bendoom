@@ -1,39 +1,12 @@
-# The exit's tally on E1M1 from the WAD named by BENDOOM_IWAD.
-# First what G_DoCompleted hands it: the player's kills, items and
-# secrets against the level's totals, and the time. Freedoom's E1M1
-# spawns 49 things flagged MF_COUNTITEM on Hurt Me Plenty (30 of type
-# 2014, 18 of 2015 and the berserk pack, read from its THINGS lump in
-# nushell), 29 monsters flagged MF_COUNTKILL, and 4 sectors of special
-# 9 (52, 86, 128 and 132).
-# Then the intermission tic by tic, from the state a short route beside
-# the exit switch leaves, which ends the level on tic 42. The tics are
-# wi_stuff.c's: WI_initStats leaves sp_state 1 and cnt_pause TICRATE, so
-# the pause ends and the kills begin at bcnt 35; each percentage climbs
-# by 2 a tic from -1, which reaches a target of 0 in one tic; each of
-# the four pauses lasts 35 tics; the time and the par climb by 3 a tic
-# together from -1, the time reaching 1 second at once and the par 30
-# after 11 tics, so sp_state 9 begins at bcnt 154 and the last state, 10,
-# at bcnt 189, where the tally stands until a press. M_Random's index is
-# the level's, 66 after the route's door and the switch's click, and
-# WI_initAnimatedBack draws once an animation, ten of them, at the start
-# and ten more when the next level's screen begins.
-# Then the presses, each a tic of use with a tic of none before it, as
-# WI_checkForAccelerate reads them: one while the counts climb shows
-# them all at once and leaves sp_state 10, the next leaves for the
-# screen that names E1M2 with its four seconds, the next cuts that
-# short to the ten tics of WI_initNoState, after which G_WorldDone asks
-# for E1M2. Its first tic starts at its player 1 start in the WAD, 608,
-# 48, with the inventory G_PlayerFinishLevel leaves, P_Random's index
-# carried on (which no G_InitNew clears), and S_Start's song for it,
-# D_E1M2; a death there and a held use reload E1M2 from a pistol start
-# on the next tic. The indices are regression pins. Then G_DoCompleted's
-# next map from each E1 map by each exit, the secret exit's seam on
-# E1M3, which leads to E1M9's tally, and E1M8's exit, which vanilla
-# follows with the finale and no tally, so its level holds.
-# Last a secret sector counted: the player put in sector 86, which
-# P_PlayerInSpecialSector counts on the tic it stands on its floor, then
-# walked north into the pit it rings, sector 87, and back into 86, which
-# counts no more, since the first entry cleared it.
+# Freedoom E1M1's tally and map chaining. THINGS and SECTORS supply
+# totals of 29 kills, 49 items and 4 secrets. wi_stuff.c supplies the
+# 35-tic pauses, percentage increments of 2, time increments of 3,
+# par times and episode destinations. f_wipe.c consumes 320 M_Random
+# draws per melt; s_sound.c draws once per tally sound before the next
+# screen's animation seeds when sgcock starts it.
+# The route's level RNG and inventory values are regression pins.
+# snl_pointeron's initial false value survives an arbitrary launch map;
+# WI_drawNoState sets it true for subsequent intermissions and deaths.
 import Base
 import ../src/vec.bend as V
 import ../src/fixed.bend as F
@@ -65,9 +38,9 @@ def beside() -> L.Level.Start:
 
 def line(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, map}:
+    case W.Playing{+state, map, didsecret, pointer}:
       tag ++ " level tic " ++ U32.show(S.State.clock(state)) ++ " " ++ S.Sim.Tally.show(S.Sim.tally(state))
-    case W.Showing{+wi, after, next}:
+    case W.Showing{+wi, after, trip}:
       tag ++ " " ++ W.Inter.show(wi)
 
 def told(tag: String, +play: W.Play) -> IO(W.Play):
@@ -100,9 +73,9 @@ def sound.line(events: List<&2, Sn.Sound.Event>, play: W.Play) -> String:
       ""
     case _:
       match play:
-        case W.Playing{state, map}:
+        case W.Playing{state, map, didsecret, pointer}:
           "sound level" ++ sound.events(events) ++ "\n"
-        case W.Showing{wi, after, next}:
+        case W.Showing{wi, after, trip}:
           "sound bcnt " ++ U32.show(W.Inter.bcnt(wi)) ++ sound.events(events) ++ "\n"
 
 def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) -> String:
@@ -132,13 +105,13 @@ def tics(gaps: List<&2, U32>, +level: L.Level, +at: U32, play: W.Play) -> IO(W.P
           run(U32.to_nat(gap), level, play))
         tics(rest, level, (at + gap : U32), shown)
 
-# Where the player stands, the special of the sector under it, whether
-# that sector's secret is still to count, and how many it has counted.
+# The player's place and original sector special, live secret eligibility
+# and discoveries.
 def secret.line(tag: String, +level: L.Level, +s: S.State, +p: S.Player, +sector: U32) -> String:
   tag ++ " tic " ++ U32.show(S.State.clock(s)) ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " "
     ++ F.Fixed.show(S.Player.y(p)) ++ " sector " ++ U32.show(sector) ++ " special "
     ++ U32.show(L.Level.sector.special(level, sector)) ++ " left "
-    ++ U32.show(V.Vec.get(S.State.secrets(s), sector)) ++ " counted "
+    ++ U32.show(Bool.to_u32(U32.is_eq(L.Level.sector.special(S.State.level(s), sector), 9))) ++ " counted "
     ++ U32.show(I.Inventory.secrets(S.Player.inv(p)))
 
 def secret.at(tag: String, +level: L.Level, +s: S.State, +p: S.Player) -> String:
@@ -160,7 +133,7 @@ def back() -> List<&2, K.Cmd>:
 
 def initial(+level: L.Level) -> W.Play:
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
-  W.Play.after(L.Name{1, 1}, took)
+  W.Play.after(False{}, L.Name{1, 1}, False{}, took)
 
 def summary(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
@@ -181,39 +154,88 @@ def marker(m: Maybe<&2, L.Level.Name>) -> String:
 # carries and the random index; or the map the tally leads to.
 def on(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, L.Name{episode, map}}:
+    case W.Playing{+state, L.Name{episode, map}, didsecret, pointer}:
       +p = S.State.player(state)
       tag ++ " " ++ L.Level.marker(episode, map) ++ " tic " ++ U32.show(S.State.clock(state)) ++ " at "
         ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " "
-        ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state))
-    case W.Showing{wi, after, next}:
-      tag ++ " tally for " ++ marker(Some{next})
+        ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state)) ++ " didsecret "
+        ++ Bool.show(didsecret)
+    case W.Showing{+wi, after, W.Trip{L.Name{e, last}, L.Name{f, next}, didsecret}}:
+      tag ++ " tally for " ++ L.Level.marker(f, next) ++ " from " ++ L.Level.marker(e, last) ++ " par "
+        ++ U32.show(V.Vec.get(W.Inter.target(wi), W.Inter.parat())) ++ " didsecret " ++ Bool.show(didsecret)
 
 def killed(play: W.Play) -> W.Play:
   match play:
-    case W.Playing{+state, map}:
-      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map}
+    case W.Playing{+state, map, didsecret, pointer}:
+      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map,
+        didsecret, pointer}
     case other:
       other
 
-# E1M2 from the WAD after the tally: its first tic, and a death there
-# with use held seven tics, then a tic of none.
-def arrived.gl(play: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
-  (gfx, +next) = gl
-  +entered = W.Play.Step.play(W.Play.step(next, K.Cmd.idle(), False{}, W.Play.enter(next, play)))
-  do IO<Unit>:
-    IO.print(on("entered", entered) ++ " song " ++ W.Play.song(entered))
-    IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
-      killed(entered))))
+# A thing taken as P_TouchSpecialThing takes it, counted as an item or
+# not.
+def picked(kind: U32, counted: Bool, +inv: I.Inventory) -> I.Inventory:
+  I.Inventory.took(counted, Maybe.default(&2, I.Inventory, I.Inventory.grant(kind, False{}, inv), inv))
 
-def arrived(play: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+def armed.of(+s: S.State, +p: S.Player) -> S.State:
+  S.State.player.put(s, S.Player.holding(p, picked(2024, True{}, picked(5, False{}, picked(2013, True{},
+    picked(2018, False{}, picked(2049, False{}, picked(2001, False{}, S.Player.inv(p)))))))))
+
+# The player beside the switch with a shotgun, a box of shells, green
+# armour, a soul sphere, the blue card and invisibility.
+def armed(+level: L.Level) -> S.State:
+  +s = Tic.State.at(level, beside())
+  armed.of(s, S.State.player(s))
+
+def weapon(+inv: I.Inventory) -> String:
+  " ready " ++ U32.show(I.Inventory.ready(inv)) ++ " pending " ++ U32.show(I.Inventory.pending(inv))
+
+def carries(tag: String, play: W.Play) -> String:
+  match play:
+    case W.Playing{+state, L.Name{episode, map}, didsecret, pointer}:
+      +inv = S.Player.inv(S.State.player(state))
+      tag ++ " " ++ L.Level.marker(episode, map) ++ " " ++ I.Inventory.show(inv) ++ weapon(inv)
+    case W.Showing{wi, +after, trip}:
+      +inv = S.Player.inv(S.State.player(after))
+      tag ++ " tally " ++ I.Inventory.show(inv) ++ weapon(inv)
+
+# G_DoWorldDone on the map the tally names, as loaded, then a tic.
+def entered(+level: L.Level, play: W.Play) -> W.Play:
+  match play:
+    case W.Showing{wi, after, trip}:
+      W.Play.Step.play(W.Play.step(level, K.Cmd.idle(), False{}, W.Play.enter(level, wi, after, trip)))
+    case playing:
+      playing
+
+# E1M2 from the WAD after the tally: its first tic, and a death there
+# with use held seven tics, then a tic of none; then the armed player's
+# exit and first tic there.
+def arrived.gl(play: W.Play, +carrying: W.Play, gl: G.Gfx & L.Level) -> IO(Unit):
+  (gfx, +next) = gl
+  +arrival = entered(next, play)
+  do IO<Unit>:
+    IO.print(on("entered", arrival) ++ " song " ++ W.Play.song(arrival))
+    IO.print(on("reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), next,
+      killed(arrival))))
+    IO.print(carries("carrying", carrying))
+    IO.print(carries("carried", entered(next, carrying)))
+
+def arrived(play: W.Play, carrying: W.Play, opened: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = opened
-  arrived.gl(play, gl)
+  arrived.gl(play, carrying, gl)
+
+# The map G_WorldDone asks for once the tally is over.
+def wants(play: W.Play) -> String:
+  match play:
+    case W.Showing{+wi, after, W.Trip{last, L.Name{episode, map}, didsecret}}:
+      Bool.pick(String, W.Inter.over(wi), L.Level.marker(episode, map), "none")
+    case _:
+      "none"
 
 # The tally, and the map it asks to load.
 def asked(tag: String, +play: W.Play) -> IO(W.Play):
   do IO<W.Play>:
-    IO.print(line(tag, play) ++ " wants " ++ marker(W.Play.wants(play)))
+    IO.print(line(tag, play) ++ " wants " ++ wants(play))
     return play
 
 def intermission(+level: L.Level) -> IO(Unit):
@@ -226,7 +248,7 @@ def intermission(+level: L.Level) -> IO(Unit):
     p5 : W.Play <- asked("nine tics on", run(9n, level, p4))
     p6 : W.Play <- asked("ten tics on", run(1n, level, p5))
     opened : Array<U32> & G.Gfx & L.Level <- W.Play.open(L.Name{1, 2})
-    arrived(p6, opened)
+    arrived(p6, W.Play.after(False{}, L.Name{1, 1}, False{}, Tic.Sim.replay(route(), armed(level))), opened)
 
 # G_DoCompleted's next map from each map of episode 1, by a normal exit
 # and by a secret one.
@@ -235,16 +257,32 @@ def nexts.go(n: Nat, +map: U32) -> String:
     case 0n:
       ""
     case 1n+m:
-      L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(False{}, L.Name{1, map})) ++ " "
-        ++ marker(W.Play.next(True{}, L.Name{1, map})) ++ "\n" ++ nexts.go(m, (map + 1 : U32))
+      L.Level.marker(1, map) ++ " " ++ marker(W.Play.next(S.Ended{False{}}, L.Name{1, map})) ++ " "
+        ++ marker(W.Play.next(S.Ended{True{}}, L.Name{1, map})) ++ " par " ++ U32.show(W.Inter.par(map)) ++ "\n"
+        ++ nexts.go(m, (map + 1 : U32))
 
 # The seam the secret exit line fires: E1M3 ended by a secret exit shows
-# the tally for E1M9, and E1M8 ended by the exit holds its level.
+# the tally for E1M9, and E1M8 ended by the exit holds its level. Then
+# didsecret, the player's flag that E1M9 is done, which G_DoCompleted
+# sets on leaving E1M9 and the map screen reads after each map on.
 def seams(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(L.Name{1, 3}, Sp.State.end(S.Secret{}, took))))
-    IO.print(on("E1M8 normal", W.Play.after(L.Name{1, 8}, took)))
+    IO.print(nexts.go(9n, 1) ++ on("E1M3 secret", W.Play.after(False{}, L.Name{1, 3}, False{}, Sp.State.end(True{}, took))))
+    IO.print(on("E1M8 normal", W.Play.after(False{}, L.Name{1, 8}, False{}, took)))
+    IO.print(on("E1M9 normal", W.Play.after(False{}, L.Name{1, 9}, False{}, took)))
+    IO.print(on("E1M4 normal", W.Play.after(False{}, L.Name{1, 4}, True{}, took)))
+
+# A tic keeps didsecret, and G_PlayerReborn clears it once a death asks
+# for the level again.
+def done(+level: L.Level) -> W.Play:
+  W.Playing{Tic.State.at(level, beside()), L.Name{1, 4}, True{}, False{}}
+
+def didsecret(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    IO.print(on("E1M4 a tic", replayed(idle(1n), level, done(level))))
+    IO.print(on("E1M4 reborn", replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), level,
+      killed(done(level)))))
 
 def soundcheck(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -253,22 +291,129 @@ def soundcheck(+level: L.Level) -> IO(Unit):
       ++ sounds(held(1n, 0, 0, 0, True{}), level, p1, ""))
     return Unit{}
 
+def secret.original(level: L.Level) -> S.State:
+  Tic.State.at(level, L.Start{F.Fixed.of_map(400), F.Fixed.of_map(2040), A.Angle.of_thing(270)})
+
 def secrets(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    s0 : S.State <- secret("in the secret", level, Tic.State.at(level, L.Start{F.Fixed.of_map(400),
-      F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
+    s0 : S.State <- secret("in the secret", level, secret.original(level))
     s1 : S.State <- secret("stood a tic", level, Tic.Sim.tic(K.Cmd.idle(), s0))
     s2 : S.State <- secret("out south", level, Tic.Sim.replay(out(), s1))
     s3 : S.State <- secret("back north", level, Tic.Sim.replay(back(), s2))
     return Unit{}
 
+# p_spec.c counts initial special 9 in P_SpawnSpecials, then discovers
+# only live special 9 at floor height and clears it. p_floor.c's special
+# copies and p_plats.c's clears never change that initial total.
+def secret.changed(+special: U32, +s: S.State) -> S.State:
+  +level = S.State.level(s)
+  +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
+  Sp.Sim.floor.change(sector, L.Level.floorpic(level, sector), special, s)
+
+def secret.tally.of(t: S.Sim.Tally) -> String:
+  S.Tally{kills, items, secrets, maxkills, maxitems, maxsecret, time} = t
+  U32.show(secrets) ++ "/" ++ U32.show(maxsecret)
+
+def secret.tally(tag: String, +s: S.State) -> String:
+  tag ++ " secrets " ++ secret.tally.of(S.Sim.tally(s)) ++ " special "
+    ++ U32.show(L.Level.sector.special(S.State.level(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))))
+
+def secret.copied(level: L.Level) -> S.State:
+  Sp.Sim.sector.secret(secret.changed(9,
+    Tic.State.at(level, L.Start{F.Fixed.of_map(400), F.Fixed.of_map(1936), A.Angle.of_thing(270)})))
+
+def secret.recopied(n: Nat, s: S.State) -> S.State:
+  match n:
+    case 0n:
+      s
+    case 1n+m:
+      secret.recopied(m, Sp.Sim.sector.secret(secret.changed(9, s)))
+
+def secret.airborne(+s: S.State) -> S.State:
+  +level = S.State.level(s)
+  +p = S.State.player(s)
+  +sector = L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))
+  Sp.Sim.sector.secret(S.State.player.put(s, S.Player.at.fin(S.Player.x(p), S.Player.y(p), S.Player.angle(p),
+    (L.Level.floor(level, sector) + F.Fixed.unit() : U32), L.Level.ceil(level, sector), S.Player.inv(p))))
+
+def secret.totals(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    IO.print(secret.tally("cleared", Sp.Sim.sector.secret(secret.changed(0, secret.original(level)))))
+    IO.print(secret.tally("found", Sp.Sim.sector.secret(secret.original(level))))
+    IO.print(secret.tally("found again", Sp.Sim.sector.secret(Sp.Sim.sector.secret(secret.original(level)))))
+    IO.print(secret.tally("copied", secret.copied(level)))
+    IO.print(secret.tally("copied again", Sp.Sim.sector.secret(secret.changed(9, secret.copied(level)))))
+    IO.print(secret.tally("copies exceed total", secret.recopied(4n, secret.copied(level))))
+    IO.print(secret.tally("airborne", secret.airborne(secret.original(level))))
+
+# WI_checkForAccelerate permits a new attack while use stays held,
+# then a new use while attack stays held; neither held button repeats.
+def buttons() -> String:
+  +wi = W.Inter.start(S.Tally{0, 0, 0, 1, 1, 1, 0}, 30, 0, W.Inter.buttons(False{}, True{}))
+  +both = W.Inter.tic(W.Inter.buttons(True{}, True{}), wi)
+  +attack = W.Inter.tic(W.Inter.buttons(True{}, False{}), both)
+  "buttons " ++ Bool.show(W.Inter.pressed(3, wi)) ++ " " ++ Bool.show(W.Inter.pressed(3, both))
+    ++ " " ++ Bool.show(W.Inter.pressed(1, both)) ++ " " ++ Bool.show(W.Inter.pressed(3, attack))
+    ++ " down " ++ Bool.show(W.Inter.attackdown(attack)) ++ " " ++ Bool.show(W.Inter.usedown(attack))
+
+def pointer(play: W.Play) -> Bool:
+  match play:
+    case W.Playing{state, map, didsecret, pointer}:
+      pointer
+    case W.Showing{wi, after, trip}:
+      W.Inter.pointer(wi)
+
+def exited(play: W.Play) -> W.Play:
+  match play:
+    case W.Playing{state, map, didsecret, pointer}:
+      W.Play.after(pointer, map, didsecret, Sp.State.end(False{}, state))
+    case showing:
+      showing
+
+def pointers(+level: L.Level) -> String:
+  +first = press(level, press(level, exited(W.Play.start(level, L.Name{1, 5}))))
+  +firston = pointer(first)
+  +ticon = pointer(run(1n, level, first))
+  +last = press(level, first)
+  +laston = pointer(last)
+  +arrival = entered(level, last)
+  +nexton = pointer(press(level, press(level, exited(arrival))))
+  +reborn = replayed(List.append(&2, K.Cmd, held(7n, 0, 0, 0, True{}), idle(1n)), level, killed(arrival))
+  "pointer first " ++ Bool.show(firston) ++ " tic1 " ++ Bool.show(ticon)
+    ++ " last " ++ Bool.show(laston) ++ " next " ++ Bool.show(nexton)
+    ++ " reborn " ++ Bool.show(pointer(press(level, press(level, exited(reborn)))))
+
+# D_DoomLoop's first command and D_RunFrame's next command precede
+# wipe_initMelt; the third ST_Ticker reads random table index67.
+def startup.melt(+level: L.Level) -> String:
+  +first = Tic.Sim.tic(K.Cmd.idle(), Tic.State.start(level))
+  +one = S.State.mrnd(first)
+  +second = Tic.Sim.tic(K.Cmd.idle(), first)
+  +two = S.State.mrnd(second)
+  +third = Tic.Sim.tic(K.Cmd.idle(), second)
+  "startup draws " ++ U32.show(one) ++ " " ++ U32.show(two) ++ " " ++ U32.show(S.State.mrnd(third))
+
+def random.draws() -> String:
+  +start = W.Inter.start(S.Tally{0, 0, 0, 1, 1, 1, 0}, 30, 0, 0)
+  +skip = W.Inter.tic(1, start)
+  +next = W.Inter.tic(1, W.Inter.tic(0, skip))
+  "draws seeds " ++ U32.show(W.Inter.mrnd(start)) ++ " skip " ++ U32.show(W.Inter.mrnd(skip))
+    ++ " next " ++ U32.show(W.Inter.mrnd(next))
+
 def play(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
     summary(level)
+    IO.print(startup.melt(level))
     intermission(level)
     seams(level)
+    didsecret(level)
     soundcheck(level)
     secrets(level)
+    secret.totals(level)
+    IO.print(buttons())
+    IO.print(pointers(level))
+    IO.print(random.draws())
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
@@ -281,41 +426,48 @@ def main() -> IO(Unit):
     start(world)
 #|start kills 0/29 items 0/49 secrets 0/4 time 0
 #|exit kills 0/29 items 0/49 secrets 0/4 time 7 ended normal random 73
+#|startup draws 1 66 67
 #|bcnt 0 count 1 cnt 35 bcnt 0 shown - - - - - anims - - - - - - - - - - random 83
-#|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - 0 - - - - - - - 0 random 83
-#|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 0 2 2 2 2 2 2 2 0 random 83
-#|bcnt 35 count 2 cnt 35 bcnt 35 shown - - - - - anims 2 0 2 2 2 2 0 2 2 0 random 83
-#|bcnt 36 count 3 cnt 35 bcnt 36 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 83
-#|bcnt 71 count 4 cnt 35 bcnt 71 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 83
-#|bcnt 72 count 5 cnt 35 bcnt 72 shown 0 0 - - - anims 0 0 0 2 2 0 0 2 2 0 random 83
-#|bcnt 107 count 6 cnt 35 bcnt 107 shown 0 0 - - - anims 0 0 0 0 2 0 0 2 0 0 random 83
-#|bcnt 108 count 7 cnt 35 bcnt 108 shown 0 0 0 - - anims 0 0 0 0 2 0 0 2 0 0 random 83
-#|bcnt 143 count 8 cnt 35 bcnt 143 shown 0 0 0 - - anims 0 0 0 0 0 0 0 0 0 0 random 83
-#|bcnt 144 count 8 cnt 35 bcnt 144 shown 0 0 0 0 2 anims 0 1 0 0 0 0 0 0 0 1 random 83
-#|bcnt 145 count 8 cnt 35 bcnt 145 shown 0 0 0 0 5 anims 0 1 0 0 0 0 1 0 0 1 random 83
-#|bcnt 154 count 9 cnt 35 bcnt 154 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 83
-#|bcnt 155 count 9 cnt 34 bcnt 155 shown 0 0 0 0 30 anims 1 2 1 1 1 1 1 1 1 2 random 83
-#|bcnt 189 count 10 cnt 35 bcnt 189 shown 0 0 0 0 30 anims 1 2 1 1 1 1 2 1 1 2 random 83
-#|bcnt 190 count 10 cnt 35 bcnt 190 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 83
-#|bcnt 191 count 10 cnt 35 bcnt 191 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 83
-#|jumped count 10 cnt 30 bcnt 42 shown 0 0 0 0 30 anims 0 0 0 0 2 0 0 2 0 0 random 83
-#|next next cnt 140 bcnt 44 shown 0 0 0 0 30 anims - - - - - - - - - - random 93
-#|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 93
-#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 1 2 2 2 2 2 1 1 1 1 random 93 wants none
-#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 1 2 2 2 2 2 2 2 2 1 random 93 wants E1M2
-#|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 3 song D_E1M2
-#|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 199
-#|E1M1 E1M2 E1M9
-#|E1M2 E1M3 E1M9
-#|E1M3 E1M4 E1M9
-#|E1M4 E1M5 E1M9
-#|E1M5 E1M6 E1M9
-#|E1M6 E1M7 E1M9
-#|E1M7 E1M8 E1M9
-#|E1M8 none none
-#|E1M9 E1M4 E1M9
-#|E1M3 secret tally for E1M9
-#|E1M8 normal E1M8 tic 7 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 67
+#|bcnt 1 count 1 cnt 34 bcnt 1 shown - - - - - anims - 0 - - - - - - - 0 random 147
+#|bcnt 34 count 1 cnt 1 bcnt 34 shown - - - - - anims 2 0 2 2 2 2 2 2 2 0 random 147
+#|bcnt 35 count 2 cnt 35 bcnt 35 shown - - - - - anims 2 0 2 2 2 2 0 2 2 0 random 147
+#|bcnt 36 count 3 cnt 35 bcnt 36 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 149
+#|bcnt 71 count 4 cnt 35 bcnt 71 shown 0 - - - - anims 0 0 2 2 2 2 0 2 2 0 random 149
+#|bcnt 72 count 5 cnt 35 bcnt 72 shown 0 0 - - - anims 0 0 0 2 2 0 0 2 2 0 random 151
+#|bcnt 107 count 6 cnt 35 bcnt 107 shown 0 0 - - - anims 0 0 0 0 2 0 0 2 0 0 random 151
+#|bcnt 108 count 7 cnt 35 bcnt 108 shown 0 0 0 - - anims 0 0 0 0 2 0 0 2 0 0 random 153
+#|bcnt 143 count 8 cnt 35 bcnt 143 shown 0 0 0 - - anims 0 0 0 0 0 0 0 0 0 0 random 153
+#|bcnt 144 count 8 cnt 35 bcnt 144 shown 0 0 0 0 2 anims 0 1 0 0 0 0 0 0 0 1 random 154
+#|bcnt 145 count 8 cnt 35 bcnt 145 shown 0 0 0 0 5 anims 0 1 0 0 0 0 1 0 0 1 random 154
+#|bcnt 154 count 9 cnt 35 bcnt 154 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 157
+#|bcnt 155 count 9 cnt 34 bcnt 155 shown 0 0 0 0 30 anims 1 2 1 1 1 1 1 1 1 2 random 157
+#|bcnt 189 count 10 cnt 35 bcnt 189 shown 0 0 0 0 30 anims 1 2 1 1 1 1 2 1 1 2 random 157
+#|bcnt 190 count 10 cnt 35 bcnt 190 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 157
+#|bcnt 191 count 10 cnt 35 bcnt 191 shown 0 0 0 0 30 anims 2 2 1 1 1 1 2 1 1 2 random 157
+#|jumped count 10 cnt 30 bcnt 42 shown 0 0 0 0 30 anims 0 0 0 0 2 0 0 2 0 0 random 150
+#|next next cnt 140 bcnt 44 shown 0 0 0 0 30 anims - - - - - - - - - - random 161
+#|cut short done cnt 10 bcnt 66 shown 0 0 0 0 30 anims 1 1 1 1 1 1 1 1 1 1 random 161
+#|nine tics on done cnt 1 bcnt 75 shown 0 0 0 0 30 anims 2 2 2 2 1 2 2 2 2 2 random 161 wants none
+#|ten tics on done cnt 0 bcnt 76 shown 0 0 0 0 30 anims 2 2 2 2 2 2 2 2 2 2 random 161 wants E1M2
+#|entered E1M2 tic 1 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 3 didsecret False song D_E1M2
+#|reborn E1M2 tic 7 at 608.000000 48.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 199 didsecret False
+#|carrying tally inventory health 200 armour 100 type 1 cards 1 ammo 50 28 0 0 caps 200 50 300 50 backpack False weapons 7 powers 0 0 2093 0 0 0 items 2 flash 11 ready 1 pending 2
+#|carried E1M2 inventory health 200 armour 100 type 1 cards 0 ammo 50 28 0 0 caps 200 50 300 50 backpack False weapons 7 powers 0 0 0 0 0 0 items 0 flash 0 ready 1 pending 255
+#|E1M1 E1M2 E1M9 par 30
+#|E1M2 E1M3 E1M9 par 75
+#|E1M3 E1M4 E1M9 par 120
+#|E1M4 E1M5 E1M9 par 90
+#|E1M5 E1M6 E1M9 par 165
+#|E1M6 E1M7 E1M9 par 180
+#|E1M7 E1M8 E1M9 par 180
+#|E1M8 none none par 30
+#|E1M9 E1M4 E1M9 par 165
+#|E1M3 secret tally for E1M9 from E1M3 par 120 didsecret False
+#|E1M8 normal E1M8 tic 7 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 67 didsecret False
+#|E1M9 normal tally for E1M4 from E1M9 par 165 didsecret True
+#|E1M4 normal tally for E1M5 from E1M4 par 90 didsecret True
+#|E1M4 a tic E1M4 tic 1 at -363.000000 1316.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 61 didsecret True
+#|E1M4 reborn E1M4 tic 7 at -416.000000 256.000000 inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 random 126 didsecret False
 #|sound bcnt 36 DSPISTOL from nobody vol 64 sep 128 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 41 DSBAREXP from nobody vol 64 sep 128
 #|sound bcnt 192 DSSGCOCK from nobody vol 64 sep 128
@@ -324,3 +476,15 @@ def main() -> IO(Unit):
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1
 #|out south tic 24 at 400.037475 1935.800521 sector 87 special 0 left 0 counted 1
 #|back north tic 48 at 400.011810 1994.541183 sector 86 special 9 left 0 counted 1
+#|cleared secrets 0/4 special 0
+#|found secrets 1/4 special 0
+#|found again secrets 1/4 special 0
+#|copied secrets 1/4 special 0
+#|copied again secrets 2/4 special 0
+#|copies exceed total secrets 5/4 special 0
+#|airborne secrets 0/4 special 9
+
+#|buttons True False False True down True False
+
+#|pointer first False tic1 True last True next True reborn True
+#|draws seeds 10 skip 75 next 86

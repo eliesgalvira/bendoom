@@ -171,11 +171,11 @@
 # ride them, as solids says; and the blue key door refuses a use, a blue card is taken
 # and the door then opens, in one replay, as locked says.
 # Every run prints, before its own line, a line for each sound its tics
-# started or stopped, under the clock after the tic, and each case ends
-# with M_Random's index, 64 after the wipe, one more for each tic, which
-# is ST_Ticker's own draw for the face, and one more for each start but
-# the item pickup's (the shell box cases draw once for the closet
-# door, opened before their first run). Which sound, from whom and on which tic is read
+# started or stopped, under the clock after the tic. M_Random draws
+# once per ST_Ticker, 320 times after the second startup command, and
+# once per sound pitch except item pickups. The shell box cases draw
+# once for the closet door, opened before their first run. Which sound,
+# from whom and on which tic is read
 # from where Chocolate Doom calls S_StartSound: EV_VerticalDoor's
 # sfx_doropn on the use, T_VerticalDoor's sfx_dorcls as the wait ends
 # (tic 253) and sfx_doropn again as the door meets the player (tic 288)
@@ -235,8 +235,8 @@
 # which is st_randomnumber % 3 of the tic's own M_Random draw, 3 for a
 # turn right, 4 for a turn left, 5 for the ouch face, 6 for the evil
 # grin, 7 for the rampage face, and 41 for ST_DEADFACE. Each line
-# carries the M_Random index the tic's draw left, so every glance below
-# is rndtable read in nushell at that index, remainder 3: 197 at 65 and
+# carries M_Random's index after the command and any melt; every glance
+# is rndtable read in nushell at that index, remainder 3: 8 at 1 and
 # 92 at 99 give 2, 249 at 82 and 171 at 124 give 0, 145 at 101 and 61 at
 # 137 give 1. The nukage's first blow lands on the
 # tic the level begins, when the health ST_Ticker saw last is still -1,
@@ -482,8 +482,8 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -607,12 +607,12 @@ def opens(+open: S.State) -> IO(Unit):
 # where it now stands, as P_UnsetThingPosition and P_SetThingPosition
 # relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
   S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}, I.Inventory.start()), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd, reborn, secrets}
+    sounds, mrnd, reborn, totalsecret}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -672,8 +672,16 @@ def carry(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, +id: U32, s: 
     IO.print(Run.log(r) ++ watch(tag, sectors, q) ++ bounded(H.Things.get(S.State.things(q), id)))
     return q
 
+def patch.byte.put(+at: U32, b: U32, p: Array<U32> & U32) -> Array<U32>:
+  (a, +word) = p
+  +shift = U32.to_nat(((at .&. 3 : U32) * 8 : U32))
+  Array.set(U32, a, (at >> 2n : U32), ((word - (word .&. (255 << shift))) .|. (b << shift) : U32))
+
+def patch.byte(a: Array<U32>, +at: U32, b: U32) -> Array<U32>:
+  patch.byte.put(at, b, a[(at >> 2n : U32)])
+
 def patch.word(a: Array<U32>, +at: U32, +w: U32) -> Array<U32>:
-  Array.set(U32, Array.set(U32, a, at, (w .&. 255 : U32)), (at + 1 : U32), (w >> 8n : U32))
+  patch.byte(patch.byte(a, at, (w .&. 255 : U32)), (at + 1 : U32), (w >> 8n : U32))
 
 # THINGS record i made a thing of a type at (x, y) in map units, on
 # every skill, in the WAD's bytes, whose E1M1 THINGS lump starts at pos.
@@ -1265,9 +1273,9 @@ def dying(+level: L.Level) -> IO(Unit):
     IO.print("-")
 
 def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
-    clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # A state in the one-sector room, Level.room: the player at rest
 # at the origin facing east with some health, the random index a blow's
@@ -1303,9 +1311,9 @@ def blows() -> IO(Unit):
 # it here.
 def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
   S.State{S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The player killed on the spot by a blow from nobody.
 def killed(+s: S.State) -> S.State:
@@ -2527,11 +2535,11 @@ def main() -> IO(Unit):
 #|live slide tic 20 626.112716 992.000000 180.000 z -128.000000 floor -128.000000 eye 40.976486
 #|  inventory health 100 armour 0 type 0 cards 0 ammo 60 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0 things 208 taken 140 message 9 "Picked up a clip." tics 128
 #|-
-#|face tic 1 index 2 health 100 drew 65
+#|face tic 1 index 2 health 100 drew 1
 #|face tic 18 index 0 health 100 drew 82
 #|face tic 35 index 2 health 100 drew 99
 #|glance tic 60 index 2 count 8 health 100 sounds drew to 124
-#|face tic 1 index 5 health 95 drew 65
+#|face tic 1 index 5 health 95 drew 1
 #|face tic 36 index 2 health 90 drew 109
 #|face tic 53 index 1 health 90 drew 126
 #|face tic 65 index 7 health 85 drew 139
@@ -2552,14 +2560,14 @@ def main() -> IO(Unit):
 #|shotgun guy hit tic 61 index 15 count 34 health 73 sounds drew to 128
 #|face tic 34 index 6 health 100 drew 102
 #|chainsaw grin tic 37 index 6 count 66 health 100 sounds drew to 105
-#|face tic 1 index 2 health 100 drew 65
+#|face tic 1 index 2 health 100 drew 1
 #|face tic 18 index 0 health 100 drew 82
 #|face tic 35 index 1 health 100 drew 101
 #|face tic 52 index 2 health 100 drew 119
 #|face tic 69 index 1 health 100 drew 137
 #|face tic 71 index 7 health 100 drew 139
 #|held fire tic 90 index 7 count 0 health 100 sounds drew to 160
-#|face tic 1 index 2 health 100 drew 65
+#|face tic 1 index 2 health 100 drew 1
 #|face tic 18 index 0 health 100 drew 82
 #|face tic 35 index 1 health 100 drew 101
 #|face tic 52 index 2 health 100 drew 119

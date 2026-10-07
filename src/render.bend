@@ -135,7 +135,7 @@ def Render.frame(tables: P.Project.Tables, +gfx: G.Gfx, +s: S.State, messages: B
   +palette = Render.palette(S.State.player(s))
   Render.paletted(palette, Render.hud(messages, gfx, S.State.message(s), S.State.msgtics(s),
     Y.Bar.draw(S.Player.inv(S.State.player(s)), S.Player.ready(S.State.player(s)),
-      S.Sim.Face.index(S.State.face(s)), S.Sim.Face.armed(S.State.face(s)), gfx,
+      S.Sim.Face.index(S.State.face(s)), S.Sim.Face.startweapons(S.State.face(s)), gfx,
       Render.view(Render.eye(tables, S.State.player(s)), S.State.level(s),
         G.Gfx.of_state(gfx, S.State.sidetex(s), S.State.clock(s)), H.Things.shown(S.State.things(s)),
         S.State.player(s), mem))))
