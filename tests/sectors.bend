@@ -10,12 +10,15 @@
 # or down ends, as it is turned back, and as it grinds. Every expected
 # value is worked by hand from vanilla's source, as each case says.
 import Base
+import ../src/keys.bend as K
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/sim.bend as S
 import ../src/special.bend as Sp
+import ../src/tic.bend as Tic
 import ../src/sound.bend as Sn
+import ../src/inventory.bend as I
 import ./fixtures/closed.bend as Fx
 
 def line(~seen: S.State -> String, tag: String, +s: S.State) -> String:
@@ -39,6 +42,8 @@ def steps(ss: List<&2, S.Sim.Step>) -> String:
       Bool.pick(String, down, " down to ", " up to ") ++ F.Fixed.show(dest) ++ steps(rest)
     case S.Hold{tics} <> rest:
       " hold " ++ U32.show(tics) ++ steps(rest)
+    case S.Change{flat, special} <> rest:
+      " change to " ++ U32.show(flat) ++ " " ++ U32.show(special) ++ steps(rest)
 
 def noise(n: S.Sim.Noise) -> String:
   S.Noise{start, wake, up, down, crush, grind} = n
@@ -50,7 +55,7 @@ def thinker(t: S.Thinker) -> String:
     case S.Mover{sector, ceiling, speed, ss, plan, n}:
       "mover sector " ++ U32.show(sector) ++ Bool.pick(String, ceiling, " ceiling", " floor") ++ " speed "
         ++ F.Fixed.show(speed) ++ " steps" ++ steps(ss) ++ " plan" ++ steps(plan) ++ noise(n)
-    case S.Button{side, slot, texture, tics}:
+    case S.Button{side, slot, texture, tics, index}:
       "button side " ++ U32.show(side) ++ " slot " ++ U32.show(slot) ++ " texture " ++ U32.show(texture)
         ++ " tics " ++ U32.show(tics)
     case S.Blink{sector, count, dark, bright, darktime, brighttime, random}:
@@ -112,6 +117,12 @@ def m_random(s: S.State) -> String:
 def p_random(s: S.State) -> String:
   " p_random " ++ U32.show(S.State.rnd(s))
 
+def spawned(s: S.State) -> String:
+  S.State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  " light " ++ U32.show(L.Level.sector.light(level, 1)) ++ " p_random " ++ U32.show(rnd) ++
+    " sector_special " ++ U32.show(L.Level.sector.special(level, 1))
+
+
 # The player's place, facing, momentum, heights and eye, and whether the
 # rest of it is as it began: no line crossed, G_PlayerReborn's inventory,
 # no weapon sprite showing and the mobj unhurt.
@@ -161,6 +172,25 @@ def blazing() -> IO(Unit):
     watch(~ceiling, "blazing door", [7n, 1n, 150n, 1n, 7n, 1n], Fx.Closed.used(0n, Fx.Closed.east()))
     watch(~running, "blazing door", [], Fx.Closed.used(167n, Fx.Closed.east()))
 
+# vld_close30ThenOpen, as EV_DoDoor begins it for specials 16 and 76, on
+# the door open at 68 beside the west room's player at (32, 64): it
+# closes from where it stands, sfx_dorcls, 21, as it starts, 66 after
+# tic 1 and 0 after tic 34; tic 35 passes the floor, and the door waits
+# shut TICRATE*30, 1050 tics; the count reaches zero on tic 1085, which
+# sounds sfx_doropn, 20, and turns it up; 2 after tic 1086, 68 after
+# tic 1119, and tic 1120 passes the ceiling it started at and ends the
+# thinker.
+def closing() -> S.State:
+  +s = Fx.Closed.at(Fx.Closed.player(2097152, 4194304, 0, 8388608), L.Level.plane.put(Fx.Closed.doors(), 1, True{},
+    4456448), [], [])
+  Sp.Sim.door.close30(S.State.level(s), 1, s)
+
+def close30() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "close30", [1n, 33n, 1n, 1050n, 1n, 33n, 1n], closing())
+    watch(~sounds, "close30", [1085n], closing())
+    watch(~running, "close30", [1n], Fx.Closed.idled(1119n, closing()))
+
 # The west room's floor going down 4 a tic toward -16, with a player
 # standing on it at x.
 def carrying(x: U32) -> S.State:
@@ -184,7 +214,7 @@ def carried() -> IO(Unit):
 # both its faces at (72, 64).
 def crushing() -> S.State:
   Fx.Closed.moving(L.Level.plane.put(Fx.Closed.doors(), 1, True{}, 4456448),
-    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door()},
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door(Sn.Sound.doropn(), Sn.Sound.dorcls())},
     4718592, 4194304, 4456448)
 
 # A door that closes on the player goes back up: 56 after 6 tics; the
@@ -195,6 +225,31 @@ def crushed.door() -> IO(Unit):
   do IO<Unit>:
     watch(~ceiling, "crushed door", [1n, 1n], Fx.Closed.idled(6n, crushing()))
     watch(~running, "crushed door", [], Fx.Closed.idled(7n, crushing()))
+
+# The same door closing for 30 seconds over the player goes back up and
+# no further, T_VerticalDoor's crushed branch for vld_close30ThenOpen:
+# 56 after 6 tics, the 7th undone with its steps its plan from the
+# travel up; 58 after the 8th, 68 after the 13th, and the 14th passes
+# its top and ends it.
+def crushing30() -> S.State:
+  Fx.Closed.moving(L.Level.plane.put(Fx.Closed.doors(), 1, True{}, 4456448),
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}, S.Hold{1050}, S.Travel{False{}, 4456448}],
+      [S.Travel{True{}, 0}, S.Hold{1050}, S.Travel{False{}, 4456448}], Sp.Sim.noise.door(Sn.Sound.dorcls(), Sn.Sound.doropn())},
+    4718592, 4194304, 4456448)
+
+def crushed.close30() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "crushed close30", [1n, 1n, 5n], Fx.Closed.idled(6n, crushing30()))
+    watch(~running, "crushed close30", [7n], Fx.Closed.idled(7n, crushing30()))
+
+# EV_VerticalDoor's vld_open, special 31, used from the west room: up 2
+# a tic, 68 after tic 34, and tic 35 lands on its top and ends it; the
+# line has no special from tic 1.
+def stays.open() -> IO(Unit):
+  do IO<Unit>:
+    watch(~ceiling, "stays open", [33n, 1n], Fx.Closed.used(0n, Fx.Closed.door(31, Fx.Closed.inv([]))))
+    watch(~running, "stays open", [1n], Fx.Closed.used(33n, Fx.Closed.door(31, Fx.Closed.inv([]))))
+    watch(~special, "stays open", [], Fx.Closed.used(0n, Fx.Closed.door(31, Fx.Closed.inv([]))))
 
 # A walk-over line fires from the move that crosses it, once, and
 # special 36 is vanilla's turboLower: 4 a tic down to the highest floor
@@ -254,6 +309,60 @@ def lowered() -> IO(Unit):
     watch(~floor, "lowered", [31n], Fx.Closed.used(0n, Fx.Closed.switched(23)))
     watch(~running, "lowered", [32n], Fx.Closed.used(0n, Fx.Closed.switched(23)))
     watch(~special, "lowered", [], Fx.Closed.used(0n, Fx.Closed.switched(23)))
+
+# The switched floor of special 18, vanilla's raiseFloorToNearest: 1 a
+# tic up to the lowest floor around above its own, else to its own. The
+# rooms have none above them, so their first tic lands and ends them; the
+# door sector rises from -32 to the rooms' 0, -31 after tic 1 and 0
+# after tic 32, and tic 33 would pass it, so it lands and ends.
+def nearest() -> IO(Unit):
+  do IO<Unit>:
+    watch(~floors, "nearest", [31n], Fx.Closed.used(0n, Fx.Closed.switched(18)))
+    watch(~running, "nearest", [31n, 1n], Fx.Closed.used(0n, Fx.Closed.switched(18)))
+
+# The switched level with the west room's floor flat 5 and the door
+# sector's special 7.
+def marked(+s: S.State) -> S.State:
+  S.State.moved(S.Try{True{}, S.State.player(s), S.State.things(s)},
+    L.Level.sector.put(L.Level.sector.put(S.State.level(s), 0, 2, 5), 1, 5, 7), s)
+
+def changes.of(+level: L.Level) -> String:
+  " flats " ++ U32.show(L.Level.floorpic(level, 0)) ++ " " ++ U32.show(L.Level.floorpic(level, 1)) ++ " "
+    ++ U32.show(L.Level.floorpic(level, 2)) ++ " specials " ++ U32.show(L.Level.sector.special(level, 0)) ++ " "
+    ++ U32.show(L.Level.sector.special(level, 1)) ++ " " ++ U32.show(L.Level.sector.special(level, 2))
+
+def changes(s: S.State) -> String:
+  changes.of(S.State.level(s))
+
+# Special 20, vanilla's raiseToNearestAndChange plat: every sector of
+# the tag takes the floor flat of the switch's front, the west room's 5,
+# and special 0, at once, then rises half a unit a tic to the next floor
+# up. The door sector is -31.5 after tic 1 and 0 after tic 64, and tic
+# 65 lands it. Tic 1 sounds EV_DoPlat's sfx_stnmov, 22, in each sector,
+# the switch's click, then each plat's T_PlatRaise: sfx_stnmov, since
+# leveltime is 0, and sfx_pstop, 19, for the rooms, which land.
+def plat() -> IO(Unit):
+  do IO<Unit>:
+    watch(~changes, "plat", [], marked(Fx.Closed.switched(20)))
+    watch(~changes, "plat", [], Fx.Closed.used(0n, marked(Fx.Closed.switched(20))))
+    watch(~floors, "plat", [63n], Fx.Closed.used(0n, marked(Fx.Closed.switched(20))))
+    watch(~running, "plat", [63n, 1n], Fx.Closed.used(0n, marked(Fx.Closed.switched(20))))
+    watch(~sounds, "plat", [], Fx.Closed.used(0n, marked(Fx.Closed.switched(20))))
+
+# Special 9, vanilla's EV_DoDonut, with every sector a pillar. The west
+# room's first line is line 0, so its ring is the door sector, and the
+# ring's first line whose back is not the west room is line 0 again,
+# whose back is the ring itself: the ring rises to its own -32, which
+# lands at once and takes its own flat and special 0, and the west room
+# sinks half a unit a tic to -32. The door sector is moving by its
+# turn, so it is passed over. The east room's ring is the door sector
+# too, which starts again and lands again, and the east room sinks as
+# the west does: -0.5 after tic 1, -32 after tic 64, ended on tic 65.
+def donut() -> IO(Unit):
+  do IO<Unit>:
+    watch(~changes, "donut", [], Fx.Closed.used(0n, marked(Fx.Closed.switched(9))))
+    watch(~floors, "donut", [63n], Fx.Closed.used(0n, marked(Fx.Closed.switched(9))))
+    watch(~running, "donut", [64n], Fx.Closed.used(0n, marked(Fx.Closed.switched(9))))
 
 # The west room's floor at -32 under a ceiling at 40, rising 4 a tic
 # under a player 56 tall.
@@ -315,6 +424,68 @@ def lights() -> IO(Unit):
     watch(~light, "strobe beside 96", [1n, 34n, 1n, 4n, 1n], Fx.Closed.lit(12, 96))
     watch(~light, "strobe beside 160", [35n, 5n], Fx.Closed.idled(1n, Fx.Closed.lit(12, 160)))
     watch(~light, "glow", [6n, 1n, 1n, 5n, 1n, 1n], Fx.Closed.idled(1n, Fx.Closed.lit(8, 96)))
+    watch(~spawned, "fast strobe", [6n, 15n, 5n], Fx.Closed.lit(2, 96))
+    watch(~spawned, "slow strobe", [6n, 35n, 5n], Fx.Closed.lit(3, 96))
+    watch(~spawned, "sync fast strobe", [1n, 15n, 5n], Fx.Closed.lit(13, 96))
+
+
+def damage.seen(+s: S.State) -> String:
+  " health " ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(s)))) ++
+    " flash " ++ U32.show(S.Sim.Hurt.damage(S.Player.hurt(S.State.player(s)))) ++ p_random(s)
+
+def damage.start(suit: U32, rnd: U32) -> S.State:
+  S.State.rnd.put(rnd, S.State.player.put(Fx.Closed.west(),
+    S.Player.holding(Fx.Closed.player(2097152, 4194304, 0, 8388608),
+      I.Inventory.power(I.Inventory.pw_ironfeet(), suit, I.Inventory.start()))))
+
+# P_PlayerInSpecialSector gates damage on clock&31; suit leakage rolls even between hits.
+def damage() -> IO(Unit):
+  do IO<Unit>:
+    IO.print("20 percent" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 0, damage.start(0, 0))))
+    IO.print("between hits" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 1, damage.start(0, 0))))
+    IO.print("airborne" ++ damage.seen(Sp.Sim.sector.grounded(False{}, 16, 0, damage.start(0, 0))))
+    IO.print("suit blocks nukage" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 7, 0, damage.start(1, 0))))
+    IO.print("suit leak between hits" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 1, damage.start(1, 255))))
+    IO.print("suit leaks" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 0, damage.start(1, 255))))
+
+def light.occupied(+s: S.State) -> String:
+  +level = S.State.level(s)
+  "occupied lights " ++ U32.show(L.Level.sector.light(level, 0)) ++ " " ++
+    U32.show(L.Level.sector.light(level, 1)) ++ " " ++ U32.show(L.Level.sector.light(level, 2)) ++
+    " mover " ++ Bool.show(Sp.Sim.moving(S.State.thinkers(s), 1)) ++ special(s)
+
+def secret.exit(+s: S.State) -> String:
+  "exit " ++ S.Sim.Exit.show(S.State.ended(s)) ++ special(s) ++ seen(s)
+
+# EV_LightTurnOn ignores specialdata; P_UseSpecialLine51 changes the switch then ends secretly.
+def light.lines() -> IO(Unit):
+  do IO<Unit>:
+    IO.print(light.occupied(Sp.Sim.cross.special(35, 0,
+      Sp.Sim.door.open(Fx.Closed.doors(), 1, Fx.Closed.west()))))
+    IO.print(secret.exit(Sp.Sim.use.special(51, 0, True{}, Fx.Closed.switched(51))))
+
+# P_StartButton fills slots 0 then 1; P_UpdateSpecials clears slot 0
+# after its last tic. A still-active slot 1 cannot supply the press origin.
+def buttons.seed(s: S.State) -> S.State:
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  S.State{player, level, things, sidetex, S.Thinkers{[], [S.Button{0, 2, 1, 1, 0}, S.Button{1, 2, 1, 11, 1}]},
+    rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
+
+def buttons.gap() -> S.State:
+  Fx.Closed.idled(1n, buttons.seed(Fx.Closed.switched(46)))
+
+def buttons.seen(+s: S.State) -> String:
+  +ts = S.State.thinkers(s)
+  " origin " ++ Sn.Sound.Source.show(Sp.Sim.switch.origin(ts, S.State.level(s))) ++ " next timer " ++
+    U32.show(Sp.Sim.button.timer(ts, 1)) ++ " free " ++ U32.show(Sp.Sim.button.free(Sp.Sim.button.used(ts)))
+
+def buttons() -> IO(Unit):
+  do IO<Unit>:
+    IO.print("buttons before" ++ buttons.seen(buttons.seed(Fx.Closed.switched(46))))
+    IO.print("buttons thinkers" ++ buttons.seen(Tic.Sim.thinkers(K.Cmd.idle(), L.Level.geo(S.State.level(Fx.Closed.switched(46))), buttons.seed(Fx.Closed.switched(46)))))
+    IO.print("buttons gap" ++ buttons.seen(buttons.gap()))
+    IO.print("buttons reused" ++ buttons.seen(Sp.Sim.switch(True{}, 0, buttons.gap())))
+    IO.print("buttons reset" ++ sounds(buttons.gap()))
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -322,12 +493,21 @@ def main() -> IO(Unit):
     blazing()
     carried()
     crushed.door()
+    close30()
+    crushed.close30()
+    stays.open()
     turbo()
     lift()
     lowered()
+    nearest()
+    plat()
+    donut()
     crushed.lift()
     places()
     lights()
+    damage()
+    light.lines()
+    buttons()
 
 #|door tic 1 ceiling 2.000000
 #|door tic 33 ceiling 66.000000
@@ -358,6 +538,30 @@ def main() -> IO(Unit):
 #|crushed door tic 7 ceiling 56.000000
 #|crushed door tic 8 ceiling 58.000000
 #|crushed door tic 7 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 hold 150 down to 0.000000 plan up to 68.000000 hold 150 down to 0.000000 noise 20 21 0 0 20 0)
+#|close30 tic 0 ceiling 68.000000
+#|close30 tic 1 ceiling 66.000000
+#|close30 tic 34 ceiling 0.000000
+#|close30 tic 35 ceiling 0.000000
+#|close30 tic 1085 ceiling 0.000000
+#|close30 tic 1086 ceiling 2.000000
+#|close30 tic 1119 ceiling 68.000000
+#|close30 tic 1120 ceiling 68.000000
+#|close30 tic 0 sounds (DSDORCLS from sector 1 vol 64 sep 129)
+#|close30 tic 1085 sounds (DSDOROPN from sector 1 vol 64 sep 129)
+#|close30 tic 1119 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan down to 0.000000 hold 1050 up to 68.000000 noise 21 20 0 0 20 0)
+#|close30 tic 1120 thinkers
+#|crushed close30 tic 6 ceiling 56.000000
+#|crushed close30 tic 7 ceiling 56.000000
+#|crushed close30 tic 8 ceiling 58.000000
+#|crushed close30 tic 13 ceiling 68.000000
+#|crushed close30 tic 7 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan down to 0.000000 hold 1050 up to 68.000000 noise 21 20 0 0 20 0)
+#|crushed close30 tic 14 thinkers
+#|stays open tic 1 ceiling 2.000000
+#|stays open tic 34 ceiling 68.000000
+#|stays open tic 35 ceiling 68.000000
+#|stays open tic 34 thinkers (mover sector 1 ceiling speed 2.000000 steps up to 68.000000 plan up to 68.000000 noise 20 21 0 0 20 0)
+#|stays open tic 35 thinkers
+#|stays open tic 1 special 0
 #|turbo tic 1 floors 24.000000 12.000000 24.000000
 #|turbo tic 2 floors 24.000000 8.000000 24.000000
 #|turbo tic 3 thinkers
@@ -379,6 +583,24 @@ def main() -> IO(Unit):
 #|lowered tic 1 thinkers (mover sector 0 floor speed 1.000000 steps down to -32.000000 plan down to -32.000000 noise 0 0 19 19 0 22) (mover sector 2 floor speed 1.000000 steps down to -32.000000 plan down to -32.000000 noise 0 0 19 19 0 22)
 #|lowered tic 33 thinkers
 #|lowered tic 1 special 0
+#|nearest tic 1 floors 0.000000 -31.000000 0.000000
+#|nearest tic 32 floors 0.000000 0.000000 0.000000
+#|nearest tic 1 thinkers (mover sector 1 floor speed 1.000000 steps up to 0.000000 plan up to 0.000000 noise 0 0 19 19 0 22)
+#|nearest tic 32 thinkers (mover sector 1 floor speed 1.000000 steps up to 0.000000 plan up to 0.000000 noise 0 0 19 19 0 22)
+#|nearest tic 33 thinkers
+#|plat tic 0 flats 5 0 0 specials 0 7 0
+#|plat tic 1 flats 5 5 5 specials 0 0 0
+#|plat tic 1 floors 0.000000 -31.500000 0.000000
+#|plat tic 64 floors 0.000000 0.000000 0.000000
+#|plat tic 1 thinkers (mover sector 1 floor speed 0.500000 steps up to 0.000000 plan up to 0.000000 noise 22 0 19 19 18 22)
+#|plat tic 64 thinkers (mover sector 1 floor speed 0.500000 steps up to 0.000000 plan up to 0.000000 noise 22 0 19 19 18 22)
+#|plat tic 65 thinkers
+#|plat tic 1 sounds (DSSTNMOV from sector 0 vol 64 sep 129) (DSSTNMOV from sector 1 vol 64 sep 129) (DSSTNMOV from sector 2 vol 64 sep 129) (DSSWTCHN from nobody vol 64 sep 128) (DSSTNMOV from sector 0 vol 64 sep 129) (DSPSTOP from sector 0 vol 64 sep 129) (DSSTNMOV from sector 1 vol 64 sep 129) (DSSTNMOV from sector 2 vol 64 sep 129) (DSPSTOP from sector 2 vol 64 sep 129)
+#|donut tic 1 flats 5 0 0 specials 0 0 0
+#|donut tic 1 floors -0.500000 -32.000000 -0.500000
+#|donut tic 64 floors -32.000000 -32.000000 -32.000000
+#|donut tic 1 thinkers (mover sector 0 floor speed 0.500000 steps down to -32.000000 plan down to -32.000000 noise 0 0 19 19 0 22) (mover sector 2 floor speed 0.500000 steps down to -32.000000 plan down to -32.000000 noise 0 0 19 19 0 22)
+#|donut tic 65 thinkers
 #|crushed lift tic 4 floor -16.000000
 #|crushed lift tic 5 floor -16.000000
 #|crushed lift tic 6 floor -20.000000
@@ -416,3 +638,33 @@ def main() -> IO(Unit):
 #|glow tic 14 light 152
 #|glow tic 15 light 152
 #|glow tic 16 light 144
+
+# P_SpawnStrobeFlash consumes entry2=109: (109&7)+1=6; synced count1 consumes none.
+#|fast strobe tic 0 light 160 p_random 2 sector_special 0
+#|fast strobe tic 6 light 96 p_random 2 sector_special 0
+#|fast strobe tic 21 light 160 p_random 2 sector_special 0
+#|fast strobe tic 26 light 96 p_random 2 sector_special 0
+#|slow strobe tic 0 light 160 p_random 2 sector_special 0
+#|slow strobe tic 6 light 96 p_random 2 sector_special 0
+#|slow strobe tic 41 light 160 p_random 2 sector_special 0
+#|slow strobe tic 46 light 96 p_random 2 sector_special 0
+#|sync fast strobe tic 0 light 160 p_random 1 sector_special 0
+#|sync fast strobe tic 1 light 96 p_random 1 sector_special 0
+#|sync fast strobe tic 16 light 160 p_random 1 sector_special 0
+#|sync fast strobe tic 21 light 96 p_random 1 sector_special 0
+
+# Source m_random.c entries0=0 and1=8; a surviving damage hit takes a pain roll.
+#|20 percent health 80 flash 20 p_random 1
+#|between hits health 100 flash 0 p_random 0
+#|airborne health 100 flash 0 p_random 0
+#|suit blocks nukage health 100 flash 0 p_random 0
+#|suit leak between hits health 100 flash 0 p_random 0
+#|suit leaks health 80 flash 20 p_random 1
+
+#|occupied lights 35 35 35 mover True special 0
+#|exit secret special 0 floor 0.000000 texture 2
+#|buttons before origin sector 0 next timer 11 free 2
+#|buttons thinkers origin sector 0 next timer 11 free 2
+#|buttons gap origin nobody next timer 10 free 0
+#|buttons reused origin sector 0 next timer 10 free 2
+#|buttons reset sounds (DSSWTCHN from spot 0.000167 0.000000 vol 64 sep 214)

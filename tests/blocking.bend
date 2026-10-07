@@ -100,6 +100,8 @@ def steps(xs: List<&2, S.Sim.Step>) -> String:
       " up to " ++ F.Fixed.show(dest) ++ steps(rest)
     case S.Hold{t} <> rest:
       " hold " ++ U32.show(t) ++ steps(rest)
+    case S.Change{flat, special} <> rest:
+      " change to " ++ U32.show(flat) ++ " " ++ U32.show(special) ++ steps(rest)
 
 def thinkers(ts: List<&2, S.Thinker>) -> String:
   match ts:

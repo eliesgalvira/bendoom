@@ -94,9 +94,9 @@ law tic_counts:
   for +clock: U32
   for +secret: Bool
   {(S.State.clock(Tic.Sim.tic(cmd, Fx.Closed.state(p, level, clock))),
-    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, 0}))
     == ((clock + 1 : U32),
-      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, 0})
     : U32 & S.State}
 
 # LAW: standing still on the floor of Level.room, one sector with no
@@ -128,10 +128,10 @@ law use_fires_once:
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: V.Vec
   for reborn: Bool
-  for secrets: V.Vec
+  for totalsecret: U32
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {Tic.Sim.pressed(next, S.State.usedown(Tic.Sim.tic(K.Cmd{forward, side, turn, buttons},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, secrets}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, totalsecret}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -151,7 +151,7 @@ def Exit.level() -> L.Level:
 def Exit.used() -> S.State:
   Tic.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Fx.Closed.player(2097152, 4194304, 0, 8388608), Exit.level(), Fx.Closed.none(), L.Level.sidetex(Exit.level()),
-      S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+      S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, 0}))
 
 # exit_ends's claim on a state, its parameter, so the checker computes
 # the state once.
