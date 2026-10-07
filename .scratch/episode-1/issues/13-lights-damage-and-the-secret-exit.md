@@ -12,3 +12,7 @@
 - [ ] Standing on a 20% floor on E1M3 hurts as vanilla's: the health and the pain flash match at a chosen tic.
 - [ ] Pressing E1M3's secret exit leads to the tally and then to E1M9, matching vanilla's frames: `tools/oracle.nu --screen tally` and `--screen entering` from E1M3 (ticket 07 tested the secret path only at its seam, an ended state of kind Secret).
 - [ ] The proof checks; report how LAWS.bend changed.
+
+**E1M2 reload dependency from ticket 06:** after a death and reload, the red key differs at five pixels in (163–165, 83–84). The same pixels and colours occur in the preserved pre-change frame binary. Reproduce on DOOM1.WAD with `tools/oracle.nu -32 -240 90 "60,0,0,0,2 40,0,0,0,0 1,0,0,0,1 30,0,0,0,0" --map E1M2 --things "11,2035,-32,-210 12,2035,-32,-178" --wad /path/to/doom1.wad --frame frame`.
+
+Clearing only E1M2 SECTORS' special words for sectors 87, 90, 128, 146, 148 (special 3) and 193 (special 2) in a WAD copy makes this exact probe zero; clearing only special 13 leaves the same five pixels. Each field is the little-endian word at `SECTORS.pos + sector * 26 + 22`; the control changes no other byte. Vanilla's `P_SpawnStrobeFlash` draws `P_Random` for non-synchronised strobes, while the current `Sim.light.spawn` ignores 2/3. Preserve those spawn draws and rerun this probe when implementing the strobes. This is a light-special dependency, not a missing red-key type or a ticket 06 regression.

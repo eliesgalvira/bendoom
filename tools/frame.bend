@@ -4,8 +4,9 @@
 # it, printed as a line of the palette's index and then 200 lines of 320
 # palette indices, two hex digits each. A demo that takes the exit
 # leaves the tally showing, and its tics after the exit are the tally's,
-# their use the press that accelerates it, and then the next map's. tools/oracle.nu writes the
-# demo and diffs the frame against Chocolate Doom's after the same one.
+# their attack or use the press that accelerates it, and then the next
+# map's. tools/oracle.nu writes the demo and diffs the frame against
+# Chocolate Doom's after the same one.
 #
 #   bend tools/frame.bend -o frame
 #   DEMO=script.lmp ./frame

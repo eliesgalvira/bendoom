@@ -2,7 +2,7 @@
 
 **Tier:** 3
 
-**What to build:** things with vanilla's shadow flag draw with vanilla's fuzz column, its offset table and its running position, so the spectre shimmers as in vanilla. Partial invisibility gives the player the shadow flag for vanilla's duration: monsters aim with vanilla's spread, and the weapon sprite draws fuzzed, with the blink before it runs out.
+**What to build:** things with vanilla's shadow flag draw with vanilla's fuzz column, its offset table and its running position, so the spectre shimmers as in vanilla. Partial invisibility gives the player the shadow flag for vanilla's duration: monsters aim with vanilla's spread (A_FaceTarget's MF_SHADOW branch, missing from `Sim.chase.face.at` in src/tic.bend), and the weapon sprite draws fuzzed, with the blink before it runs out.
 
 **Blocked by:** 03
 

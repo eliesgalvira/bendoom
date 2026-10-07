@@ -419,10 +419,8 @@ def Laws.tic_rest(level, x, y):
         geo, sectors, specials, heard, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock, secret):
-  match level secret:
-    case L.Level{geo, sectors, specials, heard} True{}:
-      {==}
-    case L.Level{geo, sectors, specials, heard} False{}:
+  match level:
+    case L.Level{geo, sectors, specials, heard}:
       {==}
 
 def Laws.eye_rest(x, y):
@@ -1270,9 +1268,7 @@ def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.Stat
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Normal{}, usedown, sounds, mrnd, reborn, +secrets}:
-      {==}
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Secret{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
     case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, +secrets}:
       {==}
@@ -1294,9 +1290,7 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Normal{}, usedown, sounds, mrnd, reborn, +secrets}:
-      free
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Secret{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +secrets}:
       free
     case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, S.Unended{}, +usedown, sounds, +mrnd, +reborn, +secrets}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}

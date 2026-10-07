@@ -85,14 +85,6 @@ law tic_rest:
       Fx.Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, level, 0)))))
     == (x, y) : U32 & U32}
 
-# A level's end by the exit or by the secret exit.
-def Exit.kind(secret: Bool) -> S.Sim.Exit:
-  match secret:
-    case True{}:
-      S.Secret{}
-    case False{}:
-      S.Normal{}
-
 # LAW: a tic counts on the clock, and an ended level's tic changes
 # nothing, whatever the command and however the level ended.
 law tic_counts:
@@ -102,9 +94,9 @@ law tic_counts:
   for +clock: U32
   for +secret: Bool
   {(S.State.clock(Tic.Sim.tic(cmd, Fx.Closed.state(p, level, clock))),
-    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
     == ((clock + 1 : U32),
-      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
     : U32 & S.State}
 
 # LAW: standing still on the floor of Level.room, one sector with no
@@ -166,7 +158,7 @@ def Exit.used() -> S.State:
 def Exit.ended(+cmd: K.Cmd, +s: S.State) -> Type:
   {(S.State.ended(s), S.State.clock(s), L.Level.special(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2),
     Tic.Sim.tic(cmd, s))
-    == (S.Normal{}, 3, 0, 2, s) : S.Sim.Exit & U32 & U32 & U32 & S.State}
+    == (S.Ended{False{}}, 3, 0, 2, s) : S.Sim.Exit & U32 & U32 & U32 & S.State}
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
