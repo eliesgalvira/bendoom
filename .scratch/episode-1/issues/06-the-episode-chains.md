@@ -6,16 +6,16 @@ The chain landed on episode-1 (merge 096ffaa): `-warp`, exit kinds, vanilla's ne
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] `-warp` applies `G_InitNew`'s clamps: on DOOM1.WAD (shareware) an episode above 1 becomes 1, and the map is held to 1–9, so `-warp 2 1` and `-warp 1 0` play E1M1 as in Chocolate Doom instead of failing. The clamps depend on the WAD's game mode (Freedoom is "ultimate"); `tests/game.bend` pins `-WARP 2` as E2M1 today, which vanilla does not do on shareware.
-- [ ] A committed test tells carrying from resetting: `tests/tally.bend` reaches E1M2 with pistol-start values, the same as after a death. Pin a run that carries something (the oracle run carried a shotgun, 8 shells and 100% armour to E1M2 with 0 differing pixels at tics 5 and 30; that evidence was not committed).
+- [x] `-warp` applies `G_InitNew`'s clamps: on DOOM1.WAD (shareware) an episode above 1 becomes 1, and the map is held to 1–9, so `-warp 2 1` and `-warp 1 0` play E1M1 as in Chocolate Doom instead of failing. The clamps depend on the WAD's game mode (Freedoom is "ultimate"); `tests/game.bend` pins `-WARP 2` as E2M1 today, which vanilla does not do on shareware.
+- [x] A committed test tells carrying from resetting: `tests/tally.bend` reaches E1M2 with pistol-start values, the same as after a death. Pin a run that carries something (the oracle run carried a shotgun, 8 shells and 100% armour to E1M2 with 0 differing pixels at tics 5 and 30; that evidence was not committed).
 - [ ] Rerun the death check on E1M2 after ticket 03 lands: it showed 5 differing pixels at (163–165, 83–84), attributed to the missing red keycard.
-- [ ] `Play.next` takes the exit kind (`S.Sim.Exit`) instead of a Bool, so `Play.ended`'s two identical arms and LAWS.bend's `Exit.kind(secret: Bool)` helper go; consider `Unended | Ended{secret}` if it merges the duplicated `Normal`/`Secret` arms in `tic_counts`, `tic_keeps_geometry` and `tic_keeps_free`.
-- [ ] `Play.back`'s episode 2–4 cases (`2→6, 3→7, 4→3`) are beyond this milestone; keep episode 1's rule unless Freedoom's maps need the others.
-- [ ] `Play.wants` and `Play.enter` both match `Play`, and `enter`'s `Playing` arm cannot run; match once.
-- [ ] `Inventory.finished` names its masks (`16711680`, `4278190080`) and shares `Inventory.start`'s powers literal; the face slot holding weapons owned at `ST_Start` gets a name that says so.
-- [ ] `nix/tests.nix` has a narrating comment in `buildPhase` that repeats `docs/bend.md`; delete it. The `docs/bend.md` note says "32 MB stack" while `BUN_JSC_maxPerThreadStackUsage` is 16 MB (32 MB is the ulimit), and its "about 20000 on bun" depth is stale. `tools/frame.bend`'s header has an unwrapped line.
-- [ ] `State.carried` feeds one value to both use-down and attack-down; vanilla's `WI_checkForAccelerate` tracks them apart (matters once the rocket launcher lands).
+- [x] `Play.next` takes the exit kind (`S.Sim.Exit`) instead of a Bool, so `Play.ended`'s two identical arms and LAWS.bend's `Exit.kind(secret: Bool)` helper go; consider `Unended | Ended{secret}` if it merges the duplicated `Normal`/`Secret` arms in `tic_counts`, `tic_keeps_geometry` and `tic_keeps_free`.
+- [x] `Play.back`'s episode 2–4 cases (`2→6, 3→7, 4→3`) are beyond this milestone; keep episode 1's rule unless Freedoom's maps need the others.
+- [x] `Play.wants` and `Play.enter` both match `Play`, and `enter`'s `Playing` arm cannot run; match once.
+- [x] `Inventory.finished` names its masks (`16711680`, `4278190080`) and shares `Inventory.start`'s powers literal; the face slot holding weapons owned at `ST_Start` gets a name that says so.
+- [x] `nix/tests.nix` has a narrating comment in `buildPhase` that repeats `docs/bend.md`; delete it. The `docs/bend.md` note says "32 MB stack" while `BUN_JSC_maxPerThreadStackUsage` is 16 MB (32 MB is the ulimit), and its "about 20000 on bun" depth is stale. `tools/frame.bend`'s header has an unwrapped line.
+- [x] `State.carried` feeds one value to both use-down and attack-down; vanilla's `WI_checkForAccelerate` tracks them apart (matters once the rocket launcher lands).
 
-**Where it stopped (2026-10-03, 17:45):** stopped by Elies. Worktree `../bendoom-e1-06b` (branch `e1-06b`, at 1e5662f) holds about 290 uncommitted lines on 19 files toward this list; nothing is committed or verified. It was on the inventory carry and the face slot name.
+**Remaining:** standards and spec reviews of `bbc0a2b` must settle the rerun criterion. The exact E1M2 death-then-reload probe still differs at five red-key pixels, identically in the preserved pre-change frame binary. Clearing only sector specials 2/3 makes it zero; clearing only 13 leaves the same five pixels. Ticket 13 owns these missing strobe spawns and their `P_Random` draws. The death frame, carry frames at tics 5/30, and all 19 rested E1M1 probes are zero. All affected native/JS tests, the proof and native game/film/frame builds pass. No light workaround belongs here.
