@@ -55,7 +55,7 @@ def Wad.dir.listed(+count: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & L
 
 def Wad.dir.at(a: Array<U32>, h: Wad.Header) -> Array<U32> & List<&2, Wad.Lump>:
   Header{kind, +count, dir} = h
-  Wad.dir.listed(count, B.Bytes.list(a, dir, (count * 16 : U32)))
+  Wad.dir.listed(count, B.Bytes.file.list(a, dir, (count * 16 : U32)))
 
 def Wad.dir.headed(p: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, Wad.Lump>:
   (a, bytes) = p
@@ -63,7 +63,7 @@ def Wad.dir.headed(p: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, Wad.L
 
 # The directory of a WAD read whole.
 def Wad.dir(a: Array<U32>) -> Array<U32> & List<&2, Wad.Lump>:
-  Wad.dir.headed(B.Bytes.list(a, 0, 12))
+  Wad.dir.headed(B.Bytes.file.list(a, 0, 12))
 
 def Wad.named(+name: String, l: Wad.Lump) -> Bool:
   Lump{pos, size, n} = l
@@ -129,7 +129,7 @@ def Wad.lumps.at(p: Array<U32> & List<&2, List<&2, U32>>, q: U32 & U32) ->
   Array<U32> & List<&2, List<&2, U32>>:
   (a, bytes) = p
   (pos, size) = q
-  Wad.lumps.read(bytes, B.Bytes.list(a, pos, size))
+  Wad.lumps.read(bytes, B.Bytes.file.list(a, pos, size))
 
 def Wad.lumps(names: List<&2, String>, +dir: List<&2, Wad.Lump>, a: Array<U32>) ->
   Array<U32> & List<&2, List<&2, U32>>:

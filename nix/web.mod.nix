@@ -4,6 +4,13 @@
     let
       inherit (lib.attrsets) optionalAttrs;
       inherit (lib.meta) availableOn;
+      webFor = bendoom: pkgs.callPackage ./web.nix {
+        inherit (bendoom) iwad;
+        game = pkgs.callPackage ./web-game.nix {
+          bend = config.packages.bend-web;
+          inherit bendoom;
+        };
+      };
     in {
       packages = {
         bend-web = config.packages.bend.overrideAttrs {
@@ -13,18 +20,12 @@
           patches = [ ./web-audio.patch ./web-runtime.patch ];
         };
       } // optionalAttrs (availableOn pkgs.stdenv.hostPlatform pkgs.chromium) {
-        web = pkgs.callPackage ./web.nix {
-          inherit (config.packages.bendoom) iwad;
-          game = pkgs.callPackage ./web-game.nix {
-            bend = config.packages.bend-web;
-            inherit (config.packages) bendoom;
-          };
-        };
+        web = webFor config.packages.bendoom;
       };
       checks = optionalAttrs (system == "x86_64-linux") {
         web = pkgs.callPackage ./web-check.nix {
           bend = config.packages.bend-web;
-          inherit (config.packages) web;
+          web = webFor config.packages.bendoom-freedoom;
         };
       };
     };

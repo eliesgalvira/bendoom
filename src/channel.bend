@@ -46,7 +46,7 @@ def Channel.plan.read(+id: U32, +at: U32, sounds: List<&2, Channel.Sound>, +size
 def Channel.plan.at(id: U32, p: Channel.Plan, q: U32 & U32) -> Channel.Plan:
   Plan{a, sounds, at} = p
   (pos, +size) = q
-  Channel.plan.read(id, at, sounds, size, B.Bytes.list(a, pos, U32.min(size, 8)))
+  Channel.plan.read(id, at, sounds, size, B.Bytes.file.list(a, pos, U32.min(size, 8)))
 
 def Channel.plan.one(row: Sn.Sound.Sfx, +dir: List<&2, W.Wad.Lump>, p: Channel.Plan) -> Channel.Plan:
   Sn.Sfx{id, +lump, priority} = row
@@ -73,7 +73,7 @@ def Channel.fill.read(+at: U32, bank: Array<U32>, p: Array<U32> & List<&2, U32>)
 def Channel.fill.at(at: U32, p: Array<U32> & Array<U32>, q: U32 & U32) -> Array<U32> & Array<U32>:
   (wad, bank) = p
   (pos, size) = q
-  Channel.fill.read(at, bank, B.Bytes.list(wad, pos, size))
+  Channel.fill.read(at, bank, B.Bytes.file.list(wad, pos, size))
 
 def Channel.fill.one(row: Sn.Sound.Sfx, sound: Channel.Sound, +dir: List<&2, W.Wad.Lump>,
   p: Array<U32> & Array<U32>) -> Array<U32> & Array<U32>:
