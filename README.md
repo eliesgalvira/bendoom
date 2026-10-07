@@ -81,9 +81,9 @@ with an error.
 | Strafe left / right | A / D |
 | Run | Hold Shift |
 | Fire | Ctrl |
-| Open doors / press switches | Space |
+| Open doors / press switches | Space / Enter |
 | Select fist / pistol / shotgun / chaingun | 1 / 2 / 3 / 4, if owned |
-| Restart after dying | Space |
+| Restart after dying | Space / Enter |
 | Quit | Esc, or close the window |
 
 ## Record and export a video
