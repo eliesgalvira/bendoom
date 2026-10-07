@@ -357,7 +357,7 @@ def Laws.last_press(code, d1, d2, keys):
       press9(U32.is_eq(code, 63232) || U32.is_eq(code, 119),
         U32.is_eq(code, 63233) || U32.is_eq(code, 115), U32.is_eq(code, 63234),
         U32.is_eq(code, 63235), U32.is_eq(code, 97), U32.is_eq(code, 100),
-        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32),
+        U32.is_eq(code, 65592) || U32.is_eq(code, 65596), U32.is_eq(code, 32) || U32.is_eq(code, 13),
         U32.is_eq(code, 65595) || U32.is_eq(code, 65598), K.Keys.number(code), d1, d2, up, dn, left, right, sleft,
         sright, run, use, fire, numbers)
 
