@@ -569,7 +569,7 @@ def step(s: N.Planes.Step) -> String:
 # distance scale one value.
 def view(angle: U32, sine: V.Vec, tangent: V.Vec, xtoangle: U32, yslope: U32, distscale: U32) -> P.View:
   P.View{0, 0, 0, angle, 0, 0, P.Tables{sine, tangent, V.Leaf{0}, V.Leaf{0}, V.Leaf{xtoangle}, V.Leaf{yslope},
-    V.Leaf{distscale}, V.Leaf{0}, 0}, 0}
+    V.Leaf{distscale}, V.Leaf{0}, 0}, 0, 0}
 
 def arithmetic() -> IO(Unit):
   +sines = V.Vec.of_list(T.Tables.finesine(), 10240)
@@ -599,7 +599,7 @@ def arithmetic() -> IO(Unit):
     IO.print("texcol " ++ words([Sg.Segs.texcol(view(0, V.Leaf{0}, tans, 0, 0, 0), 10485760, 4194304, 1073741824, 0),
       Sg.Segs.texcol(view(0, V.Leaf{0}, tans, 537395200, 0, 0), 10485760, 4194304, 1073741824, 0)]))
     IO.print("iscale " ++ words([Sg.Segs.iscale(65536), Sg.Segs.iscale(4194304), Sg.Segs.iscale(256)]))
-    IO.print("wall colormap " ++ words([Sg.Segs.colormap(8, 65536), Sg.Segs.colormap(8, 4194304)]))
+    IO.print("wall colormap " ++ words([Sg.Segs.colormap(0, 8, 65536), Sg.Segs.colormap(0, 8, 4194304)]))
     IO.print("silhouettes " ++ String.join([
       sil(Sg.Segs.sil.of(True{}, False{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 0, 0}, 3211264)),
       sil(Sg.Segs.sil.of(False{}, True{}, L.Sector{524288, 8388608, 160}, L.Sector{0, 8388608, 160}, 3211264)),
@@ -620,7 +620,7 @@ def arithmetic() -> IO(Unit):
     IO.print("shown moved " ++ words(Fx.Sprite.shown(Fx.Sprite.moved(Fx.Closed.ranked(6, 2097152, 0)))))
     IO.print("skycol " ++ words([N.Planes.skycol(view(0, V.Leaf{0}, V.Leaf{0}, 537395200, 0, 0), 0),
       N.Planes.skycol(view(1073741824, V.Leaf{0}, V.Leaf{0}, 537395200, 0, 0), 0)]))
-    IO.print("flat colormap " ++ words([N.Planes.colormap(8, 13107200), N.Planes.colormap(8, 859832320)]))
+    IO.print("flat colormap " ++ words([N.Planes.colormap(0, 8, 13107200), N.Planes.colormap(0, 8, 859832320)]))
     IO.print("flat scales " ++ words([N.Planes.xscale(view(0, sines, V.Leaf{0}, 0, 0, 0)),
       N.Planes.yscale(view(0, sines, V.Leaf{0}, 0, 0, 0))]))
     IO.print("flat step " ++ step(N.Planes.step(N.Flat{view(0, sines, V.Leaf{0}, 0, 20971520, 65537), 0, 409, 2686976,

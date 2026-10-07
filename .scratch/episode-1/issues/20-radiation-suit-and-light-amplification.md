@@ -2,9 +2,7 @@
 
 **Tier:** 3
 
-**What to build:** the radiation suit protects the player from damaging floors with vanilla's exception (`Sim.sector` in src/special.bend hurts regardless today) and tints the screen with vanilla's palette rule while it lasts (`Bar.palette` in src/bar.bend never picks RADIATIONPAL today). Light amplification lights every room through vanilla's fixed colormap rule while it lasts, blinking before it runs out. Both last vanilla's durations.
-
-**Blocked by:** 03, 13 (damaging floors)
+**What remains:** verify the implemented suit palette and visor fixed colormap against Chocolate Doom after actual stock pickups, during stable effects and their final blink. Ticket 13 already implements floor protection and suit leakage. Native and JavaScript powerup, player, pickup, sector and render tests pass; frame, game and film builds and the proof pass. Stock frames, active palette and health evidence remain pending.
 
 **Status:** ready-for-agent
 

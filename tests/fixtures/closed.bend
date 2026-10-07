@@ -509,7 +509,7 @@ def Closed.wakes(d: H.Thing.Def) -> Bool:
 # mirrored, the same seen from every side.
 def Sprite.view() -> P.View:
   P.View{0, 0, 2686976, 0, 0, 65536, P.Tables{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0},
-    V.Leaf{0}, V.Leaf{0}, 0}, 0}
+    V.Leaf{0}, V.Leaf{0}, 0}, 0, 0}
 
 def Sprite.slots(n: Nat, +patch: U32, +flip: U32) -> List<&2, U32>:
   match n:
