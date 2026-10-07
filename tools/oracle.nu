@@ -137,13 +137,13 @@ def face-box [wad: binary]: nothing -> list<int> {
 # the pause froze, the tally's "Finished!" or the map screen's words and
 # pointer. The config sets screen size 10, the full 320 by 168 view over
 # the status bar that Bendoom draws (Doom's default 9 borders a 288 by
-# 144 view), and turns messages off; the extra config binds F1,
+# 144 view), and shows messages only with --messages; the extra config binds F1,
 # scancode 59, to the screenshot, since -devparm, which binds it too,
 # writes its frame-rate dots over the bar's last row.
-def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path]: nothing -> record<indices: list<string>, palette: string> {
+def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path, messages: bool]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
-  "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
+  $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "key_menu_screenshot 59\n" | save --force ($dir | path join extra.cfg)
   let display = xvfb $dir 1024x768
   let game = job spawn {
@@ -184,10 +184,10 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
 # and face drift when comparing the pixels normally masked below.
 # Official timedemo mode supplies one command per frame; undrawn tics
 # are rejected by the diagnostic binary rather than drawing extra frames.
-def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path]: nothing -> record<indices: list<string>, palette: string> {
+def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path, messages: bool]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
-  "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
+  $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "show_endoom 0\n" | save --force ($dir | path join extra.cfg)
   let target = $dir | path join frame.raw
   let result = try {
@@ -223,7 +223,7 @@ def captured [iwad: binary, name: string, script: binary, count: int, binary: pa
 # given, and where they differ. The run is the flags both commands take.
 def compare [
   iwad: binary, header: binary, tics: binary
-  run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool>
+  run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool, messages: bool>
 ]: nothing -> record {
   if $run.unmasked and $run.capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
   let capture = if $run.capture == "" { "" } else { $run.capture | path expand }
@@ -244,10 +244,10 @@ def compare [
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
   let tail = if $inter { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
   let shot = if $run.capture == "" {
-    vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
-  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir }
+    vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir $run.messages
+  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir $run.messages }
   $tics | demo $header | save ($dir | path join ours.lmp)
-  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
+  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp), BENDOOM_MESSAGES: (if $run.messages { "1" } else { "0" })} { ^$run.frame } | lines
   if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let face = face-box $iwad
@@ -279,12 +279,13 @@ def main [
   --screen: string = "level"              # level, or tally or entering after the exit the script takes
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
+  --messages                               # show messages in both engines
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked})
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages})
 }
 
 # The first tics of a recorded demo.
@@ -297,6 +298,7 @@ def "main demo" [
   --screen: string = "level"              # level, or tally or entering after the exit the tics take
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
+  --messages                               # show messages in both engines
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
@@ -315,5 +317,5 @@ def "main demo" [
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
   | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
-    {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked})
+    {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages})
 }

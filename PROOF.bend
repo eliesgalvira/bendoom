@@ -387,7 +387,7 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
 def rest_counted(+nukage: Bool, +hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
   +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
-    Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.damage.enter.acted, K.Cmd.idle(),
+    Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.damage.enter.acted, ~Sp.Sim.shoot, K.Cmd.idle(),
       Tic.Sim.weapon.select(K.Cmd.idle(), Sp.Sim.sector.secret.count(counts, sector,
         Sp.Sim.sector.damage(nukage, hellslime, 0, rest_walked(geo, sectors, specials, heard, x, y)))))))
 
@@ -1313,6 +1313,65 @@ def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.Stat
         S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
           usedown, sounds, mrnd, reborn, totalsecret}, h)
 
+def sound_if_held(audible: Bool, geo: L.Level.Geo, +e: Sn.Sound.Event, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.sound.if(audible, e, s)):
+  match audible:
+    case False{}:
+      h
+    case True{}:
+      heard_held(geo, e, s, h)
+
+def sound_start_held(+geo: L.Level.Geo, +sfx: U32, +source: Sn.Sound.Source, params: U32 & U32, +s: S.State,
+  h: Held(geo, s)) -> Held(geo, S.Sim.sound.start(sfx, source, params, s)):
+  (+vol, +sep) = params
+  sound_if_held(Bool.not(Bool.or(U32.is_zero(sfx), U32.is_zero(vol))), geo, Sn.Start{sfx, source, vol, sep}, s, h)
+
+def sound_held(+geo: L.Level.Geo, sfx: U32, +source: Sn.Sound.Source, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, S.Sim.sound(sfx, source, s)):
+  +after = {S.State.told(s) : S.State}
+  sound_start_held(geo, sfx, source, S.Sim.sound.parameters(True{}, after, source), after, told_held(geo, s, h))
+
+def button_held(done: Bool, +geo: L.Level.Geo, side: U32, +slot: U32, +texture: U32, tics: U32, +index: U32,
+  s: S.State, h: Held(geo, s)) -> Held(geo, Sp.Sim.button(done, side, slot, texture, tics, index, s)):
+  match done s:
+    case False{} +s:
+      kept_held(geo, s, S.Button{side, slot, texture, (tics - 1 : U32), index}, h)
+    case True{} S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +totalsecret}:
+      +next = Sp.Sim.button.timer(List.append(&2, S.Thinker, List.reverse(&2, S.Thinker, ran), due), (index + 1 : U32))
+      sound_held(geo, Sn.Sound.swtchn(), Sn.Spot{next, 0},
+        S.State{player, level, things, V.Vec.set(sidetex, (side * 3 + slot : U32), texture), S.Thinkers{ran, due},
+          rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, h)
+
+def button_turn_held(+geo: L.Level.Geo, t: S.Thinker, +s: S.State, h: Held(geo, s)) ->
+  Held(geo, Tic.Sim.buttons.turn(t, s)):
+  match t:
+    case S.Button{+side, +slot, +texture, +tics, +index}:
+      button_held(U32.is_eq(tics, 1), geo, side, slot, texture, tics, index, s, h)
+    case S.Mobj{+id}:
+      kept_held(geo, s, S.Mobj{id}, h)
+    case S.Mover{+sector, +ceiling, +speed, +steps, +plan, +noise}:
+      kept_held(geo, s, S.Mover{sector, ceiling, speed, steps, plan, noise}, h)
+    case S.Blink{+sector, +count, +dark, +bright, +darktime, +brighttime, +random}:
+      kept_held(geo, s, S.Blink{sector, count, dark, bright, darktime, brighttime, random}, h)
+    case S.Glow{+sector, +dark, +bright, +down}:
+      kept_held(geo, s, S.Glow{sector, dark, bright, down}, h)
+
+def buttons_go_held(fuel: List<&2, S.Thinker>, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
+  Held(geo, Tic.Sim.buttons.go(fuel, s)):
+  match fuel s:
+    case [] +s:
+      rested_held(geo, s, h)
+    case f <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, []}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +totalsecret}:
+      rested_held(geo, S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, h)
+    case f <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +totalsecret}:
+      buttons_go_held(rest, geo, Tic.Sim.buttons.turn(t,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}),
+        button_turn_held(geo, t,
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, h))
+
+def buttons_held(+geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> Held(geo, Tic.Sim.buttons(s)):
+  buttons_go_held(S.State.thinkers(s), geo, s, h)
+
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
     case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +totalsecret}:
@@ -1330,10 +1389,11 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
     S.Player.y(S.State.player(before)), after)):
   +place = {Tic.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)),
     after) : S.State}
-  told_held(geo, Tic.Sim.thinkers(cmd, geo, place),
+  told_held(geo, Tic.Sim.buttons(Tic.Sim.thinkers(cmd, geo, place)),
+    buttons_held(geo, Tic.Sim.thinkers(cmd, geo, place),
     rested_held(geo, Tic.Sim.thinkers.all(8n, cmd, geo, place),
       all_held(8n, cmd, geo, place,
-        held_free(geo, before, after, h))))
+        held_free(geo, before, after, h)))))
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
