@@ -200,13 +200,14 @@ def Sim.mover.heard(+sector: U32, grind: U32, stop: U32, s: S.State) -> S.State:
 # T_VerticalDoor and T_PlatRaise turn their direction.
 def Sim.plan.from(steps: List<&2, S.Sim.Step>, +down: Bool, +otherwise: List<&2, S.Sim.Step>) ->
   List<&2, S.Sim.Step>:
-  match steps:
-    case []:
+  match steps down:
+    case [] _:
       otherwise
-    case S.Travel{+way, +dest} <> +rest:
-      Bool.pick(List<&2, S.Sim.Step>, Bool.xor(way, down), Sim.plan.from(rest, down, otherwise),
-        S.Travel{way, dest} <> rest)
-    case other <> rest:
+    case S.Travel{False{}, dest} <> rest False{}:
+      S.Travel{False{}, dest} <> rest
+    case S.Travel{True{}, dest} <> rest True{}:
+      S.Travel{True{}, dest} <> rest
+    case other <> rest down:
       Sim.plan.from(rest, down, otherwise)
 
 # A step something does not fit is undone, everything clipped again, and
@@ -224,6 +225,21 @@ def Sim.mover.fitted(t: S.Sim.Try, +sector: U32, +ceiling: Bool, speed: U32, was
       Sim.mover.kept(sector, ceiling, speed, crushed, plan, noise,
         Sim.mover.heard(sector, grind, crush, S.State.moved(Sim.change(undone, sector, p, got), undone, s)))
 
+def Sim.mover.going(past: Bool, down: Bool, dest: U32, rest: List<&2, S.Sim.Step>) -> List<&2, S.Sim.Step>:
+  match past:
+    case True{}:
+      rest
+    case False{}:
+      S.Travel{down, dest} <> rest
+
+def Sim.mover.crushed(past: Bool, plan: List<&2, S.Sim.Step>, down: Bool, going: List<&2, S.Sim.Step>) ->
+  List<&2, S.Sim.Step>:
+  match past:
+    case True{}:
+      going
+    case False{}:
+      Sim.plan.from(plan, Bool.not(down), going)
+
 # Doom's T_MovePlane: a step that would pass the destination lands on it
 # and ends the travel. A ceiling going up short of its destination does
 # not care what fits under it. The sector grinds when the clock's low
@@ -240,21 +256,26 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
   +past = Bool.pick(Bool, down, F.Fixed.lt(next, dest), F.Fixed.gt(next, dest))
   +moved = L.Level.plane.put(level, sector, ceiling, Bool.pick(U32, past, dest, next))
   +stop = Bool.pick(U32, past, Bool.pick(U32, down, fell, rose), 0)
-  +going = Bool.pick(List<&2, S.Sim.Step>, past, rest, S.Travel{down, dest} <> rest)
+  +going = Sim.mover.going(past, down, dest, rest)
   Sim.mover.fitted(S.Sim.Try.or(Bool.and(ceiling, Bool.not(Bool.or(down, past))),
     Sim.change(moved, sector, player, things)), sector, ceiling, speed, was, going,
-    Bool.pick(List<&2, S.Sim.Step>, past, going, Sim.plan.from(plan, Bool.not(down), going)), plan, noise,
+    Sim.mover.crushed(past, plan, down, going), plan, noise,
     Bool.pick(U32, U32.is_zero((clock .&. 7 : U32)), grind, 0), stop, Bool.pick(U32, past, stop, crush),
     S.State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
-def Sim.button.timer(thinkers: List<&2, S.Thinker>, +index: U32) -> U32:
-  match thinkers:
-    case []:
+def Sim.button.timer.go(thinkers: List<&2, S.Thinker>, found: Bool, +index: U32, got: U32) -> U32:
+  match thinkers found:
+    case _ True{}:
+      got
+    case [] False{}:
       0
-    case S.Button{side, slot, texture, tics, at} <> rest:
-      Bool.pick(U32, U32.is_eq(at, index), tics, Sim.button.timer(rest, index))
-    case _ <> rest:
-      Sim.button.timer(rest, index)
+    case S.Button{side, slot, texture, tics, at} <> rest False{}:
+      Sim.button.timer.go(rest, U32.is_eq(at, index), index, tics)
+    case _ <> rest False{}:
+      Sim.button.timer.go(rest, False{}, index, got)
+
+def Sim.button.timer(thinkers: List<&2, S.Thinker>, index: U32) -> U32:
+  Sim.button.timer.go(thinkers, False{}, index, 0)
 
 # On Chocolate's 64-bit ABI, &buttonlist[i].soundorg reads the next
 # slot's timer as mobj.x and its zero padding as mobj.y.
@@ -427,14 +448,21 @@ def Sim.door.turned(steps: List<&2, S.Sim.Step>, shuts: Bool, +plan: List<&2, S.
     case other False{}:
       other
 
+def Sim.door.steps(same: Bool, steps: List<&2, S.Sim.Step>, shuts: Bool,
+  plan: List<&2, S.Sim.Step>, floor: U32) -> List<&2, S.Sim.Step>:
+  match same:
+    case True{}:
+      Sim.door.turned(steps, shuts, plan, floor)
+    case False{}:
+      steps
+
 def Sim.door.turn(thinkers: List<&2, S.Thinker>, +shuts: Bool, +sector: U32, +floor: U32) ->
   List<&2, S.Thinker>:
   match thinkers:
     case []:
       []
     case S.Mover{+s, ceiling, speed, +steps, +plan, noise} <> rest:
-      S.Mover{s, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(s, sector),
-        Sim.door.turned(steps, shuts, plan, floor), steps), plan, noise} <>
+      S.Mover{s, ceiling, speed, Sim.door.steps(U32.is_eq(s, sector), steps, shuts, plan, floor), plan, noise} <>
         Sim.door.turn(rest, shuts, sector, floor)
     case other <> rest:
       other <> Sim.door.turn(rest, shuts, sector, floor)
@@ -446,9 +474,12 @@ def Sim.door.top(+level: L.Level, sector: U32) -> U32:
 # A door begun up to its top, and for one that closes again, VDOORWAIT's
 # 150 tics open and down to its floor.
 def Sim.door.begin(raise: Bool, +sector: U32, +top: U32, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
-  Sim.mover.begin(sector, True{}, speed, Bool.pick(List<&2, S.Sim.Step>, raise,
-    [S.Travel{False{}, top}, S.Hold{150}, S.Travel{True{}, L.Level.floor(S.State.level(s), sector)}],
-    [S.Travel{False{}, top}]), noise, s)
+  match raise:
+    case True{}:
+      Sim.mover.begin(sector, True{}, speed,
+        [S.Travel{False{}, top}, S.Hold{150}, S.Travel{True{}, L.Level.floor(S.State.level(s), sector)}], noise, s)
+    case False{}:
+      Sim.mover.begin(sector, True{}, speed, [S.Travel{False{}, top}], noise, s)
 
 # A door already moving is turned without a sound.
 def Sim.door.on(moving: Bool, +shuts: Bool, +sector: U32, speed: U32, noise: S.Sim.Noise, +s: S.State) -> S.State:
@@ -649,25 +680,34 @@ def Sim.switch.slot(+level: L.Level, +sidetex: V.Vec, +at: U32) -> U32:
     Bool.pick(U32, U32.is_zero(L.Level.switch(level, V.Vec.get(sidetex, (at + 2 : U32)))),
       Bool.pick(U32, U32.is_zero(L.Level.switch(level, V.Vec.get(sidetex, (at + 1 : U32)))), 3, 1), 2), 0)
 
-def Sim.pressed.side(thinkers: List<&2, S.Thinker>, +side: U32) -> Bool:
-  match thinkers:
-    case []:
-      False{}
-    case S.Button{pressed, slot, texture, tics, index} <> rest:
-      Bool.or(U32.is_eq(pressed, side), Sim.pressed.side(rest, side))
-    case _ <> rest:
-      Sim.pressed.side(rest, side)
+def Sim.pressed.side.go(thinkers: List<&2, S.Thinker>, found: Bool, +side: U32) -> Bool:
+  match thinkers found:
+    case [] _:
+      found
+    case _ True{}:
+      True{}
+    case S.Button{pressed, slot, texture, tics, index} <> rest False{}:
+      Sim.pressed.side.go(rest, U32.is_eq(pressed, side), side)
+    case _ <> rest False{}:
+      Sim.pressed.side.go(rest, False{}, side)
+
+def Sim.pressed.side(thinkers: List<&2, S.Thinker>, side: U32) -> Bool:
+  Sim.pressed.side.go(thinkers, False{}, side)
 
 # P_ChangeSwitchTexture uses button slot zero, including NULL after expiry.
-def Sim.switch.origin(thinkers: List<&2, S.Thinker>, +level: L.Level) -> Sn.Sound.Source:
-  match thinkers:
-    case []:
+def Sim.switch.origin.go(thinkers: List<&2, S.Thinker>, found: Bool, +level: L.Level, side: U32) -> Sn.Sound.Source:
+  match thinkers found:
+    case _ True{}:
+      Sn.Sector{L.Level.side.sector(level, side)}
+    case [] False{}:
       Sn.Nobody{}
-    case S.Button{side, slot, texture, tics, index} <> rest:
-      Bool.pick(Sn.Sound.Source, U32.is_zero(index), Sn.Sector{L.Level.side.sector(level, side)},
-        Sim.switch.origin(rest, level))
-    case _ <> rest:
-      Sim.switch.origin(rest, level)
+    case S.Button{at, slot, texture, tics, index} <> rest False{}:
+      Sim.switch.origin.go(rest, U32.is_zero(index), level, at)
+    case _ <> rest False{}:
+      Sim.switch.origin.go(rest, False{}, level, side)
+
+def Sim.switch.origin(thinkers: List<&2, S.Thinker>, level: L.Level) -> Sn.Sound.Source:
+  Sim.switch.origin.go(thinkers, False{}, level, 0)
 
 def Sim.button.used(thinkers: List<&2, S.Thinker>) -> U32:
   match thinkers:
