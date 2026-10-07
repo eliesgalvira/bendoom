@@ -37,6 +37,6 @@ def main() -> IO(Unit):
   do IO<Unit>:
     named : Result<&1, &1, U32 & String, String> <- IO.get_env("SONG")
     +song : String = Result.default(&1, &1, U32 & String, String, named, "D_E1M1")
-    loaded : S.Song.Deck & List<&2, C.Channel.Sound> <- A.Stream.load([song], [])
+    loaded : S.Song.Deck & C.Channel.Bank <- A.Stream.load([song], [])
     t0 : Nat <- IO.now()
-    Bench.run(song, Pair.fst(S.Song.Deck, List<&2, C.Channel.Sound>, loaded), t0)
+    Bench.run(song, Pair.fst(S.Song.Deck, C.Channel.Bank, loaded), t0)

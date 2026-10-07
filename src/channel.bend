@@ -1,22 +1,29 @@
 # Doom's s_sound.c channels: the eight voices a level's sounds are
 # allotted. They live outside the sim's state because vanilla frees a
 # channel when the device has finished it and not on a tic. A channel is
-# the frames its sound has left to play, the sound and the source that
-# made it, and the left and right volumes the device was given for it.
-# The frames come from the bank, every sound expanded once from the
-# opened WAD; the mixer plays them, and this module allots them.
+# the span of the bank its sound has left to play, the sound and the
+# source that made it, and the left and right volumes the device was
+# given for it. The bank is every sound expanded once from the opened
+# WAD, end to end in one array; the mixer plays from it, and this module
+# allots the spans.
 import Base
+import ./vec.bend as V
 import ./sound.bend as Sn
 import ./sfx.bend as X
 
-# A playing sound, from the frame the mixer writes next.
+# A playing sound: the bank's frames from the one the mixer writes next
+# to the one past its last.
 type Channel is Data:
-  Chan{frames: List<&2, U32>, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32}
+  Chan{at: U32, end: U32, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32}
 
-# A sound of the table, by its number, and what Chocolate Doom plays of
-# it.
+# A sound of the table, by its number, and its span of the bank.
 type Channel.Sound is Data:
-  Sound{id: U32, frames: List<&2, U32>}
+  Sound{id: U32, at: U32, end: U32}
+
+# The expanded frames, 16-bit samples one a slot, and where each sound's
+# lie.
+type Channel.Bank is Type:
+  Bank{frames: Array<U32>, sounds: List<&2, Channel.Sound>}
 
 # The lumps of the table's rows.
 def Channel.lumps(rows: List<&2, Sn.Sound.Sfx>) -> List<&2, String>:
@@ -26,21 +33,67 @@ def Channel.lumps(rows: List<&2, Sn.Sound.Sfx>) -> List<&2, String>:
     case Sn.Sfx{id, lump, priority} <> rest:
       lump <> Channel.lumps(rest)
 
-# Each row's sound expanded from its lump, the lumps in the rows' order.
-def Channel.bank(rows: List<&2, Sn.Sound.Sfx>, lumps: List<&2, List<&2, U32>>) -> List<&2, Channel.Sound>:
-  match rows lumps:
-    case Sn.Sfx{id, lump, priority} <> rs l <> ls:
-      Sound{id, X.Sfx.of(l)} <> Channel.bank(rs, ls)
+def Channel.length(m: Maybe<&2, X.Sfx.Sound>) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{s}:
+      X.Sfx.length(s)
+
+# Each row's sound laid after the one before, from at.
+def Channel.layout(rows: List<&2, Sn.Sound.Sfx>, reads: List<&2, Maybe<&2, X.Sfx.Sound>>, +at: U32) ->
+  List<&2, Channel.Sound>:
+  match rows reads:
+    case Sn.Sfx{id, lump, priority} <> rs m <> ms:
+      +end = (at + Channel.length(m) : U32)
+      Sound{id, at, end} <> Channel.layout(rs, ms, end)
     case _ _:
       []
 
-# A sound's frames in the bank, none for a sound it lacks.
-def Channel.frames(bank: List<&2, Channel.Sound>, +sfx: U32) -> List<&2, U32>:
-  match bank:
+def Channel.expand(m: Maybe<&2, X.Sfx.Sound>, +at: U32, a: Array<U32>) -> Array<U32>:
+  match m:
+    case None{}:
+      a
+    case Some{s}:
+      X.Sfx.expand(s, a, at)
+
+def Channel.fill(reads: List<&2, Maybe<&2, X.Sfx.Sound>>, sounds: List<&2, Channel.Sound>, a: Array<U32>) -> Array<U32>:
+  match reads sounds:
+    case m <> ms Sound{id, at, end} <> ss:
+      Channel.fill(ms, ss, Channel.expand(m, at, a))
+    case _ _:
+      a
+
+def Channel.end(m: Maybe<&2, Channel.Sound>) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{Sound{id, at, end}}:
+      end
+
+def Channel.read(lumps: List<&2, List<&2, U32>>) -> List<&2, Maybe<&2, X.Sfx.Sound>>:
+  match lumps:
     case []:
       []
-    case Sound{id, frames} <> rest:
-      Bool.pick(List<&2, U32>, U32.is_eq(id, sfx), frames, Channel.frames(rest, sfx))
+    case l <> rest:
+      X.Sfx.read(l) <> Channel.read(rest)
+
+def Channel.bank.of(+reads: List<&2, Maybe<&2, X.Sfx.Sound>>, +sounds: List<&2, Channel.Sound>) -> Channel.Bank:
+  Bank{Channel.fill(reads, sounds, Array.new(U32, V.Vec.depth(Channel.end(List.last(&2, Channel.Sound, sounds))), 0)), sounds}
+
+# The rows' sounds expanded from their lumps, the lumps in the rows'
+# order. A lump CacheSFX refuses is a sound of no frames.
+def Channel.bank(+rows: List<&2, Sn.Sound.Sfx>, lumps: List<&2, List<&2, U32>>) -> Channel.Bank:
+  +reads = Channel.read(lumps)
+  Channel.bank.of(reads, Channel.layout(rows, reads, 0))
+
+# A sound's span in the bank, none for a sound it lacks.
+def Channel.find(sounds: List<&2, Channel.Sound>, +sfx: U32) -> Channel.Sound:
+  match sounds:
+    case []:
+      Sound{sfx, 0, 0}
+    case Sound{+id, +at, +end} <> rest:
+      Bool.pick(Channel.Sound, U32.is_eq(id, sfx), Sound{id, at, end}, Channel.find(rest, sfx))
 
 # snd_channels at Chocolate Doom's default, every one free.
 def Channel.none() -> List<&2, Maybe<&2, Channel>>:
@@ -72,8 +125,8 @@ def Channel.hush.slot(+source: Sn.Sound.Source, c: Maybe<&2, Channel>) -> Maybe<
   match c:
     case None{}:
       None{}
-    case Some{Chan{frames, sfx, +was, left, right}}:
-      Channel.kept(Sn.Sound.Source.same(source, was), Chan{frames, sfx, was, left, right})
+    case Some{Chan{at, end, sfx, +was, left, right}}:
+      Channel.kept(Sn.Sound.Source.same(source, was), Chan{at, end, sfx, was, left, right})
 
 # S_StopSound: the source's channel is freed. A source holds one channel
 # at a time, so there is at most one to free.
@@ -240,7 +293,7 @@ def Channel.key(c: Maybe<&2, Channel>) -> Maybe<&2, Nat>:
   match c:
     case None{}:
       None{}
-    case Some{Chan{frames, sfx, source, left, right}}:
+    case Some{Chan{at, end, sfx, source, left, right}}:
       Some{U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx))}
 
 def Channel.keys(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Nat>>:
@@ -255,44 +308,46 @@ def Channel.keys(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Nat>
 # more important the sound is dropped. A sound the bank holds no frames
 # of takes its channel too, as one whose lump CacheSFX refuses does, and
 # frees it at the next mix.
-def Channel.start(+bank: List<&2, Channel.Sound>, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32,
+def Channel.start(s: Channel.Sound, source: Sn.Sound.Source, +left: U32, +right: U32,
   +chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
+  Sound{+sfx, at, end} = s
   Channel.put(chans, Channel.choice(U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx)), Channel.keys(chans)),
-    Chan{Channel.frames(bank, sfx), sfx, source, left, right})
+    Chan{at, end, sfx, source, left, right})
 
 # What the sim reported, played: S_StartSound's tail after the
 # audibility test, where the source's old sound is stopped and the new
 # one takes a channel at the sides the volume and separation give.
-def Channel.event(+bank: List<&2, Channel.Sound>, e: Sn.Sound.Event, chans: List<&2, Maybe<&2, Channel>>) ->
+def Channel.event(+sounds: List<&2, Channel.Sound>, e: Sn.Sound.Event, chans: List<&2, Maybe<&2, Channel>>) ->
   List<&2, Maybe<&2, Channel>>:
   match e:
-    case Sn.Start{+sfx, +source, +vol, +sep}:
-      Channel.start(bank, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), Channel.hush(source, chans))
+    case Sn.Start{sfx, +source, +vol, +sep}:
+      Channel.start(Channel.find(sounds, sfx), source, Channel.left(vol, sep), Channel.right(vol, sep),
+        Channel.hush(source, chans))
     case Sn.Stop{source}:
       Channel.hush(source, chans)
 
 # The channels after the sounds of a frame's tics, in the order the tics
 # made them.
-def Channel.hear(+bank: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Event>,
+def Channel.hear(+sounds: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Event>,
   chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   match events:
     case []:
       chans
     case e <> rest:
-      Channel.hear(bank, rest, Channel.event(bank, e, chans))
+      Channel.hear(sounds, rest, Channel.event(sounds, e, chans))
 
 def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
-  Chan{frames, sfx, source, left, right} = c
+  Chan{at, end, sfx, source, left, right} = c
   (+vol, +sep) = p
-  Channel.kept(U32.is_zero(vol), Chan{frames, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep)})
+  Channel.kept(U32.is_zero(vol), Chan{at, end, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep)})
 
 def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
   c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
       None{}
-    case Some{Chan{frames, sfx, +source, left, right}}:
-      Channel.moved(Chan{frames, sfx, source, left, right}, params(ctx, source))
+    case Some{Chan{at, end, sfx, +source, left, right}}:
+      Channel.moved(Chan{at, end, sfx, source, left, right}, params(ctx, source))
 
 # S_UpdateSounds follows the current listener and source positions.
 def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,

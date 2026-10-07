@@ -54,7 +54,7 @@ def Test.slot(c: Maybe<&2, C.Channel>) -> String:
   match c:
     case None{}:
       "-"
-    case Some{C.Chan{frames, +sfx, source, left, right}}:
+    case Some{C.Chan{at, end, +sfx, source, left, right}}:
       Sn.Sound.lump(Sn.Sound.table(), sfx) ++ "/" ++ Sn.Sound.Source.show(source) ++ "/"
         ++ U32.show(left) ++ "," ++ U32.show(right)
 
@@ -71,21 +71,21 @@ def Test.told(+tag: String, +chans: List<&2, Maybe<&2, C.Channel>>) -> IO(List<&
     return chans
 
 # One event given to the channels, and the table it leaves.
-def Test.step(+bank: List<&2, C.Channel.Sound>, +tag: String, e: Sn.Sound.Event, chans: List<&2, Maybe<&2, C.Channel>>) ->
+def Test.step(+sounds: List<&2, C.Channel.Sound>, +tag: String, e: Sn.Sound.Event, chans: List<&2, Maybe<&2, C.Channel>>) ->
   IO(List<&2, Maybe<&2, C.Channel>>):
-  Test.told(tag, C.Channel.hear(bank, [e], chans))
+  Test.told(tag, C.Channel.hear(sounds, [e], chans))
 
-# The deck and channels after the frames mixed so far, in order.
-type Test.Mix is Data:
-  Mix{deck: S.Song.Deck, chans: List<&2, Maybe<&2, C.Channel>>, words: List<&2, U32>}
+# The bank, deck and channels after the frames mixed so far, in order.
+type Test.Mix is Type:
+  Mix{bank: C.Channel.Bank, deck: S.Song.Deck, chans: List<&2, Maybe<&2, C.Channel>>, words: List<&2, U32>}
 
-def Test.took(acc: List<&2, U32>, p: S.Song.Deck & List<&2, Maybe<&2, C.Channel>> & List<&2, U32>) -> Test.Mix:
-  (deck, chans, words) = p
-  Mix{deck, chans, List.append(&2, U32, acc, words)}
+def Test.took(acc: List<&2, U32>, w: A.Stream.Window) -> Test.Mix:
+  A.Window{bank, deck, chans, words} = w
+  Mix{bank, deck, chans, List.append(&2, U32, acc, words)}
 
 def Test.take(+n: U32, m: Test.Mix) -> Test.Mix:
-  Mix{deck, +chans, acc} = m
-  Test.took(acc, A.Stream.window(n, deck, chans))
+  Mix{bank, deck, +chans, acc} = m
+  Test.took(acc, A.Stream.window(n, deck, chans, bank))
 
 # A window of each of the frame counts.
 def Test.run(sizes: List<&2, U32>, m: Test.Mix) -> Test.Mix:
@@ -114,24 +114,25 @@ def Test.sizes() -> List<&2, U32>:
   [1, 7, 100, 2048, 33, 999, 3072, 5, 3072, 3072, 3072, 3072]
 
 # The grunt alone, over a deck that plays no song.
-def Test.alone(m: Test.Mix) -> IO(Unit):
-  Mix{deck, +chans, +words} = m
-  do IO<Unit>:
+def Test.alone(m: Test.Mix) -> IO(C.Channel.Bank):
+  Mix{bank, deck, +chans, +words} = m
+  do IO<C.Channel.Bank>:
     IO.print("grunt " ++ U32.show(H.Fnv.words(List.take(&2, U32, words, 16996n))) ++ " "
       ++ String.join(Test.frames(words, [0, 1, 3, 2714, 16995, 16996]), " "))
     IO.print("after " ++ String.join(Test.table(chans), " "))
+    return bank
 
 def Test.song.done(m: Test.Mix) -> IO(Unit):
-  Mix{deck, +chans, +words} = m
+  Mix{bank, deck, +chans, +words} = m
   do IO<Unit>:
     IO.print("song " ++ U32.show(H.Fnv.words(words)) ++ " "
       ++ String.join(Test.frames(words, [0, 1, 2155, 2156, 2157, 15480]), " "))
     IO.print("playing " ++ String.join(Test.table(chans), " "))
 
-def Test.song.on(+bank: List<&2, C.Channel.Sound>, m: Test.Mix) -> Test.Mix:
-  Mix{deck, chans, acc} = m
+def Test.song.on(+sounds: List<&2, C.Channel.Sound>, m: Test.Mix) -> Test.Mix:
+  Mix{bank, deck, chans, acc} = m
   Test.run([33, 999, 3072, 5, 3072, 3072, 3072],
-    Mix{deck, C.Channel.hear(bank, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], chans), acc})
+    Mix{bank, deck, C.Channel.hear(sounds, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], chans), acc})
 
 def Test.started(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
   (deck, idle) = p
@@ -139,10 +140,10 @@ def Test.started(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
 
 # The song from its first frame, after the chip's first buffer, with a
 # door from that frame and the grunt from 2156.
-def Test.song(+bank: List<&2, C.Channel.Sound>, deck: S.Song.Deck) -> Test.Mix:
-  Test.song.on(bank, Test.run([1, 7, 100, 2048],
-    Mix{Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))),
-      C.Channel.hear(bank, [Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}], C.Channel.none()), []}))
+def Test.song(+sounds: List<&2, C.Channel.Sound>, deck: S.Song.Deck, bank: C.Channel.Bank) -> Test.Mix:
+  Test.song.on(sounds, Test.run([1, 7, 100, 2048],
+    Mix{bank, Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))),
+      C.Channel.hear(sounds, [Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}], C.Channel.none()), []}))
 
 def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
   match source:
@@ -154,27 +155,27 @@ def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
       (51, 204)
 
 # The scripted sequence, one event a step.
-def Test.script(+bank: List<&2, C.Channel.Sound>) -> IO(Unit):
+def Test.script(+sounds: List<&2, C.Channel.Sound>) -> IO(Unit):
   do IO<Unit>:
-    c1 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "01", Sn.Start{Sn.Sound.stnmov(), Sn.Sector{1}, 64, 128},
+    c1 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "01", Sn.Start{Sn.Sound.stnmov(), Sn.Sector{1}, 64, 128},
       C.Channel.none())
-    c2 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "02", Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}, c1)
-    c3 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "03", Sn.Start{Sn.Sound.dorcls(), Sn.Sector{3}, 64, 129}, c2)
-    c4 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "04", Sn.Start{Sn.Sound.pstart(), Sn.Sector{4}, 64, 128}, c3)
-    c5 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "05", Sn.Start{Sn.Sound.pstop(), Sn.Sector{5}, 64, 128}, c4)
-    c6 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "06", Sn.Start{Sn.Sound.bdopn(), Sn.Sector{6}, 64, 128}, c5)
-    c7 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "07", Sn.Start{Sn.Sound.bdcls(), Sn.Sector{7}, 64, 128}, c6)
-    c8 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "08", Sn.Start{Sn.Sound.swtchn(), Sn.Nobody{}, 64, 128}, c7)
-    c9 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "09", Sn.Start{Sn.Sound.plpain(), Sn.Thing{1}, 64, 128}, c8)
-    c10 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "10", Sn.Start{Sn.Sound.pldeth(), Sn.Thing{1}, 64, 128}, c9)
-    c11 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "11", Sn.Start{Sn.Sound.itemup(), Sn.Sector{8}, 64, 128}, c10)
-    c12 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "12", Sn.Start{Sn.Sound.getpow(), Sn.Sector{9}, 64, 128}, c11)
-    c13 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "13", Sn.Start{Sn.Sound.pldeth(), Sn.Thing{2}, 64, 128}, c12)
-    c14 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "14", Sn.Start{Sn.Sound.stnmov(), Sn.Sector{10}, 64, 128}, c13)
-    c15 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "15", Sn.Stop{Sn.Thing{2}}, c14)
-    c16 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "16", Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}, c15)
+    c2 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "02", Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}, c1)
+    c3 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "03", Sn.Start{Sn.Sound.dorcls(), Sn.Sector{3}, 64, 129}, c2)
+    c4 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "04", Sn.Start{Sn.Sound.pstart(), Sn.Sector{4}, 64, 128}, c3)
+    c5 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "05", Sn.Start{Sn.Sound.pstop(), Sn.Sector{5}, 64, 128}, c4)
+    c6 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "06", Sn.Start{Sn.Sound.bdopn(), Sn.Sector{6}, 64, 128}, c5)
+    c7 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "07", Sn.Start{Sn.Sound.bdcls(), Sn.Sector{7}, 64, 128}, c6)
+    c8 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "08", Sn.Start{Sn.Sound.swtchn(), Sn.Nobody{}, 64, 128}, c7)
+    c9 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "09", Sn.Start{Sn.Sound.plpain(), Sn.Thing{1}, 64, 128}, c8)
+    c10 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "10", Sn.Start{Sn.Sound.pldeth(), Sn.Thing{1}, 64, 128}, c9)
+    c11 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "11", Sn.Start{Sn.Sound.itemup(), Sn.Sector{8}, 64, 128}, c10)
+    c12 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "12", Sn.Start{Sn.Sound.getpow(), Sn.Sector{9}, 64, 128}, c11)
+    c13 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "13", Sn.Start{Sn.Sound.pldeth(), Sn.Thing{2}, 64, 128}, c12)
+    c14 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "14", Sn.Start{Sn.Sound.stnmov(), Sn.Sector{10}, 64, 128}, c13)
+    c15 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "15", Sn.Stop{Sn.Thing{2}}, c14)
+    c16 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "16", Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}, c15)
     c17 : List<&2, Maybe<&2, C.Channel>> <- Test.told("17", C.Channel.update(~Unit, ~Test.params, Unit{}, c16))
-    c18 : List<&2, Maybe<&2, C.Channel>> <- Test.step(bank, "18", Sn.Stop{Sn.Nobody{}}, c17)
+    c18 : List<&2, Maybe<&2, C.Channel>> <- Test.step(sounds, "18", Sn.Stop{Sn.Nobody{}}, c17)
     return Unit{}
 
 # The sounds the mixer plays here; the rest take their channels with no
@@ -183,21 +184,26 @@ def Test.mixed(r: Sn.Sound.Sfx) -> Bool:
   Sn.Sfx{+id, lump, priority} = r
   U32.is_eq(id, Sn.Sound.noway()) || U32.is_eq(id, Sn.Sound.doropn())
 
-def Test.all(p: S.Song.Deck & List<&2, C.Channel.Sound>) -> IO(Unit):
-  (+deck, +bank) = p
+def Test.all.go(+deck: S.Song.Deck, bank: C.Channel.Bank) -> IO(Unit):
+  C.Bank{frames, +sounds} = bank
   do IO<Unit>:
-    Test.script(bank)
-    Test.alone(Test.run(Test.sizes(), Mix{deck,
-      C.Channel.hear(bank, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], C.Channel.none()), []}))
-    Test.song.done(Test.song(bank, deck))
+    Test.script(sounds)
+    rest : C.Channel.Bank <- Test.alone(Test.run(Test.sizes(), Mix{C.Bank{frames, sounds}, deck,
+      C.Channel.hear(sounds, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], C.Channel.none()), []}))
+    Test.song.done(Test.song(sounds, deck, rest))
     IO.print("postmix " ++ Test.frame(A.Stream.post([(35536 << 16n : U32)],
       [A.Stream.mix(0, 255, 30000, A.Stream.mix(0, 255, 30000, 0))]), 0))
 
+def Test.all(p: S.Song.Deck & C.Channel.Bank) -> IO(Unit):
+  (deck, bank) = p
+  Test.all.go(deck, bank)
+
 def main() -> IO(Unit):
   do IO<Unit>:
-    loaded : S.Song.Deck & List<&2, C.Channel.Sound> <-
+    loaded : S.Song.Deck & C.Channel.Bank <-
       A.Stream.load(["D_E1M1"], List.filter(~Sn.Sound.Sfx, ~Test.mixed, Sn.Sound.table()))
     Test.all(loaded)
+
 #|01 DSSTNMOV/sector 1/63,64 - - - - - - -
 #|02 DSSTNMOV/sector 1/63,64 DSDOROPN/sector 2/20,81 - - - - - -
 #|03 DSSTNMOV/sector 1/63,64 DSDOROPN/sector 2/20,81 DSDORCLS/sector 3/62,65 - - - - -

@@ -92,22 +92,23 @@ def Sfx.dot(row: List<&2, F32>, xs: List<&2, F32>) -> F32:
 def Sfx.sample(x: F32) -> U32:
   (F32.to_u32(F32.clamp((((x + 257.0 : F32) - 256.0 : F32) * 32768.0 : F32), 0.0, 65535.0)) .^. 32768 : U32)
 
-# The frames one source sample makes, latest first onto acc.
-def Sfx.frames(rows: List<&2, List<&2, F32>>, +xs: List<&2, F32>, acc: List<&2, U32>) -> List<&2, U32>:
+# The frames one source sample makes, written from i on.
+def Sfx.frames(rows: List<&2, List<&2, F32>>, +xs: List<&2, F32>, a: Array<U32>, +i: U32) -> Array<U32>:
   match rows:
     case []:
-      acc
+      a
     case row <> rest:
-      Sfx.frames(rest, xs, Sfx.sample(Sfx.dot(row, xs)) <> acc)
+      Sfx.frames(rest, xs, Array.set(U32, a, i, Sfx.sample(Sfx.dot(row, xs))), (i + 1 : U32))
 
-def Sfx.expand.go(n: Nat, +rows: List<&2, List<&2, F32>>, xs: List<&2, F32>, acc: List<&2, U32>) -> List<&2, U32>:
+def Sfx.expand.go(n: Nat, +rows: List<&2, List<&2, F32>>, +step: U32, xs: List<&2, F32>, a: Array<U32>, +i: U32) ->
+  Array<U32>:
   match n xs:
     case 0n _:
-      List.reverse(&2, U32, acc)
+      a
     case 1n+m Nil{}:
-      List.reverse(&2, U32, acc)
+      a
     case 1n+m +x <> +rest:
-      Sfx.expand.go(m, rows, rest, Sfx.frames(rows, x <> rest, acc))
+      Sfx.expand.go(m, rows, step, rest, Sfx.frames(rows, x <> rest, a, i), (i + step : U32))
 
 # The resampler's phase advances by 8 * rate / 44100 a frame, and the
 # table holds the even phases, so a frame's row is every rate / 11025th.
@@ -118,29 +119,33 @@ def Sfx.rows(rows: List<&2, List<&2, F32>>, +every: U32, +i: U32) -> List<&2, Li
     case row <> rest:
       List.filter.put(List<&2, F32>, row, Sfx.rows(rest, every, (i + 1 : U32)), U32.is_zero((i % every : U32)))
 
-def Sfx.expand.at(ok: Bool, rate: U32, +count: U32, bytes: List<&2, U32>) -> List<&2, U32>:
+def Sfx.served(+rate: U32) -> Bool:
+  U32.is_eq(rate, 11025) || U32.is_eq(rate, 22050) || U32.is_eq(rate, 44100)
+
+def Sfx.length.at(ok: Bool, +rate: U32, +count: U32) -> U32:
   match ok:
     case False{}:
-      []
+      0
     case True{}:
-      Sfx.expand.go(U32.to_nat(count), Sfx.rows(T.SfxTaps.rows(), (rate / 11025 : U32), 0),
-        Sfx.floats(U32.to_nat(count), bytes, [0.0, 0.0, 0.0, 0.0, 0.0]), [])
+      (count * (44100 / rate) : U32)
 
-# A sound's 16-bit samples at 44100 Hz, the five source samples before
-# its first silence as SDL's history is; none at a rate SDL's converter
-# is not given.
-def Sfx.expand(s: Sfx.Sound) -> List<&2, U32>:
+# The frames a sound expands to: 44100 / rate a byte played, none at a
+# rate SDL's converter is not given.
+def Sfx.length(s: Sfx.Sound) -> U32:
   Sound{+rate, count, bytes} = s
-  Sfx.expand.at(U32.is_eq(rate, 11025) || U32.is_eq(rate, 22050) || U32.is_eq(rate, 44100), rate, count, bytes)
+  Sfx.length.at(Sfx.served(rate), rate, count)
 
-def Sfx.heard(m: Maybe<&2, Sfx.Sound>) -> List<&2, U32>:
-  match m:
-    case None{}:
-      []
-    case Some{s}:
-      Sfx.expand(s)
+def Sfx.expand.at(ok: Bool, +rate: U32, +count: U32, bytes: List<&2, U32>, a: Array<U32>, +at: U32) -> Array<U32>:
+  match ok:
+    case False{}:
+      a
+    case True{}:
+      Sfx.expand.go(U32.to_nat(count), Sfx.rows(T.SfxTaps.rows(), (rate / 11025 : U32), 0), (44100 / rate : U32),
+        Sfx.floats(U32.to_nat(count), bytes, [0.0, 0.0, 0.0, 0.0, 0.0]), a, at)
 
-# What Chocolate Doom plays of a lump: its expansion, or nothing for a
-# lump CacheSFX refuses.
-def Sfx.of(lump: List<&2, U32>) -> List<&2, U32>:
-  Sfx.heard(Sfx.read(lump))
+# A sound's 16-bit samples at 44100 Hz written into the array from at,
+# the five source samples before its first silence as SDL's history is;
+# nothing at a rate SDL's converter is not given.
+def Sfx.expand(s: Sfx.Sound, a: Array<U32>, +at: U32) -> Array<U32>:
+  Sound{+rate, count, bytes} = s
+  Sfx.expand.at(Sfx.served(rate), rate, count, bytes, a, at)

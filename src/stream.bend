@@ -3,20 +3,20 @@
 # playing channel's sound over it, 44100 frames a second, left then
 # right, a frame of the loop at a time.
 import Base
+import ./bytes.bend as B
 import ./wad.bend as W
 import ./song.bend as S
 import ./sound.bend as Sn
 import ./channel.bend as C
 
 # The mixer: the device, the music in a list of one, the channels
-# playing over it, the bank of sounds they play from, and the game
-# frames whose top-up found the device's queue empty, which the window
-# bench reports. A list is the one shape the native build holds by
-# pointer; the deck's own words would not fit the game's frame
-# (docs/bend.md).
+# playing over it, the bank they play from, and the game frames whose
+# top-up found the device's queue empty, which the window bench reports.
+# A list is the one shape the native build holds by pointer; the deck's
+# own words would not fit the game's frame (docs/bend.md).
 type Stream is Type:
-  Stream{audio: Audio, deck: List<&2, S.Song.Deck>, chans: List<&2, Maybe<&2, C.Channel>>,
-    bank: List<&2, C.Channel.Sound>, dry: U32}
+  Stream{audio: Audio, deck: List<&2, S.Song.Deck>, chans: List<&2, Maybe<&2, C.Channel>>, bank: C.Channel.Bank,
+    dry: U32}
 
 # A 16-bit sample as the device takes it: its sign bit flipped is its
 # value over 32768, offset by a half.
@@ -63,38 +63,41 @@ def Stream.over(+left: U32, +right: U32, frames: List<&2, U32>, words: List<&2, 
     case _ ws:
       ws
 
-def Stream.voice(c: Maybe<&2, C.Channel>, words: List<&2, U32>) -> List<&2, U32>:
+def Stream.voice.over(+left: U32, +right: U32, words: List<&2, U32>, q: Array<U32> & List<&2, U32>) ->
+  Array<U32> & List<&2, U32>:
+  (a, frames) = q
+  (a, Stream.over(left, right, frames, words))
+
+def Stream.voice.read(+left: U32, +right: U32, +at: U32, +n: U32, p: Array<U32> & List<&2, U32>) ->
+  Array<U32> & List<&2, U32>:
+  (a, words) = p
+  Stream.voice.over(left, right, words, B.Bytes.list(a, at, n))
+
+def Stream.voice(+want: U32, c: Maybe<&2, C.Channel>, p: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, U32>:
   match c:
     case None{}:
-      words
-    case Some{C.Chan{frames, sfx, source, +left, +right}}:
-      Stream.over(left, right, frames, words)
+      p
+    case Some{C.Chan{+at, +end, sfx, source, +left, +right}}:
+      Stream.voice.read(left, right, at, U32.min(want, (end - at : U32)), p)
 
 # Every channel mixed in, in the order SDL_mixer takes them, since the
 # clipping of one addition is what the next adds to.
-def Stream.voices(chans: List<&2, Maybe<&2, C.Channel>>, words: List<&2, U32>) -> List<&2, U32>:
+def Stream.voices(+want: U32, chans: List<&2, Maybe<&2, C.Channel>>, p: Array<U32> & List<&2, U32>) ->
+  Array<U32> & List<&2, U32>:
   match chans:
     case []:
-      words
+      p
     case c <> rest:
-      Stream.voices(rest, Stream.voice(c, words))
+      Stream.voices(want, rest, Stream.voice(want, c, p))
 
 # A channel that has played its sound out frees itself, as SDL_mixer's
 # does in the callback that mixes its last frame.
-def Stream.left(frames: List<&2, U32>, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32) ->
-  Maybe<&2, C.Channel>:
-  match frames:
-    case []:
-      None{}
-    case f <> rest:
-      Some{C.Chan{f <> rest, sfx, source, left, right}}
-
 def Stream.played.slot(+want: U32, c: Maybe<&2, C.Channel>) -> Maybe<&2, C.Channel>:
   match c:
     case None{}:
       None{}
-    case Some{C.Chan{frames, sfx, source, left, right}}:
-      Stream.left(List.drop(&2, U32, frames, U32.to_nat(want)), sfx, source, left, right)
+    case Some{C.Chan{+at, +end, sfx, source, left, right}}:
+      C.Channel.kept(U32.is_ge((at + want : U32), end), C.Chan{(at + want : U32), end, sfx, source, left, right})
 
 # The channels past want frames.
 def Stream.played(+want: U32, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
@@ -112,17 +115,29 @@ def Stream.post(song: List<&2, U32>, words: List<&2, U32>) -> List<&2, U32>:
     case _ ws:
       ws
 
-def Stream.window.mixed(+want: U32, +chans: List<&2, Maybe<&2, C.Channel>>, p: S.Song.Deck & List<&2, U32>) ->
-  S.Song.Deck & List<&2, Maybe<&2, C.Channel>> & List<&2, U32>:
+# A window of the mix: the bank, the deck, the channels after it, and
+# its frames.
+type Stream.Window is Type:
+  Window{bank: C.Channel.Bank, deck: S.Song.Deck, chans: List<&2, Maybe<&2, C.Channel>>, words: List<&2, U32>}
+
+def Stream.window.done(+sounds: List<&2, C.Channel.Sound>, deck: S.Song.Deck, chans: List<&2, Maybe<&2, C.Channel>>,
+  song: List<&2, U32>, p: Array<U32> & List<&2, U32>) -> Stream.Window:
+  (a, words) = p
+  Window{C.Bank{a, sounds}, deck, chans, Stream.post(song, words)}
+
+def Stream.window.mixed(+want: U32, +chans: List<&2, Maybe<&2, C.Channel>>, bank: C.Channel.Bank,
+  p: S.Song.Deck & List<&2, U32>) -> Stream.Window:
+  C.Bank{a, +sounds} = bank
   (deck, song) = p
-  (deck, Stream.played(want, chans), Stream.post(song, Stream.voices(chans, List.replicate(U32, U32.to_nat(want), 0))))
+  Stream.window.done(sounds, deck, Stream.played(want, chans), song,
+    Stream.voices(want, chans, (a, List.replicate(U32, U32.to_nat(want), 0))))
 
 # The next want frames of the mix. Chocolate Doom registers
 # OPL_Mix_Callback as MIX_CHANNEL_POST, so the song is added after the
 # sound channels have clipped.
-def Stream.window(+want: U32, deck: S.Song.Deck, +chans: List<&2, Maybe<&2, C.Channel>>) ->
-  S.Song.Deck & List<&2, Maybe<&2, C.Channel>> & List<&2, U32>:
-  Stream.window.mixed(want, chans, S.Song.Deck.take(want, deck))
+def Stream.window(+want: U32, deck: S.Song.Deck, +chans: List<&2, Maybe<&2, C.Channel>>, bank: C.Channel.Bank) ->
+  Stream.Window:
+  Stream.window.mixed(want, chans, bank, S.Song.Deck.take(want, deck))
 
 # The frames the device holds between top-ups, of the ring's 4096: 52.2
 # ms at 44100 Hz, against Chocolate Doom's 1024 frames and 23.2 ms.
@@ -131,26 +146,25 @@ def Stream.window(+want: U32, deck: S.Song.Deck, +chans: List<&2, Maybe<&2, C.Ch
 def Stream.top() -> U32:
   2304
 
-def Stream.wrote(deck: List<&2, S.Song.Deck>, chans: List<&2, Maybe<&2, C.Channel>>, bank: List<&2, C.Channel.Sound>,
+def Stream.wrote(deck: List<&2, S.Song.Deck>, chans: List<&2, Maybe<&2, C.Channel>>, bank: C.Channel.Bank,
   dry: U32, p: Audio & U32) -> IO(Stream):
   (audio, queued) = p
   IO.pure(Stream, Stream{audio, deck, chans, bank, dry})
 
-def Stream.filled(audio: Audio, bank: List<&2, C.Channel.Sound>, dry: U32,
-  r: S.Song.Deck & List<&2, Maybe<&2, C.Channel>> & List<&2, U32>) -> IO(Stream):
-  (deck, chans, words) = r
+def Stream.filled(audio: Audio, dry: U32, w: Stream.Window) -> IO(Stream):
+  Window{bank, deck, chans, words} = w
   IO.bind(Audio & U32, Stream, Audio.write(audio, Stream.samples(words)),
     q => Stream.wrote([deck], chans, bank, dry, q))
 
 def Stream.topped(+song: String, deck: List<&2, S.Song.Deck>, chans: List<&2, Maybe<&2, C.Channel>>,
-  bank: List<&2, C.Channel.Sound>, +dry: U32, p: Audio & U32) -> IO(Stream):
+  bank: C.Channel.Bank, +dry: U32, p: Audio & U32) -> IO(Stream):
   match deck:
     case []:
       Stream.wrote([], chans, bank, dry, p)
     case d <> rest:
       (audio, +queued) = p
-      Stream.filled(audio, bank, (dry + Bool.to_u32(U32.is_zero(queued)) : U32),
-        Stream.window((Stream.top() - queued : U32), S.Song.Deck.change(song, d), chans))
+      Stream.filled(audio, (dry + Bool.to_u32(U32.is_zero(queued)) : U32),
+        Stream.window((Stream.top() - queued : U32), S.Song.Deck.change(song, d), chans, bank))
 
 # A frame of the mix with the scene's song, which S_ChangeMusic starts
 # if another is playing: a write of no samples reads the queue, and the
@@ -173,8 +187,8 @@ def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> Maybe<Str
   match m:
     case None{}:
       None{}
-    case Some{Stream{audio, deck, chans, +bank, dry}}:
-      Some{Stream{audio, deck, C.Channel.hear(bank, events, chans), bank, dry}}
+    case Some{Stream{audio, deck, chans, C.Bank{a, +sounds}, dry}}:
+      Some{Stream{audio, deck, C.Channel.hear(sounds, events, chans), C.Bank{a, sounds}, dry}}
 
 def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
   m: Maybe<Stream>) -> Maybe<Stream>:
@@ -185,15 +199,14 @@ def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx
       Some{Stream{audio, deck, C.Channel.update(~Ctx, ~params, ctx, chans), bank, dry}}
 
 def Stream.loaded(+songs: List<&2, String>, +rows: List<&2, Sn.Sound.Sfx>, +lumps: List<&2, List<&2, U32>>) ->
-  S.Song.Deck & List<&2, C.Channel.Sound>:
+  S.Song.Deck & C.Channel.Bank:
   (S.Song.Deck.of(songs, List.drop(&2, List<&2, U32>, lumps, List.length(&2, Sn.Sound.Sfx, rows))),
     C.Channel.bank(rows, lumps))
 
 # The named songs, with GENMIDI, and the sounds of the table's rows given,
 # expanded, all read from the WAD BENDOOM_IWAD names in one pass.
-def Stream.load(+songs: List<&2, String>, +rows: List<&2, Sn.Sound.Sfx>) ->
-  IO(S.Song.Deck & List<&2, C.Channel.Sound>):
-  do IO<S.Song.Deck & List<&2, C.Channel.Sound>>:
+def Stream.load(+songs: List<&2, String>, +rows: List<&2, Sn.Sound.Sfx>) -> IO(S.Song.Deck & C.Channel.Bank):
+  do IO<S.Song.Deck & C.Channel.Bank>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     lumps : List<&2, List<&2, U32>> <- W.Wad.read(path, List.append(&2, String, C.Channel.lumps(rows), "GENMIDI" <> songs))
     return Stream.loaded(songs, rows, lumps)
@@ -204,7 +217,7 @@ def Stream.silent() -> IO(Maybe<Stream>):
     IO.print_err("bendoom: no sound device; playing silent")
     return None{}
 
-def Stream.device(audio: Result<&1, &1, U32 & String, Audio>, deck: S.Song.Deck, bank: List<&2, C.Channel.Sound>) ->
+def Stream.device(audio: Result<&1, &1, U32 & String, Audio>, deck: S.Song.Deck, bank: C.Channel.Bank) ->
   IO(Maybe<Stream>):
   match audio:
     case Fail{e}:
@@ -212,7 +225,7 @@ def Stream.device(audio: Result<&1, &1, U32 & String, Audio>, deck: S.Song.Deck,
     case Done{a}:
       IO.pure(Maybe<Stream>, Some{Stream{a, [deck], C.Channel.none(), bank, 0}})
 
-def Stream.opened(audio: Result<&1, &1, U32 & String, Audio>, p: S.Song.Deck & List<&2, C.Channel.Sound>) ->
+def Stream.opened(audio: Result<&1, &1, U32 & String, Audio>, p: S.Song.Deck & C.Channel.Bank) ->
   IO(Maybe<Stream>):
   (deck, bank) = p
   Stream.device(audio, deck, bank)
@@ -221,7 +234,7 @@ def Stream.opened(audio: Result<&1, &1, U32 & String, Audio>, p: S.Song.Deck & L
 # 44100 Hz, or silence.
 def Stream.open(+songs: List<&2, String>) -> IO(Maybe<Stream>):
   do IO<Maybe<Stream>>:
-    loaded : S.Song.Deck & List<&2, C.Channel.Sound> <- Stream.load(songs, Sn.Sound.table())
+    loaded : S.Song.Deck & C.Channel.Bank <- Stream.load(songs, Sn.Sound.table())
     audio : Result<&1, &1, U32 & String, Audio> <- Audio.open(44100)
     Stream.opened(audio, loaded)
 
