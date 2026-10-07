@@ -90,9 +90,10 @@ def Film.go(outros: Nat, cmds: List<&2, K.Cmd>, world: I.Play.World, deck: Sg.So
       I.World{play, mem, +gfx, +tables, +level} = world
       C.Bank{frames, +sounds} = bank
       +step = I.Play.step(level, cmd, False{}, play)
+      +events = I.Play.Step.sounds(step)
       +next = I.Play.Step.play(step)
       Film.mixed(audio, M.Stream.window(1260, Sg.Song.Deck.change(I.Play.song(next), deck),
-          Film.channels(next, C.Channel.hear(sounds, I.Play.Step.sounds(step), chans)), C.Bank{frames, sounds}),
+          Film.channels(next, C.Channel.hear(sounds, events, chans)), C.Bank{frames, sounds}),
         file => later => voices => kept =>
           Film.shot(V.Show.rgb(I.Play.frame(tables, gfx, next, True{}, mem)),
             m => IO.bind(I.Play.World, Unit, I.Play.load(I.World{next, m, gfx, tables, level}),
