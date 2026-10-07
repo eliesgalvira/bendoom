@@ -725,20 +725,139 @@ def Laws.clear_pins_things(level, things, p, m, k, id, listed, clear):
 # The wall law
 # ------------
 
-# Free: no line stops the player's box. Every move the sim takes has
-# passed Sim.check, whose lines are those, so each function from the tic
-# down keeps it: a lemma a function, on the flag it decides by and the
-# record it opens.
-def Free(level: L.Level, +p: S.Player) -> Type:
-  {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}
+# Placed: no line stops the player's box, or it stands on a teleport
+# destination. Every move the sim takes has passed Sim.check, whose
+# lines are those, but a teleport, which lands on a destination, so
+# each function from the tic down keeps it: a lemma a function, on the
+# flag it decides by and the record it opens.
+def Placed(level: L.Level, +p: S.Player) -> Type:
+  {True{} == Bool.or(S.Sim.free(level, S.Player.x(p), S.Player.y(p)),
+    S.Sim.teleport.at(L.Level.records(level), S.Player.x(p), S.Player.y(p))) : Bool}
+
+def or_left(a: Bool, -b: Bool, e: {True{} == a : Bool}) -> {True{} == Bool.or(a, b) : Bool}:
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      %e : BD(_, Unit, {True{} == b : Bool})
+      Unit{}
+
+def or_right(a: Bool, -b: Bool, e: {True{} == b : Bool}) -> {True{} == Bool.or(a, b) : Bool}:
+  match a:
+    case True{}:
+      {==}
+    case False{}:
+      e
+
+# A destination found among some is one of them: the search over them
+# answers True at its place.
+def DestIn(ds: List<&2, S.Sim.Dest>, m: Maybe<&2, S.Sim.Dest>) -> Type:
+  match m:
+    case None{}:
+      Unit
+    case Some{S.Dest{x, y, angle}}:
+      {True{} == S.Sim.teleport.at.go(ds, x, y) : Bool}
+
+def at_head(+x: U32, +y: U32, angle: U32, rest: List<&2, S.Sim.Dest>) ->
+  {True{} == S.Sim.teleport.at.go(S.Dest{x, y, angle} <> rest, x, y) : Bool}:
+  %u32_cmp_refl(x)
+    : {True{} == Bool.or(Bool.and(Cmp.is_eq(_), U32.is_eq(y, y)), S.Sim.teleport.at.go(rest, x, y)) : Bool}
+  %u32_cmp_refl(y) : {True{} == Bool.or(Cmp.is_eq(_), S.Sim.teleport.at.go(rest, x, y)) : Bool}
+  {==}
+
+def at_tail(d: S.Sim.Dest, rest: List<&2, S.Sim.Dest>, +x: U32, +y: U32,
+  e: {True{} == S.Sim.teleport.at.go(rest, x, y) : Bool}) ->
+  {True{} == S.Sim.teleport.at.go(d <> rest, x, y) : Bool}:
+  match d:
+    case S.Dest{dx, dy, angle}:
+      or_right(Bool.and(U32.is_eq(dx, x), U32.is_eq(dy, y)), S.Sim.teleport.at.go(rest, x, y), e)
+
+def pick_in(take: Bool, d: S.Sim.Dest, rest: List<&2, S.Sim.Dest>, later: Maybe<&2, S.Sim.Dest>,
+  h: DestIn(rest, later)) -> DestIn(d <> rest, S.Sim.teleport.pick(take, d, later)):
+  match take d later:
+    case True{} S.Dest{x, y, angle} _:
+      at_head(x, y, angle, rest)
+    case False{} _ None{}:
+      Unit{}
+    case False{} e Some{S.Dest{x, y, angle}}:
+      at_tail(e, rest, x, y, h)
+
+# The search's answer is one of the destinations it searched.
+def find_in(ds: List<&2, S.Sim.Dest>, +level: L.Level, +tag: U32) -> DestIn(ds, S.Sim.teleport.find(ds, level, tag)):
+  match ds:
+    case []:
+      Unit{}
+    case +d <> +rest:
+      pick_in(S.Sim.teleport.takes(level, tag, d, S.Sim.teleport.find(rest, level, tag)), d, rest,
+        S.Sim.teleport.find(rest, level, tag), find_in(rest, level, tag))
+
+def DestAt(level: L.Level, m: Maybe<&2, S.Sim.Dest>) -> Type:
+  DestIn(S.Sim.dests(L.Level.records(level)), m)
+
+def front_in(back: Bool, +level: L.Level, +line: U32) -> DestAt(level, S.Sim.teleport.front(back, level, line)):
+  match back:
+    case False{}:
+      Unit{}
+    case True{}:
+      find_in(S.Sim.dests(L.Level.records(level)), level, L.Level.tag(level, line))
+
+def if_in(takes: Bool, +level: L.Level, +line: U32, +x: U32, +y: U32) ->
+  DestAt(level, S.Sim.teleport.if(takes, level, line, x, y)):
+  match takes:
+    case False{}:
+      Unit{}
+    case True{}:
+      front_in(S.Sim.point_side(x, y, L.Level.line(level, line)), level, line)
+
+def WentAt(level: L.Level, w: S.Sim.Went) -> Type:
+  match w:
+    case S.Went{crossed, dest}:
+      DestAt(level, dest)
+
+def went_cross_in(+level: L.Level, dest: Maybe<&2, S.Sim.Dest>, c: S.Sim.Cross, later: S.Sim.Went,
+  hd: DestAt(level, dest), hl: WentAt(level, later)) -> WentAt(level, S.Sim.went.cross(dest, c, later)):
+  match dest later:
+    case None{} S.Went{crossed, to}:
+      hl
+    case Some{d} S.Went{crossed, to}:
+      hd
+
+# Every teleport a move's crossings take lands on a destination.
+def went_in(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +z: U32, +angle: U32) ->
+  WentAt(level, S.Sim.went(lines, level, x, y, z, angle)):
+  match lines:
+    case []:
+      Unit{}
+    case +line <> +rest:
+      went_cross_in(level, S.Sim.teleport.if(S.Sim.teleports(L.Level.special(level, line)), level, line, x, y),
+        S.Cross{line, x, y, z, angle}, S.Sim.went(rest, level, x, y, z, angle),
+        if_in(S.Sim.teleports(L.Level.special(level, line)), level, line, x, y), went_in(rest, level, x, y, z, angle))
+
+# A taken move leaves the player where it passed the check, or on the
+# destination of a teleport it took.
+def went_placed(+level: L.Level, dest: Maybe<&2, S.Sim.Dest>, p: S.Player, hd: DestAt(level, dest),
+  hp: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}) -> Placed(level, S.Player.went(level, dest, p)):
+  match dest p:
+    case None{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
+      or_left(S.Sim.free(level, x, y), S.Sim.teleport.at(L.Level.records(level), x, y), hp)
+    case Some{S.Dest{+dx, +dy, angle}} S.Player{+x, +y, +z, +pangle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
+      or_right(S.Sim.free(level, dx, dy), S.Sim.teleport.at(L.Level.records(level), dx, dy), hd)
+
+def try_went_placed(w: S.Sim.Went, +level: L.Level, p: S.Player, things: H.Things, +ox: U32, +oy: U32,
+  hw: WentAt(level, w), hp: {True{} == S.Sim.free(level, S.Player.x(p), S.Player.y(p)) : Bool}) ->
+  Placed(level, S.Sim.Try.player(S.Sim.try_move.went(w, level, p, things, ox, oy))):
+  match w p:
+    case S.Went{more, dest} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
+      went_placed(level, dest, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz,
+        List.append(&2, S.Sim.Cross, crossed, more), inv, psprites, hurt}, hw, hp)
 
 def Xy.player(s: S.Sim.Xy) -> S.Player:
   S.Xy{done, t, xm, ym} = s
   S.Sim.Try.player(t)
 
 # Holding another inventory keeps the place.
-def holding_free(+level: L.Level, p: S.Player, held: I.Inventory, hp: Free(level, p)) ->
-  Free(level, S.Player.holding(p, held)):
+def holding_placed(+level: L.Level, p: S.Player, held: I.Inventory, hp: Placed(level, p)) ->
+  Placed(level, S.Player.holding(p, held)):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
@@ -762,116 +881,118 @@ def fit_ok(c: Bool, +level: L.Level, +x: U32, +y: U32, +ok: Bool, fl: U32, cl: U
   %hf : {True{} == S.Sim.Fit.ok(_) : Bool}
   and_true_left(ok, h, e)
 
-def fin_free(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
-  ceil: U32, over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, dl: U32, +h: Bool,
+def fin_placed(+level: L.Level, go: Bool, p: S.Player, things: H.Things, +x: U32, +y: U32, floor: U32,
+  ceil: U32, +over: List<&2, U32>, +c: Bool, +ok: Bool, fl: U32, cl: U32, dl: U32, +h: Bool,
   e: {go == Bool.and(ok, h) : Bool},
-  hf: {S.Fit{ok, fl, cl, dl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over))):
+  hf: {S.Fit{ok, fl, cl, dl} == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.try_move.fin(go, level, p, things, x, y, floor, ceil, over))):
   match go p:
     case False{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case True{} S.Player{+px, +py, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, dl, h, e, hf))
+      try_went_placed(S.Sim.went(over, level, x, y, z, angle), level, S.Player{x, y, z, angle, momx, momy, momz,
+        floor, ceil, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, things, px, py,
+        went_in(over, level, x, y, z, angle), at_clear(c, level, x, y, fit_ok(c, level, x, y, ok, fl, cl, dl, h, e, hf)))
 
-def fit_free(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things,
+def fit_placed(+level: L.Level, +p: S.Player, +x: U32, +y: U32, touched: I.Inventory & H.Things,
   f: S.Sim.Fit, over: List<&2, U32>, +c: Bool,
-  hf: {f == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move.fit(level, p, x, y, touched, f, over))):
+  hf: {f == S.Sim.fit.at(c, level, x, y, S.Sim.radius(), 1) : S.Sim.Fit}, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.try_move.fit(level, p, x, y, touched, f, over))):
   match touched f:
     case (+inv, +things) S.Fit{+ok, +floor, +ceil, +drop}:
-      fin_free(level, S.Sim.passes(S.Fit{ok, floor, ceil, drop}, S.Player.z(p), S.Sim.height()),
+      fin_placed(level, S.Sim.passes(S.Fit{ok, floor, ceil, drop}, S.Player.z(p), S.Sim.height()),
         S.Player.holding(p, inv), things, x, y, floor, ceil, over, c, ok, floor, ceil, drop,
         Bool.and(F.Fixed.ge((ceil - floor : U32), S.Sim.height()),
           Bool.and(F.Fixed.ge((ceil - S.Player.z(p) : U32), S.Sim.height()),
-            F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))), {==}, hf, holding_free(level, p, inv, hp))
+            F.Fixed.le((floor - S.Player.z(p) : U32), S.Sim.step_up()))), {==}, hf, holding_placed(level, p, inv, hp))
 
-def try_free(+level: L.Level, +things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.try_move(level, things, p, x, y))):
+def try_placed(+level: L.Level, +things: H.Things, +p: S.Player, +x: U32, +y: U32, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.try_move(level, things, p, x, y))):
   +m = S.Sim.Body.at(S.Player.body(p, H.Things.you(things)), x, y)
-  fit_free(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
+  fit_placed(level, p, x, y, S.Sim.touch(level, things, p, x, y, S.Sim.met(level, things, p, m)),
     S.Sim.check(level, things, p, m, 1), S.Sim.crossings(level, S.Player.x(p), S.Player.y(p), x, y, S.Sim.radius()),
     Maybe.is_none(&2, U32, S.Sim.blocked(level, things, p, m)), {==}, hp)
 
-def done_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(S.Sim.Try.done(t))):
+def done_placed(+level: L.Level, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.Try.done(t))):
   match t:
     case S.Try{ok, p, things}:
       ht
 
-def stairstep_fin_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(S.Sim.stairstep.fin(level, t))):
+def stairstep_fin_placed(+level: L.Level, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.stairstep.fin(level, t))):
   match t:
     case S.Try{True{}, p, things}:
       ht
     case S.Try{False{}, +p, +things}:
-      done_free(level, S.Sim.try_move(level, things, p, (S.Player.x(p) + S.Player.momx(p) : U32), S.Player.y(p)),
-        try_free(level, things, p, (S.Player.x(p) + S.Player.momx(p) : U32), S.Player.y(p), ht))
+      done_placed(level, S.Sim.try_move(level, things, p, (S.Player.x(p) + S.Player.momx(p) : U32), S.Player.y(p)),
+        try_placed(level, things, p, (S.Player.x(p) + S.Player.momx(p) : U32), S.Player.y(p), ht))
 
-def stairstep_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.stairstep(level, things, p))):
+def stairstep_placed(+level: L.Level, +things: H.Things, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.stairstep(level, things, p))):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      stairstep_fin_free(level, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, x, (y + momy : U32)),
-        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, x, (y + momy : U32), hp))
+      stairstep_fin_placed(level, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, x, (y + momy : U32)),
+        try_placed(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, x, (y + momy : U32), hp))
 
-def wall_go_free(+level: L.Level, things: H.Things, p: S.Player, m: U32 & U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.wall.go(level, things, p, m))):
+def wall_go_placed(+level: L.Level, things: H.Things, p: S.Player, m: U32 & U32, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.wall.go(level, things, p, m))):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       (+mx, +my) = m
-      try_free(level, things, S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz,
+      try_placed(level, things, S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz,
         crossed, inv, psprites, hurt}, (x + mx : U32), (y + my : U32), hp)
 
-def wall_free(left: Bool, +level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32,
-  hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.wall(left, level, things, p, frac, i))):
+def wall_placed(left: Bool, +level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32,
+  hp: Placed(level, p)) -> Placed(level, S.Sim.Try.player(S.Sim.slide.wall(left, level, things, p, frac, i))):
   match left p:
     case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      wall_go_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, S.Sim.along(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, i, F.Fixed.mul(momx, frac), F.Fixed.mul(momy, frac)), hp)
+      wall_go_placed(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, S.Sim.along(level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, i, F.Fixed.mul(momx, frac), F.Fixed.mul(momy, frac)), hp)
 
-def rest_free(+level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.rest(level, things, p, frac, i))):
-  wall_free(F.Fixed.gt(F.Fixed.min(F.Fixed.unit(), (F.Fixed.unit() - frac - 2048 : U32)), 0),
+def rest_placed(+level: L.Level, things: H.Things, p: S.Player, +frac: U32, i: U32, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.rest(level, things, p, frac, i))):
+  wall_placed(F.Fixed.gt(F.Fixed.min(F.Fixed.unit(), (F.Fixed.unit() - frac - 2048 : U32)), 0),
     level, things, p, F.Fixed.min(F.Fixed.unit(), (F.Fixed.unit() - frac - 2048 : U32)), i, hp)
 
-def upto_fin_free(+level: L.Level, +frac: U32, i: U32, t: S.Sim.Try,
-  ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.upto.fin(level, frac, i, t))):
+def upto_fin_placed(+level: L.Level, +frac: U32, i: U32, t: S.Sim.Try,
+  ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.upto.fin(level, frac, i, t))):
   match t:
     case S.Try{True{}, p, things}:
-      rest_free(level, things, p, frac, i, ht)
+      rest_placed(level, things, p, frac, i, ht)
     case S.Try{False{}, p, things}:
-      stairstep_free(level, things, p, ht)
+      stairstep_placed(level, things, p, ht)
 
-def upto_free(some: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
-  hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.upto(some, level, things, p, frac, i))):
+def upto_placed(some: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
+  hp: Placed(level, p)) -> Placed(level, S.Sim.Try.player(S.Sim.slide.upto(some, level, things, p, frac, i))):
   match some p:
     case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      rest_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, frac, i, hp)
+      rest_placed(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, frac, i, hp)
     case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      upto_fin_free(level, frac, i, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
+      upto_fin_placed(level, frac, i, S.Sim.try_move(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
         (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32)),
-        try_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32), hp))
+        try_placed(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, (x + F.Fixed.mul(momx, frac) : U32), (y + F.Fixed.mul(momy, frac) : U32), hp))
 
-def found_free(hit: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
-  hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.slide.found(hit, level, things, p, frac, i))):
+def found_placed(hit: Bool, +level: L.Level, +things: H.Things, p: S.Player, +frac: U32, i: U32,
+  hp: Placed(level, p)) -> Placed(level, S.Sim.Try.player(S.Sim.slide.found(hit, level, things, p, frac, i))):
   match hit:
     case False{}:
-      stairstep_free(level, things, p, hp)
+      stairstep_placed(level, things, p, hp)
     case True{}:
-      upto_free(F.Fixed.gt(frac, 0), level, things, p, frac, i, hp)
+      upto_placed(F.Fixed.gt(frac, 0), level, things, p, frac, i, hp)
 
-def hit_free(+level: L.Level, +things: H.Things, p: S.Player, best: U32 & U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.hit(level, things, p, best))):
+def hit_placed(+level: L.Level, +things: H.Things, p: S.Player, best: U32 & U32, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.hit(level, things, p, best))):
   (+frac, i) = best
-  found_free(U32.is_le(frac, F.Fixed.unit()), level, things, p, (frac - 2048 : U32), i, hp)
+  found_placed(U32.is_le(frac, F.Fixed.unit()), level, things, p, (frac - 2048 : U32), i, hp)
 
-def once_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.once(level, things, p))):
+def once_placed(+level: L.Level, +things: H.Things, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.once(level, things, p))):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hit_free(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
+      hit_placed(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
         S.Sim.trace(level, things, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
           S.Sim.lead(x, momx), S.Sim.trail(y, momy), (S.Sim.lead(x, momx) + momx : U32),
           (S.Sim.trail(y, momy) + momy : U32),
@@ -882,45 +1003,45 @@ def once_free(+level: L.Level, +things: H.Things, p: S.Player, hp: Free(level, p
               S.Sim.lead(x, momx), S.Sim.lead(y, momy), (S.Sim.lead(x, momx) + momx : U32),
               (S.Sim.lead(y, momy) + momy : U32), ((F.Fixed.unit() + 1 : U32), 0)))), hp)
 
-def slide_go_free(fuel: Nat, +level: L.Level, st: S.Sim.Try, hs: Free(level, S.Sim.Try.player(st))) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide.go(fuel, level, st))):
+def slide_go_placed(fuel: Nat, +level: L.Level, st: S.Sim.Try, hs: Placed(level, S.Sim.Try.player(st))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide.go(fuel, level, st))):
   match fuel st:
     case 0n S.Try{True{}, p, things}:
       hs
     case 1n+f S.Try{True{}, p, things}:
       hs
     case 0n S.Try{False{}, p, things}:
-      stairstep_free(level, things, p, hs)
+      stairstep_placed(level, things, p, hs)
     case 1n+f S.Try{False{}, +p, +things}:
-      slide_go_free(f, level, S.Sim.slide.once(level, things, p), once_free(level, things, p, hs))
+      slide_go_placed(f, level, S.Sim.slide.once(level, things, p), once_placed(level, things, p, hs))
 
-def slide_free(+level: L.Level, things: H.Things, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.slide(level, things, p))):
-  slide_go_free(2n, level, S.Try{False{}, p, things}, hp)
+def slide_placed(+level: L.Level, things: H.Things, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.slide(level, things, p))):
+  slide_go_placed(2n, level, S.Try{False{}, p, things}, hp)
 
-def tried_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(S.Sim.xy.tried(level, t))):
+def tried_placed(+level: L.Level, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.xy.tried(level, t))):
   match t:
     case S.Try{True{}, p, things}:
       ht
     case S.Try{False{}, p, things}:
-      slide_free(level, things, p, ht)
+      slide_placed(level, things, p, ht)
 
-def xy_fin_free(+level: L.Level, +things: H.Things, +p: S.Player, +tx: U32, +ty: U32, xm: U32, ym: U32,
-  hp: Free(level, p)) -> Free(level, Xy.player(S.Sim.xy.fin(level, things, p, tx, ty, xm, ym))):
-  tried_free(level, S.Sim.try_move(level, things, p, tx, ty), try_free(level, things, p, tx, ty, hp))
+def xy_fin_placed(+level: L.Level, +things: H.Things, +p: S.Player, +tx: U32, +ty: U32, xm: U32, ym: U32,
+  hp: Placed(level, p)) -> Placed(level, Xy.player(S.Sim.xy.fin(level, things, p, tx, ty, xm, ym))):
+  tried_placed(level, S.Sim.try_move(level, things, p, tx, ty), try_placed(level, things, p, tx, ty, hp))
 
-def step_free(big: Bool, +level: L.Level, t: S.Sim.Try, +xm: U32, +ym: U32, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, Xy.player(S.Sim.xy.step(big, level, t, xm, ym))):
+def step_placed(big: Bool, +level: L.Level, t: S.Sim.Try, +xm: U32, +ym: U32, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, Xy.player(S.Sim.xy.step(big, level, t, xm, ym))):
   match big t:
     case True{} S.Try{ok, +p, +things}:
-      xy_fin_free(level, things, p, (S.Player.x(p) + F.Fixed.half(xm) : U32),
+      xy_fin_placed(level, things, p, (S.Player.x(p) + F.Fixed.half(xm) : U32),
         (S.Player.y(p) + F.Fixed.half(ym) : U32), F.Fixed.sar(xm), F.Fixed.sar(ym), ht)
     case False{} S.Try{ok, +p, +things}:
-      xy_fin_free(level, things, p, (S.Player.x(p) + xm : U32), (S.Player.y(p) + ym : U32), 0, 0, ht)
+      xy_fin_placed(level, things, p, (S.Player.x(p) + xm : U32), (S.Player.y(p) + ym : U32), 0, 0, ht)
 
-def xy_go_free(fuel: Nat, +level: L.Level, st: S.Sim.Xy, hs: Free(level, Xy.player(st))) ->
-  Free(level, S.Sim.Try.player(S.Sim.xy.go(fuel, level, st))):
+def xy_go_placed(fuel: Nat, +level: L.Level, st: S.Sim.Xy, hs: Placed(level, Xy.player(st))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.xy.go(fuel, level, st))):
   match fuel st:
     case 0n S.Xy{True{}, t, xm, ym}:
       hs
@@ -929,158 +1050,82 @@ def xy_go_free(fuel: Nat, +level: L.Level, st: S.Sim.Xy, hs: Free(level, Xy.play
     case 0n S.Xy{False{}, t, xm, ym}:
       hs
     case 1n+f S.Xy{False{}, +t, +xm, +ym}:
-      xy_go_free(f, level, S.Sim.xy.step(S.Sim.big(xm, ym), level, t, xm, ym),
-        step_free(S.Sim.big(xm, ym), level, t, xm, ym, hs))
+      xy_go_placed(f, level, S.Sim.xy.step(S.Sim.big(xm, ym), level, t, xm, ym),
+        step_placed(S.Sim.big(xm, ym), level, t, xm, ym, hs))
 
-def slow_free(stop: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.slow(stop, p)):
+def slow_placed(stop: Bool, +level: L.Level, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.slow(stop, p)):
   match stop p:
     case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
 
-def ground_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.friction.ground(cmd, p)):
+def ground_placed(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.friction.ground(cmd, p)):
   match cmd p:
     case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      slow_free(Bool.and(S.Sim.crawling(momx), Bool.and(S.Sim.crawling(momy),
+      slow_placed(Bool.and(S.Sim.crawling(momx), Bool.and(S.Sim.crawling(momy),
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
         S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-def friction_if_free(ground: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, Bool.pick(S.Player, ground, S.Sim.friction.ground(cmd, p), p)):
+def friction_if_placed(ground: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, Bool.pick(S.Player, ground, S.Sim.friction.ground(cmd, p), p)):
   match ground:
     case True{}:
-      ground_free(level, cmd, p, hp)
+      ground_placed(level, cmd, p, hp)
     case False{}:
       hp
 
-def friction_free(+level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.friction(cmd, p)):
-  friction_if_free(S.Player.onground(p), level, cmd, p, hp)
+def friction_placed(+level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.friction(cmd, p)):
+  friction_if_placed(S.Player.onground(p), level, cmd, p, hp)
 
-def slowed_free(+level: L.Level, +cmd: K.Cmd, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(S.Sim.xy.slowed(cmd, t))):
+def slowed_placed(+level: L.Level, +cmd: K.Cmd, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(S.Sim.xy.slowed(cmd, t))):
   match t:
     case S.Try{ok, +p, things}:
-      friction_free(level, cmd, p, ht)
+      friction_placed(level, cmd, p, ht)
 
-def moving_free(moving: Bool, +level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player,
-  hp: Free(level, p)) -> Free(level, S.Sim.Try.player(S.Sim.xy.moving(moving, level, things, cmd, p))):
+def moving_placed(moving: Bool, +level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player,
+  hp: Placed(level, p)) -> Placed(level, S.Sim.Try.player(S.Sim.xy.moving(moving, level, things, cmd, p))):
   match moving p:
     case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      slowed_free(level, cmd, S.Sim.xy.go(2n, level, S.Xy{False{}, S.Try{False{},
+      slowed_placed(level, cmd, S.Sim.xy.go(2n, level, S.Xy{False{}, S.Try{False{},
         S.Player{x, y, z, angle, S.Sim.clamp(momx), S.Sim.clamp(momy), momz, floorz, ceilz, viewheight,
           deltaview, viewz, crossed, inv, psprites, hurt}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}),
-        xy_go_free(2n, level, S.Xy{False{}, S.Try{False{},
+        xy_go_placed(2n, level, S.Xy{False{}, S.Try{False{},
           S.Player{x, y, z, angle, S.Sim.clamp(momx), S.Sim.clamp(momy), momz, floorz, ceilz,
             viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, things}, S.Sim.clamp(momx), S.Sim.clamp(momy)}, hp))
 
-def xy_free(+level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.Try.player(S.Sim.xy(level, things, cmd, p))):
+def xy_placed(+level: L.Level, +things: H.Things, +cmd: K.Cmd, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.Try.player(S.Sim.xy(level, things, cmd, p))):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      moving_free(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, things, cmd, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
+      moving_placed(Bool.not(Bool.and(U32.is_zero(momx), U32.is_zero(momy))), level, things, cmd, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-# Thrust, turning, the eye and the vertical move keep the position.
-def thrust_free(+level: L.Level, p: S.Player, +angle: U32, +move: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.thrust(level, p, angle, move)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def push_if_free(skip: Bool, +level: L.Level, +p: S.Player, +angle: U32, +move: U32,
-  hp: Free(level, p)) ->
-  Free(level, Bool.pick(S.Player, skip, p, S.Sim.thrust(level, p, angle, (move * 2048 : U32)))):
-  match skip:
-    case True{}:
-      hp
-    case False{}:
-      thrust_free(level, p, angle, (move * 2048 : U32), hp)
-
-def push_free(+level: L.Level, +p: S.Player, +angle: U32, +move: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.push(level, p, angle, move)):
-  push_if_free(Bool.or(U32.is_zero(move), Bool.not(S.Player.onground(p))), level, p, angle, move, hp)
-
-def move_cmd_free(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.move.cmd(level, cmd, p)):
-  match cmd p:
-    case K.Cmd{+forward, +side, +turn, +buttons} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      push_free(level, S.Sim.push(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
-        (angle + (turn << 16n) : U32), forward),
-        ((angle + (turn << 16n) : U32) - A.Angle.ang90() : U32), side,
-        push_free(level, S.Player{x, y, z, (angle + (turn << 16n) : U32), momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
-          (angle + (turn << 16n) : U32), forward, hp))
-
-def pulled_free(+level: L.Level, p: S.Player, pulled: Bool, hp: Free(level, p)) ->
-  Free(level, S.Player.pulled(p, pulled)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def move_go_free(pulled: Bool, +level: L.Level, cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.move.go(pulled, level, cmd, p)):
-  match pulled:
-    case True{}:
-      move_cmd_free(level, K.Cmd.demo(100, 0, 0, 0), S.Player.pulled(p, False{}),
-        pulled_free(level, p, False{}, hp))
-    case False{}:
-      move_cmd_free(level, cmd, p, hp)
-
-def move_free(+level: L.Level, cmd: K.Cmd, +p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.move(level, cmd, p)):
-  move_go_free(Bool.not(U32.is_zero(V.Vec.get(S.Player.hurt(p), S.Sim.hurt.justattacked()))), level, cmd, p, hp)
-
-def eye_if_free(ground: Bool, live: Bool, +level: L.Level, p: S.Player, swing: U32, hp: Free(level, p)) ->
-  Free(level, S.Sim.eye.if(ground, live, p, swing)):
-  match ground live p:
-    case True{} True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-    case True{} False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-    case False{} True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-    case False{} False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def eye_free(+level: L.Level, clock: U32, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.eye(level, clock, p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      eye_if_free(S.Player.onground(S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}),
-        Bool.not(S.Player.dead(S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt})),
-        level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt},
-        F.Fixed.mul((S.Sim.bob(momx, momy) >> 1n : U32),
-          A.Angle.sin(L.Level.sine(level), ((409 * clock : U32) .&. 8191 : U32))), hp)
-
-def z_if_free(still: Bool, +level: L.Level, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.z.if(still, p)):
+# The vertical move keeps the position.
+def z_if_placed(still: Bool, +level: L.Level, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.z.if(still, p)):
   match still p:
     case True{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
     case False{} S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
       hp
 
-def z_free(+level: L.Level, p: S.Player, hp: Free(level, p)) ->
-  Free(level, S.Sim.z(p)):
+def z_placed(+level: L.Level, p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, S.Sim.z(p)):
   match p:
     case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      z_if_free(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
+      z_if_placed(Bool.and(U32.is_eq(z, floorz), U32.is_zero(momz)), level, S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-# The counters and the vertical move keep the place too.
-def counters_free(+level: L.Level, p: S.Player, hp: Free(level, p)) -> Free(level, Tic.Sim.counters(p)):
-  match p:
-    case S.Player{+x, +y, +z, +angle, +momx, +momy, +momz, +floorz, +ceilz, +viewheight, +deltaview, +viewz, +crossed, +inv, +psprites, +hurt}:
-      hp
-
-def mobj_z_free(+level: L.Level, t: S.Sim.Try, ht: Free(level, S.Sim.Try.player(t))) ->
-  Free(level, S.Sim.Try.player(Tic.Sim.mobj.z(t))):
+def mobj_z_placed(+level: L.Level, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
+  Placed(level, S.Sim.Try.player(Tic.Sim.mobj.z(t))):
   match t:
     case S.Try{ok, +p, things}:
-      z_free(level, p, ht)
+      z_placed(level, p, ht)
 
 # Free reads the geometry alone
 # -----------------------------
@@ -1190,12 +1235,19 @@ def free_geo(+geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, 
     (x + S.Sim.radius() : U32), (y + S.Sim.radius() : U32)), geo, sa, pa, ha, sb, pb, hb, x, y, S.Sim.radius(), 1,
     S.Sim.fit.start(True{}, L.Level{geo, sa, pa, ha}, x, y), S.Sim.fit.start(True{}, L.Level{geo, sb, pb, hb}, x, y), {==})
 
-# Held: free in a geometry, whatever the state's sectors and specials
+# Held: placed in a geometry, whatever the state's sectors and specials
 # have become. Each thinker's turn keeps it: the turn is held to the
 # geometry and the player's place, or is the player's own move.
 def Held(geo: L.Level.Geo, +s: S.State) -> Type:
-  {True{} == S.Sim.free(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)), L.Level.alerted(S.State.level(s))},
-    S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))) : Bool}
+  Placed(L.Level{geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)),
+    L.Level.alerted(S.State.level(s))}, S.State.player(s))
+
+# The records read the geometry alone.
+def records_geo(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, +sb: V.Vec, +pb: V.Vec, +hb: V.Vec) ->
+  {L.Level.records(L.Level{geo, sa, pa, ha}) == L.Level.records(L.Level{geo, sb, pb, hb}) : L.Level.Things}:
+  match geo:
+    case L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}:
+      {==}
 
 def held_x(x: U32, y: U32, after: S.Player) ->
   {x == S.Player.x(Tic.Player.held(x, y, after)) : U32}:
@@ -1209,21 +1261,28 @@ def held_y(x: U32, y: U32, after: S.Player) ->
     case S.Player{ax, ay, az, aangle, amomx, amomy, amomz, afloorz, aceilz, aviewheight, adeltaview, aviewz, acrossed, ainv, apsprites, ahurt}:
       {==}
 
-# What a turn holds is free where the state before it was: the level it
-# packs has the geometry, and the player it packs the place. The hold
-# takes that place as two words, so the lemma spells it out.
-def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
+# What a turn holds is placed where the state before it was: the level
+# it packs has the geometry, and the player it packs the place, which
+# the teleport destinations read alone.
+def held_placed(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
   Held(geo, Tic.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)), after)):
   match before after:
     case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wtotal} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       %held_x(S.Player.x(was), S.Player.y(was), player)
-        : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, _,
-          S.Player.y(Tic.Player.held(S.Player.x(was), S.Player.y(was), player))) : Bool}
+        : {True{} == Bool.or(S.Sim.free(L.Level{geo, sectors, specials, heard}, _,
+          S.Player.y(Tic.Player.held(S.Player.x(was), S.Player.y(was), player))),
+          S.Sim.teleport.at(L.Level.records(L.Level{geo, sectors, specials, heard}), _,
+          S.Player.y(Tic.Player.held(S.Player.x(was), S.Player.y(was), player)))) : Bool}
       %held_y(S.Player.x(was), S.Player.y(was), player)
-        : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, S.Player.x(was), _) : Bool}
+        : {True{} == Bool.or(S.Sim.free(L.Level{geo, sectors, specials, heard}, S.Player.x(was), _),
+          S.Sim.teleport.at(L.Level.records(L.Level{geo, sectors, specials, heard}), S.Player.x(was), _)) : Bool}
       %free_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), L.Level.alerted(wlevel), sectors, specials, heard, S.Player.x(was),
         S.Player.y(was))
-        : {True{} == _ : Bool}
+        : {True{} == Bool.or(_, S.Sim.teleport.at(L.Level.records(L.Level{geo, sectors, specials, heard}), S.Player.x(was),
+          S.Player.y(was))) : Bool}
+      %records_geo(geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), L.Level.alerted(wlevel), sectors, specials, heard)
+        : {True{} == Bool.or(S.Sim.free(L.Level{geo, L.Level.sectors(wlevel), L.Level.specials(wlevel), L.Level.alerted(wlevel)},
+          S.Player.x(was), S.Player.y(was)), S.Sim.teleport.at(_, S.Player.x(was), S.Player.y(was))) : Bool}
       h
 
 def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
@@ -1232,7 +1291,7 @@ def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> He
       h
 
 def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, t: S.Sim.Try, s: S.State,
-  ht: Free(L.Level{geo, sa, pa, ha}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa, ha}, s)):
+  ht: Placed(L.Level{geo, sa, pa, ha}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa, ha}, s)):
   match t s:
     case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       ht
@@ -1245,11 +1304,11 @@ def mobj_held(+cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) -> H
   kept_held(geo, Tic.State.held(geo, S.Player.x(S.State.player(went)), S.Player.y(S.State.player(went)),
       S.Sim.mobj.tics(Sp.Sim.cross(S.Player.crossed(S.State.player(went)), went))),
     S.Mobj{H.Things.you(S.State.things(s))},
-    held_free(geo, went, S.Sim.mobj.tics(Sp.Sim.cross(S.Player.crossed(S.State.player(went)), went)),
+    held_placed(geo, went, S.Sim.mobj.tics(Sp.Sim.cross(S.Player.crossed(S.State.player(went)), went)),
       moved_held(geo, L.Level.sectors(S.State.level(s)), L.Level.specials(S.State.level(s)), L.Level.alerted(S.State.level(s)),
         Tic.Sim.mobj.z(S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s))), s,
-        mobj_z_free(level, S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s)),
-          xy_free(level, S.State.things(s), cmd, S.State.player(s), h)))))
+        mobj_z_placed(level, S.Sim.xy(level, S.State.things(s), cmd, S.State.player(s)),
+          xy_placed(level, S.State.things(s), cmd, S.State.player(s), h)))))
 
 def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.State, h: Held(geo, s)) ->
   Held(geo, Tic.Sim.turn(mine, t, cmd, geo, s)):
@@ -1257,7 +1316,7 @@ def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.St
     case True{}:
       mobj_held(cmd, geo, s, h)
     case False{}:
-      held_free(geo, s, Tic.Sim.think(t, s), h)
+      held_placed(geo, s, Tic.Sim.think(t, s), h)
 
 def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, Tic.Sim.thinkers.go(fuel, cmd, geo, s)):
@@ -1384,8 +1443,8 @@ def Laws.tic_keeps_geometry(cmd, s):
 # and the place a think leaves is the place it began with, since the
 # player's own turn is the only mover. Whatever the think left is a
 # parameter, since a symbolic level leaves it stuck.
-def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
-  h: Held(geo, before)) -> Laws.Free(Tic.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
+def tic_done_placed(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State, +after: S.State,
+  h: Held(geo, before)) -> Laws.Placed(Tic.Sim.tic.done(cmd, geo, clock, S.Player.x(S.State.player(before)),
     S.Player.y(S.State.player(before)), after)):
   +place = {Tic.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)),
     after) : S.State}
@@ -1393,26 +1452,32 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
     buttons_held(geo, Tic.Sim.thinkers(cmd, geo, place),
     rested_held(geo, Tic.Sim.thinkers.all(8n, cmd, geo, place),
       all_held(8n, cmd, geo, place,
-        held_free(geo, before, after, h)))))
+        held_placed(geo, before, after, h)))))
 
-def Laws.tic_keeps_free(cmd, s, free):
+def Laws.tic_keeps_placed(cmd, s, placed):
   match s:
     case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +totalsecret}:
-      free
+      placed
     case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, S.Unended{}, +usedown, sounds, +mrnd, +reborn, +totalsecret}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       +before = {S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, [], mrnd,
         reborn, totalsecret} : S.State}
-      tic_done_free(cmd, geo, clock, before,
+      tic_done_placed(cmd, geo, clock, before,
         Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(player)), Tic.Sim.pressed(cmd, usedown)),
-          Tic.Sim.player(S.Player.dead(player), cmd, level, clock, before)), free)
+          Tic.Sim.player(S.Player.dead(player), cmd, level, clock, before)), placed)
 
-def Laws.replay_keeps_free(script, s, free):
+def replay_placed(script: List<&2, K.Cmd>, +s: S.State, placed: Laws.Placed(s)) ->
+  Laws.Placed(Tic.Sim.replay(script, s)):
   match script:
     case []:
-      free
+      placed
     case +cmd <> rest:
-      Laws.replay_keeps_free(rest, Tic.Sim.tic(cmd, s), Laws.tic_keeps_free(cmd, s, free))
+      replay_placed(rest, Tic.Sim.tic(cmd, s), Laws.tic_keeps_placed(cmd, s, placed))
+
+def Laws.replay_from_free_is_placed(script, s, free):
+  replay_placed(script, s, or_left(S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)),
+    S.Player.y(S.State.player(s))), S.Sim.teleport.at(L.Level.records(S.State.level(s)),
+    S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))), free))
 
 # The freedom law
 # ---------------
@@ -1763,4 +1828,3 @@ def Laws.quiet_offs(t, raw, key, vel):
 
 def Laws.sfx_rates_unserved(count, bytes):
   {==}
-

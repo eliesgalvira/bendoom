@@ -8,7 +8,9 @@
 # again as vanilla's PST_REBORN does. The specials and the tic itself
 # build on this (src/special.bend and src/tic.bend).
 # Every position the player is moved to has passed Sim.check, whose
-# lines are what Sim.free asks, so the wall law holds by construction.
+# lines are what Sim.free asks, or is a teleport destination, where
+# vanilla's P_TeleportMove consults no line, so the wall law and its one
+# exception hold by construction.
 import Base
 import ./vec.bend as V
 import ./fixed.bend as F
@@ -57,10 +59,16 @@ def Sim.hurt.refire() -> U32:
 def Sim.hurt.justattacked() -> U32:
   5
 
-# A special line crossed by one part of a move, with the listener's
-# position at that part's end where vanilla fires it.
+# Doom's reactiontime on the player's mobj: the tics a teleport freezes
+# the player for.
+def Sim.hurt.reaction() -> U32:
+  6
+
+# A special line crossed by one part of a move, with the mover's place
+# at that part's end, where vanilla fires it, and its height and facing
+# then, which the move has not changed.
 type Sim.Cross is Data:
-  Cross{line: U32, x: U32, y: U32}
+  Cross{line: U32, x: U32, y: U32, z: U32, angle: U32}
 
 # Doom's mobj and player_t for one player: the position with its height,
 # the angle, the momentum, the floor and ceiling under it, the view
@@ -144,7 +152,7 @@ def Sim.maxbob() -> U32:
 # The player's mobj at rest and unhurt, as P_SpawnPlayer and
 # G_PlayerReborn leave it: its standing state, which lasts.
 def Sim.Hurt.start() -> V.Vec:
-  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you(), 0, 0], 6)
+  V.Vec.of_list([H.Thing.play(), H.Thing.Row.tics(H.Thing.row(H.Thing.play())), 0, H.Thing.you(), 0, 0, 0], 7)
 
 def Sim.Hurt.state(+h: V.Vec) -> U32:
   V.Vec.get(h, Sim.hurt.state())
@@ -1152,6 +1160,156 @@ def Sim.spechit(+level: L.Level, +x: U32, +y: U32, +r: U32, +mask: U32) -> List<
   Sim.Spec.lines(Sim.spechit.go(Sim.lines(level, (x - r : U32), (y - r : U32), (x + r : U32), (y + r : U32)),
     level, x, y, r, mask, Spec{True{}, []}))
 
+# Teleports
+# ---------
+
+# A teleport destination, Doom's MT_TELEPORTMAN: where it stands and the
+# way it faces.
+type Sim.Dest is Data:
+  Dest{x: U32, y: U32, angle: U32}
+
+def Sim.dests.keep(r: L.Level.Thing, rest: List<&2, Sim.Dest>) -> List<&2, Sim.Dest>:
+  L.Thing{x, y, angle, +kind, +options} = r
+  V.Vec.keep(~Sim.Dest, Bool.and(U32.is_eq(kind, 14), H.Thing.spawns(options)), Dest{x, y, A.Angle.of_thing(angle)},
+    rest)
+
+def Sim.dests.go(n: Nat, +t: L.Level.Things, +i: U32) -> List<&2, Sim.Dest>:
+  match n:
+    case 0n:
+      []
+    case 1n+m:
+      Sim.dests.keep(L.Level.things.record(t, i), Sim.dests.go(m, t, (i + 1 : U32)))
+
+# The map's teleport destinations: the records of type 14 the skill
+# keeps, in their order. EV_Teleport looks for their mobjs in the
+# thinker list, where they stand in that order and from which they never
+# move or leave, so the records answer for the mobjs.
+def Sim.dests(+t: L.Level.Things) -> List<&2, Sim.Dest>:
+  Sim.dests.go(U32.to_nat(L.Level.Things.count(t)), t, 0)
+
+def Sim.teleport.at.go(ds: List<&2, Sim.Dest>, +x: U32, +y: U32) -> Bool:
+  match ds:
+    case []:
+      False{}
+    case Dest{dx, dy, angle} <> rest:
+      Bool.or(Bool.and(U32.is_eq(dx, x), U32.is_eq(dy, y)), Sim.teleport.at.go(rest, x, y))
+
+# Whether a teleport destination stands at (x, y): the one place a move
+# reaches without passing Sim.check, which the wall law allows.
+def Sim.teleport.at(+t: L.Level.Things, +x: U32, +y: U32) -> Bool:
+  Sim.teleport.at.go(Sim.dests(t), x, y)
+
+def Sim.dest.sector(+level: L.Level, d: Sim.Dest) -> U32:
+  Dest{+x, +y, angle} = d
+  L.Level.sector_at(level, x, y)
+
+def Sim.teleport.pick(take: Bool, d: Sim.Dest, later: Maybe<&2, Sim.Dest>) -> Maybe<&2, Sim.Dest>:
+  match take:
+    case True{}:
+      Some{d}
+    case False{}:
+      later
+
+def Sim.teleport.before(+level: L.Level, +sector: U32, later: Maybe<&2, Sim.Dest>) -> Bool:
+  match later:
+    case None{}:
+      True{}
+    case Some{d}:
+      U32.is_le(sector, Sim.dest.sector(level, d))
+
+# Whether EV_Teleport takes a destination over the one found among the
+# later records: it stands in a sector of the tag, and in one no later
+# than that one's, since the search tries the sectors in order and,
+# within one, the thinkers.
+def Sim.teleport.takes(+level: L.Level, +tag: U32, d: Sim.Dest, later: Maybe<&2, Sim.Dest>) -> Bool:
+  +sector = Sim.dest.sector(level, d)
+  Bool.and(U32.is_eq(L.Level.sector.tag(level, sector), tag), Sim.teleport.before(level, sector, later))
+
+def Sim.teleport.first(+level: L.Level, +tag: U32, +d: Sim.Dest, +later: Maybe<&2, Sim.Dest>) ->
+  Maybe<&2, Sim.Dest>:
+  Sim.teleport.pick(Sim.teleport.takes(level, tag, d, later), d, later)
+
+def Sim.teleport.find(ds: List<&2, Sim.Dest>, +level: L.Level, +tag: U32) -> Maybe<&2, Sim.Dest>:
+  match ds:
+    case []:
+      None{}
+    case +d <> rest:
+      Sim.teleport.first(level, tag, d, Sim.teleport.find(rest, level, tag))
+
+# EV_Teleport's destination for a mover that crossed a line: none when
+# it came from the line's back, so that one can step off a teleporter,
+# and none when no destination stands in a sector of the line's tag.
+# Standing on the back now, it came from the front.
+def Sim.teleport.front(back: Bool, +level: L.Level, +line: U32) -> Maybe<&2, Sim.Dest>:
+  match back:
+    case False{}:
+      None{}
+    case True{}:
+      Sim.teleport.find(Sim.dests(L.Level.records(level)), level, L.Level.tag(level, line))
+
+def Sim.teleport.to(+level: L.Level, +line: U32, +x: U32, +y: U32) -> Maybe<&2, Sim.Dest>:
+  Sim.teleport.front(Sim.point_side(x, y, L.Level.line(level, line)), level, line)
+
+# The destination for a mover EV_Teleport takes, none for one it does
+# not.
+def Sim.teleport.if(takes: Bool, +level: L.Level, +line: U32, +x: U32, +y: U32) -> Maybe<&2, Sim.Dest>:
+  match takes:
+    case False{}:
+      None{}
+    case True{}:
+      Sim.teleport.to(level, line, x, y)
+
+# The walk-over teleports that take the player, 39 and 97; 125 and 126
+# take monsters alone.
+def Sim.teleports(special: U32) -> Bool:
+  match special:
+    case 39:
+      True{}
+    case 97:
+      True{}
+    case _:
+      False{}
+
+# Where a taken move's crossings leave the player: the lines it crossed,
+# each with the place it fires from, up to the first that teleports the
+# player, since P_TeleportMove empties spechit, and that teleport's
+# destination.
+type Sim.Went is Data:
+  Went{crossed: List<&2, Sim.Cross>, dest: Maybe<&2, Sim.Dest>}
+
+def Sim.went.cross(dest: Maybe<&2, Sim.Dest>, c: Sim.Cross, later: Sim.Went) -> Sim.Went:
+  match dest:
+    case None{}:
+      Went{crossed, to} = later
+      Went{c <> crossed, to}
+    case Some{d}:
+      Went{[c], Some{d}}
+
+def Sim.went(lines: List<&2, U32>, +level: L.Level, +x: U32, +y: U32, +z: U32, +angle: U32) -> Sim.Went:
+  match lines:
+    case []:
+      Went{[], None{}}
+    case +line <> rest:
+      Sim.went.cross(Sim.teleport.if(Sim.teleports(L.Level.special(level, line)), level, line, x, y),
+        Cross{line, x, y, z, angle}, Sim.went(rest, level, x, y, z, angle))
+
+# P_TeleportMove and EV_Teleport on the player's mobj: at the
+# destination, on the floor and under the ceiling of the sector there
+# with no line consulted, facing the destination's way, still, the eye
+# at its height over that floor, and frozen for 18 tics.
+def Player.teleported(+x: U32, +y: U32, angle: U32, f: Sim.Fit, p: Player) -> Player:
+  Fit{ok, +floor, ceil, drop} = f
+  Player{ox, oy, oz, was, momx, momy, momz, floorz, ceilz, +viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  Player{x, y, floor, angle, 0, 0, 0, floor, ceil, viewheight, deltaview, (floor + viewheight : U32), crossed, inv,
+    psprites, V.Vec.set(hurt, Sim.hurt.reaction(), 18)}
+
+def Player.went(+level: L.Level, dest: Maybe<&2, Sim.Dest>, p: Player) -> Player:
+  match dest:
+    case None{}:
+      p
+    case Some{Dest{+x, +y, angle}}:
+      Player.teleported(x, y, angle, Sim.fit.start(True{}, level, x, y), p)
+
 # The player's mobj unlinked from one place and linked at another, as
 # Doom's P_TryMove does about a move.
 def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, +y: U32) -> H.Things:
@@ -1159,12 +1317,14 @@ def Sim.relink(+level: L.Level, +things: H.Things, +ox: U32, +oy: U32, +x: U32, 
     L.Level.sector_at(level, ox, oy)), L.Level.blockmap_of(level), Sim.flags(), H.Things.you(things), x, y,
     L.Level.sector_at(level, x, y))
 
-def Sim.crossed.at(lines: List<&2, U32>, +x: U32, +y: U32) -> List<&2, Sim.Cross>:
-  match lines:
-    case []:
-      []
-    case line <> rest:
-      Cross{line, x, y} <> Sim.crossed.at(rest, x, y)
+# A taken move's end: its crossings added to the player's, and the
+# player at a teleport they took it to, relinked from where it stood.
+def Sim.try_move.went(w: Sim.Went, +level: L.Level, p: Player, things: H.Things, +ox: U32, +oy: U32) -> Sim.Try:
+  Went{more, dest} = w
+  Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+  +q = Player.went(level, dest, Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz,
+    List.append(&2, Sim.Cross, crossed, more), inv, psprites, hurt})
+  Try{True{}, q, Sim.relink(level, things, ox, oy, Player.x(q), Player.y(q))}
 
 def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x: U32, +y: U32, floor: U32,
   ceil: U32, over: List<&2, U32>) -> Sim.Try:
@@ -1172,10 +1332,9 @@ def Sim.try_move.fin(go: Bool, +level: L.Level, p: Player, things: H.Things, +x:
     case False{}:
       Try{False{}, p, things}
     case True{}:
-      Player{ox, oy, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
-      Try{True{}, Player{x, y, z, angle, momx, momy, momz, floor, ceil, viewheight, deltaview, viewz,
-        List.append(&2, Sim.Cross, crossed, Sim.crossed.at(over, x, y)), inv, psprites, hurt},
-        Sim.relink(level, things, ox, oy, x, y)}
+      Player{+ox, +oy, +z, +angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
+      Sim.try_move.went(Sim.went(over, level, x, y, z, angle), level, Player{x, y, z, angle, momx, momy, momz, floor,
+        ceil, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, things, ox, oy)
 
 # The move is taken when the place passes; the player's mobj then goes
 # first in its cell and its sector. What the check picked up stays picked
@@ -2044,16 +2203,18 @@ def Sim.move.cmd(+level: L.Level, cmd: K.Cmd, p: Player) -> Player:
   Sim.push(level, Sim.push(level, Player{x, y, z, a, momx, momy, momz, floorz, ceilz, viewheight,
     deltaview, viewz, crossed, inv, psprites, hurt}, a, forward), (a - A.Angle.ang90() : U32), side)
 
-def Sim.move.go(pulled: Bool, +level: L.Level, cmd: K.Cmd, p: Player) -> Player:
-  match pulled:
-    case True{}:
-      Sim.move.cmd(level, K.Cmd.demo(100, 0, 0, 0), Player.pulled(p, False{}))
-    case False{}:
-      Sim.move.cmd(level, cmd, p)
-
+# P_PlayerThink up to P_MovePlayer: a mobj that just attacked with the
+# chainsaw is pulled forward, a mobj a teleport froze counts its
+# reaction time down and does not move, and the chainsaw's flag is
+# cleared either way.
 def Sim.move(+level: L.Level, +cmd: K.Cmd, +p: Player) -> Player:
-  +pulled = Bool.not(U32.is_zero(V.Vec.get(Player.hurt(p), Sim.hurt.justattacked())))
-  Sim.move.go(pulled, level, cmd, p)
+  +hurt = Player.hurt(p)
+  +reaction = V.Vec.get(hurt, Sim.hurt.reaction())
+  Sim.move.cmd(level, Bool.pick(K.Cmd, U32.is_zero(reaction),
+      Bool.pick(K.Cmd, U32.is_zero(V.Vec.get(hurt, Sim.hurt.justattacked())), cmd, K.Cmd.demo(100, 0, 0, 0)),
+      K.Cmd.idle()),
+    Player.hurting(p, V.Vec.set(V.Vec.set(hurt, Sim.hurt.justattacked(), 0), Sim.hurt.reaction(),
+      Bool.pick(U32, U32.is_zero(reaction), 0, (reaction - 1 : U32)))))
 
 # The eye
 # -------
@@ -2673,9 +2834,11 @@ def Sim.damage.player(+damage: U32, +source: U32, +s: State) -> State:
   Sim.damage.taken(I.Inventory.hurt(Player.inv(State.player(s)), damage), source, s)
 
 # Doom's thrust in P_DamageMobj: a hundred times an eighth of a unit a
-# point of damage over the target's mass.
+# point of damage over the target's mass, in C's int, which a
+# telefrag's 10000 points wrap negative, so that its victim flies back
+# toward the player.
 def Sim.thrust.of(+damage: U32, +mass: U32) -> U32:
-  ((damage * 819200 : U32) / mass : U32)
+  F.Fixed.quot((damage * 819200 : U32), mass)
 
 # A fall forwards turns the blow right round and quadruples it.
 def Sim.blow.angle(+angle: U32, back: Bool) -> U32:

@@ -6,10 +6,10 @@
 
 **Blocked by:** 01, 03 (teleport destinations)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] On E1M5, a scripted demo through a teleporter compares with Chocolate Doom just after arrival and after the freeze: zero differing pixels.
-- [ ] A telefrag matches vanilla, or the ticket names the vanilla rule it checked and why no demo shows it.
-- [ ] The proof checks, and the ticket's report quotes the old and new law.
+- [x] On E1M5, a scripted demo through a teleporter compares with Chocolate Doom just after arrival and after the freeze: zero differing pixels.
+- [x] A telefrag matches vanilla, or the ticket names the vanilla rule it checked and why no demo shows it.
+- [x] The proof checks, and the ticket's report quotes the old and new law.
 
-**Where it stopped (2026-10-03, 16:15):** paused when Elies cut the night to tier 1. Branch `e1-12` (worktree `../bendoom-e1-12`) has the teleporters committed, unreviewed: 31dfb5f (EV_Teleport and the wall law's one exception), merged with episode-1 at 922ba02. The LAWS.bend change there is for Elies to review before it lands. Resume from that worktree: finish the evidence the acceptance list asks for, merge episode-1, then review on both axes before landing.
+**Before landing:** Elies must review the proposed wall-law change; no approval is implied. The original `tic_keeps_free` and `replay_keeps_free` concluded `Free`. The proposed `tic_keeps_placed` preserves `Placed`, and `replay_from_free_is_placed` requires the original `Free` start and concludes `Placed`: free space or exact xy of a skill-kept teleport destination. This is a spatial invariant, not teleport-event provenance. It admits supplied nonfree destination states for induction, but not at replay entry. Frozen or rejected-move tics can retain a nonfree arrival; vanilla's split XY movement can also run a checked remainder after teleporting, so its final position need not be the exact destination. Elies must decide how this replaces the spec's per-tic wording. Standards and Spec reviews are also required before integration.

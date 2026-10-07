@@ -607,13 +607,13 @@ def crossings(cs: List<&2, S.Sim.Cross>) -> String:
   match cs:
     case []:
       ""
-    case S.Cross{line, x, y} <> rest:
-      words([line, x, y]) ++ crossings(rest)
+    case S.Cross{line, x, y, z, angle} <> rest:
+      words([line, x, y, z, angle]) ++ crossings(rest)
 
 def rest(cs: List<&2, S.Sim.Cross>, +inv: I.Inventory, ps: S.Psprites, +hurt: V.Vec) -> String:
   crossings(cs) ++ " | " ++ I.Inventory.show(inv)
     ++ words([I.Inventory.line(inv), I.Inventory.kills(inv), I.Inventory.secrets(inv)]) ++ " |" ++ psprites(ps)
-    ++ " |" ++ V.Vec.show(hurt, 6n, 0)
+    ++ " |" ++ V.Vec.show(hurt, 7n, 0)
 
 # Whether the rest of a player is as it began, compared as printed: no
 # line crossed, G_PlayerReborn's inventory, no weapon sprite showing and
