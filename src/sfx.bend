@@ -7,22 +7,16 @@
 # each source sample (ResampleFrame_Generic_SSE), doubled to stereo and
 # made 16-bit. Both sides of Chocolate Doom's chunk hold the same
 # sample, so the expansion here is mono. Any other rate takes Chocolate
-# Doom's nearest-sample loop, which nothing E1M1 starts needs, so such a
-# sound has no run.
+# Doom's nearest-sample loop, which no shareware sound needs (Freedoom's
+# DSRLAUNC and DSHOOF do), so such a sound expands to nothing.
 import Base
 import ./bytes.bend as B
-import ./wad.bend as W
 import ./sfx_taps.bend as T
 
-# A lump's rate and the bytes Chocolate Doom plays, counted.
+# A lump's rate, how many bytes Chocolate Doom plays, and the lump from
+# the first of them on.
 type Sfx.Sound is Data:
   Sound{rate: U32, count: U32, bytes: List<&2, U32>}
-
-# An expansion under way: the taps of each frame a source sample makes,
-# the source from five samples before the next one, and the source
-# samples left.
-type Sfx.Run is Data:
-  Run{rows: List<&2, List<&2, F32>>, xs: List<&2, F32>, left: U32}
 
 # The lump reader
 # ---------------
@@ -32,41 +26,33 @@ type Sfx.Run is Data:
 def Sfx.played(+size: U32, format: U32, +length: U32) -> Bool:
   U32.is_ge(size, 8) && U32.is_eq(format, 3) && U32.is_le(length, (size - 8 : U32)) && U32.is_gt(length, 48)
 
-def Sfx.read.fin(rate: U32, count: U32, p: Array<U32> & List<&2, U32>) -> Array<U32> & Maybe<&2, Sfx.Sound>:
-  (a, bytes) = p
-  (a, Some{Sound{rate, count, bytes}})
+def Sfx.size(xs: List<&2, U32>, +n: U32) -> U32:
+  match xs:
+    case []:
+      n
+    case x <> rest:
+      Sfx.size(rest, (n + 1 : U32))
 
 # DMX skips the first 16 and the last 16 bytes of the length.
-def Sfx.read.bytes(ok: Bool, a: Array<U32>, pos: U32, rate: U32, +length: U32) ->
-  Array<U32> & Maybe<&2, Sfx.Sound>:
+def Sfx.read.at(ok: Bool, rate: U32, +length: U32, rest: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
   match ok:
     case False{}:
-      (a, None{})
+      None{}
     case True{}:
-      Sfx.read.fin(rate, (length - 32 : U32), B.Bytes.list(a, (pos + 24 : U32), (length - 32 : U32)))
+      Some{Sound{rate, (length - 32 : U32), List.drop(&2, U32, rest, 16n)}}
 
-def Sfx.read.cut(+pos: U32, size: U32, format: U32, rate: U32, p: Array<U32> & U32) ->
-  Array<U32> & Maybe<&2, Sfx.Sound>:
-  (a, +length) = p
-  Sfx.read.bytes(Sfx.played(size, format, length), a, pos, rate, length)
+# The sound in a lump's bytes, or none for a lump CacheSFX refuses; a
+# missing lump has no bytes, which it refuses.
+def Sfx.read.sized(+size: U32, lump: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
+  match lump:
+    case f0 <> f1 <> r0 <> r1 <> l0 <> l1 <> l2 <> l3 <> rest:
+      +length = B.Bytes.le32(l0, l1, l2, l3)
+      Sfx.read.at(Sfx.played(size, B.Bytes.le16(f0, f1), length), B.Bytes.le16(r0, r1), length, rest)
+    case _:
+      None{}
 
-def Sfx.read.length(+pos: U32, size: U32, format: U32, p: Array<U32> & U32) ->
-  Array<U32> & Maybe<&2, Sfx.Sound>:
-  (a, rate) = p
-  Sfx.read.cut(pos, size, format, rate, B.Bytes.u32(a, (pos + 4 : U32)))
-
-def Sfx.read.rate(+pos: U32, size: U32, p: Array<U32> & U32) -> Array<U32> & Maybe<&2, Sfx.Sound>:
-  (a, format) = p
-  Sfx.read.length(pos, size, format, B.Bytes.u16(a, (pos + 2 : U32)))
-
-def Sfx.read.at(a: Array<U32>, at: U32 & U32) -> Array<U32> & Maybe<&2, Sfx.Sound>:
-  (+pos, size) = at
-  Sfx.read.rate(pos, size, B.Bytes.u16(a, pos))
-
-# The sound in the first lump called name, or none for a lump CacheSFX
-# refuses; a missing lump has size 0, which it refuses.
-def Sfx.read(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, +name: String) -> Array<U32> & Maybe<&2, Sfx.Sound>:
-  Sfx.read.at(a, W.Wad.find(lumps, name))
+def Sfx.read(+lump: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
+  Sfx.read.sized(Sfx.size(lump, 0), lump)
 
 # The expansion
 # -------------
@@ -75,33 +61,31 @@ def Sfx.read(a: Array<U32>, +lumps: List<&2, W.Wad.Lump>, +name: String) -> Arra
 def Sfx.float(b: U32) -> F32:
   ((U32.to_f32(b) - 128.0 : F32) / 128.0 : F32)
 
-def Sfx.floats(bytes: List<&2, U32>, acc: List<&2, F32>) -> List<&2, F32>:
-  match bytes:
-    case []:
-      List.reverse(&2, F32, acc)
-    case b <> rest:
-      Sfx.floats(rest, Sfx.float(b) <> acc)
+# The first n bytes as floats, after acc's reversed, and six of
+# silence after them: SDL pads past the sound's end with silence, and
+# the last sample's taps reach six past it.
+def Sfx.floats(n: Nat, bytes: List<&2, U32>, acc: List<&2, F32>) -> List<&2, F32>:
+  match n bytes:
+    case 0n _:
+      List.reverse.go(&2, F32, acc, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    case 1n+m Nil{}:
+      List.reverse.go(&2, F32, acc, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    case 1n+m b <> rest:
+      Sfx.floats(m, rest, Sfx.float(b) <> acc)
 
-# Each tap times its sample. Past the sound's end SDL pads with silence,
-# whose products are zero.
-def Sfx.mul(row: List<&2, F32>, xs: List<&2, F32>) -> List<&2, F32>:
+# Twelve taps times twelve samples, the products added as
+# ResampleFrame_Generic_SSE adds them: three vectors of four summed lane
+# by lane, then lanes 0 and 1, lanes 2 and 3, and the two sums. libSDL3
+# holds no fused multiply-add.
+def Sfx.dot(row: List<&2, F32>, xs: List<&2, F32>) -> F32:
   match row xs:
-    case [] _:
-      []
-    case t <> tr Nil{}:
-      0.0 <> Sfx.mul(tr, [])
-    case t <> tr x <> xr:
-      (t * x : F32) <> Sfx.mul(tr, xr)
-
-# Twelve products added as ResampleFrame_Generic_SSE adds them: three
-# vectors of four summed lane by lane, then lanes 0 and 1, lanes 2 and
-# 3, and the two sums. libSDL3 holds no fused multiply-add.
-def Sfx.sum(ps: List<&2, F32>) -> F32:
-  match ps:
-    case a0 <> a1 <> a2 <> a3 <> b0 <> b1 <> b2 <> b3 <> c0 <> c1 <> c2 <> c3 <> rest:
-      ((((a0 + b0 : F32) + c0 : F32) + ((a1 + b1 : F32) + c1 : F32) : F32)
-        + (((a2 + b2 : F32) + c2 : F32) + ((a3 + b3 : F32) + c3 : F32) : F32) : F32)
-    case _:
+    case t0 <> t1 <> t2 <> t3 <> t4 <> t5 <> t6 <> t7 <> t8 <> t9 <> t10 <> t11 <> tr
+      x0 <> x1 <> x2 <> x3 <> x4 <> x5 <> x6 <> x7 <> x8 <> x9 <> x10 <> x11 <> xr:
+      (((((t0 * x0 : F32) + (t4 * x4 : F32) : F32) + (t8 * x8 : F32) : F32)
+        + (((t1 * x1 : F32) + (t5 * x5 : F32) : F32) + (t9 * x9 : F32) : F32) : F32)
+        + ((((t2 * x2 : F32) + (t6 * x6 : F32) : F32) + (t10 * x10 : F32) : F32)
+          + (((t3 * x3 : F32) + (t7 * x7 : F32) : F32) + (t11 * x11 : F32) : F32) : F32) : F32)
+    case _ _:
       0.0
 
 # SDL_Convert_F32_to_S16_SSE2: x + 257 rounds x to the nearest 1 / 32768,
@@ -111,43 +95,23 @@ def Sfx.sum(ps: List<&2, F32>) -> F32:
 def Sfx.sample(x: F32) -> U32:
   (F32.to_u32(F32.clamp((((x + 257.0 : F32) - 256.0 : F32) * 32768.0 : F32), 0.0, 65535.0)) .^. 32768 : U32)
 
-# The frames one source sample makes, before tail.
-def Sfx.frames(rows: List<&2, List<&2, F32>>, +xs: List<&2, F32>, tail: List<&2, U32>) -> List<&2, U32>:
+# The frames one source sample makes, written from i on.
+def Sfx.frames(rows: List<&2, List<&2, F32>>, +xs: List<&2, F32>, a: Array<U32>, +i: U32) -> Array<U32>:
   match rows:
     case []:
-      tail
+      a
     case row <> rest:
-      Sfx.sample(Sfx.sum(Sfx.mul(row, xs))) <> Sfx.frames(rest, xs, tail)
+      Sfx.frames(rest, xs, Array.set(U32, a, i, Sfx.sample(Sfx.dot(row, xs))), (i + 1 : U32))
 
-def Sfx.piece(n: Nat, +rows: List<&2, List<&2, F32>>, xs: List<&2, F32>) -> List<&2, U32>:
+def Sfx.expand.go(n: Nat, +rows: List<&2, List<&2, F32>>, +step: U32, xs: List<&2, F32>, a: Array<U32>, +i: U32) ->
+  Array<U32>:
   match n xs:
     case 0n _:
-      []
+      a
     case 1n+m Nil{}:
-      []
+      a
     case 1n+m +x <> +rest:
-      Sfx.frames(rows, x <> rest, Sfx.piece(m, rows, rest))
-
-# The source samples a piece covers: few enough that a piece's recursion
-# is safe on the JS lane.
-def Sfx.step(+left: U32) -> U32:
-  U32.min(left, 1024)
-
-# The pieces a run has left.
-def Sfx.pieces(r: Sfx.Run) -> Nat:
-  Run{rows, xs, left} = r
-  U32.to_nat(((left + 1023) / 1024 : U32))
-
-# The run's next piece: 16-bit samples at 44100 Hz, as many for each
-# source sample as the run has rows.
-def Sfx.out(r: Sfx.Run) -> List<&2, U32>:
-  Run{rows, xs, left} = r
-  Sfx.piece(U32.to_nat(Sfx.step(left)), rows, xs)
-
-# The run past that piece.
-def Sfx.next(r: Sfx.Run) -> Sfx.Run:
-  Run{rows, xs, +left} = r
-  Run{rows, List.drop(&2, F32, xs, U32.to_nat(Sfx.step(left))), (left - Sfx.step(left) : U32)}
+      Sfx.expand.go(m, rows, step, rest, Sfx.frames(rows, x <> rest, a, i), (i + step : U32))
 
 # The resampler's phase advances by 8 * rate / 44100 a frame, and the
 # table holds the even phases, so a frame's row is every rate / 11025th.
@@ -158,16 +122,33 @@ def Sfx.rows(rows: List<&2, List<&2, F32>>, +every: U32, +i: U32) -> List<&2, Li
     case row <> rest:
       List.filter.put(List<&2, F32>, row, Sfx.rows(rest, every, (i + 1 : U32)), U32.is_zero((i % every : U32)))
 
-def Sfx.run.at(ok: Bool, rate: U32, count: U32, bytes: List<&2, U32>) -> Maybe<&2, Sfx.Run>:
+def Sfx.served(+rate: U32) -> Bool:
+  U32.is_eq(rate, 11025) || U32.is_eq(rate, 22050) || U32.is_eq(rate, 44100)
+
+def Sfx.length.at(ok: Bool, +rate: U32, +count: U32) -> U32:
   match ok:
     case False{}:
-      None{}
+      0
     case True{}:
-      Some{Run{Sfx.rows(T.SfxTaps.rows(), (rate / 11025 : U32), 0),
-        Sfx.floats(128 <> 128 <> 128 <> 128 <> 128 <> bytes, []), count}}
+      (count * (44100 / rate) : U32)
 
-# A sound's expansion from its first sample, the five before it silence
-# as SDL's history is, or none at a rate SDL's converter is not given.
-def Sfx.run(s: Sfx.Sound) -> Maybe<&2, Sfx.Run>:
+# The frames a sound expands to: 44100 / rate a byte played, none at a
+# rate SDL's converter is not given.
+def Sfx.length(s: Sfx.Sound) -> U32:
   Sound{+rate, count, bytes} = s
-  Sfx.run.at(U32.is_eq(rate, 11025) || U32.is_eq(rate, 22050) || U32.is_eq(rate, 44100), rate, count, bytes)
+  Sfx.length.at(Sfx.served(rate), rate, count)
+
+def Sfx.expand.at(ok: Bool, +rate: U32, +count: U32, bytes: List<&2, U32>, a: Array<U32>, +at: U32) -> Array<U32>:
+  match ok:
+    case False{}:
+      a
+    case True{}:
+      Sfx.expand.go(U32.to_nat(count), Sfx.rows(T.SfxTaps.rows(), (rate / 11025 : U32), 0), (44100 / rate : U32),
+        Sfx.floats(U32.to_nat(count), bytes, [0.0, 0.0, 0.0, 0.0, 0.0]), a, at)
+
+# A sound's 16-bit samples at 44100 Hz written into the array from at,
+# the five source samples before its first silence as SDL's history is;
+# nothing at a rate SDL's converter is not given.
+def Sfx.expand(s: Sfx.Sound, a: Array<U32>, +at: U32) -> Array<U32>:
+  Sound{+rate, count, bytes} = s
+  Sfx.expand.at(Sfx.served(rate), rate, count, bytes, a, at)

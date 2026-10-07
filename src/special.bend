@@ -171,13 +171,21 @@ def Sim.Noise.wake(n: S.Sim.Noise) -> U32:
   S.Noise{start, wake, up, down, crush, grind} = n
   wake
 
-# A mover with steps left runs again next tic, after those kept so far;
-# one with none has ended.
-def Sim.mover.kept(sector: U32, ceiling: Bool, speed: U32, steps: List<&2, S.Sim.Step>,
+# A sector's floor flat and special set.
+def Sim.floor.change(+sector: U32, +flat: U32, +special: U32, s: S.State) -> S.State:
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, L.Level.sector.put(L.Level.sector.put(level, sector, 2, flat), sector, 5, special), things, sidetex,
+    thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+
+# A mover with steps left runs again next tic, after those kept so far,
+# a change at their head made at once; one with none has ended.
+def Sim.mover.kept(+sector: U32, ceiling: Bool, speed: U32, steps: List<&2, S.Sim.Step>,
   plan: List<&2, S.Sim.Step>, noise: S.Sim.Noise, s: S.State) -> S.State:
   match steps:
     case []:
       s
+    case S.Change{flat, special} <> rest:
+      Sim.mover.kept(sector, ceiling, speed, rest, plan, noise, Sim.floor.change(sector, flat, special, s))
     case step <> rest:
       S.State.kept(s, S.Mover{sector, ceiling, speed, step <> rest, plan, noise})
 
@@ -235,25 +243,41 @@ def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: S.S
     case False{}:
       S.State.kept(s, S.Button{side, slot, texture, (tics - 1 : U32)})
 
-# The sectors across a sector's two-sided lines, as Doom's getNextSector
-# answers them line by line: the back of a line whose front is the
-# sector, else the front.
-def Sim.around.of(+sector: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
+def Sim.line.touches(+sector: U32, line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
-  V.Vec.keep(~U32, Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
-    Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
-      Bool.or(U32.is_eq(front, sector), U32.is_eq(back, sector)))),
-    Bool.pick(U32, U32.is_eq(front, sector), back, front), rest)
+  Bool.or(U32.is_eq(front, sector), U32.is_eq(back, sector))
 
-def Sim.around.go(n: Nat, +level: L.Level, +sector: U32, +i: U32) -> List<&2, U32>:
+def Sim.lines.go(n: Nat, +level: L.Level, +sector: U32, +i: U32) -> List<&2, U32>:
   match n:
     case 0n:
       []
     case 1n+m:
-      Sim.around.of(sector, L.Level.line(level, i), Sim.around.go(m, level, sector, (i + 1 : U32)))
+      V.Vec.keep(~U32, Sim.line.touches(sector, L.Level.line(level, i)), i,
+        Sim.lines.go(m, level, sector, (i + 1 : U32)))
 
-def Sim.around(+level: L.Level, sector: U32) -> List<&2, U32>:
-  Sim.around.go(U32.to_nat(L.Level.nlines(level)), level, sector, 0)
+# A sector's lines in line order, as P_GroupLines lists them.
+def Sim.lines(+level: L.Level, sector: U32) -> List<&2, U32>:
+  Sim.lines.go(U32.to_nat(L.Level.nlines(level)), level, sector, 0)
+
+# Something of each of some lines, kept or not by a line of the sector's.
+def Sim.over(~of: @+sector: U32 -> @line: L.Level.Line -> @rest: List<&2, U32> -> List<&2, U32>, lines: List<&2, U32>,
+  +level: L.Level, +sector: U32) -> List<&2, U32>:
+  match lines:
+    case []:
+      []
+    case i <> rest:
+      of(sector, L.Level.line(level, i), Sim.over(~of, rest, level, sector))
+
+# Doom's getNextSector: across a two-sided line of the sector, the back
+# of a line whose front is the sector, else the front.
+def Sim.around.of(+sector: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
+  L.Line{x1, y1, x2, y2, flags, +front, +back} = line
+  V.Vec.keep(~U32, Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))), Bool.not(U32.is_eq(back, L.Level.none()))),
+    Bool.pick(U32, U32.is_eq(front, sector), back, front), rest)
+
+# The sectors across a sector's lines, line by line.
+def Sim.around(+level: L.Level, +sector: U32) -> List<&2, U32>:
+  Sim.over(~Sim.around.of, Sim.lines(level, sector), level, sector)
 
 # The least or the most of a sector's word over some sectors, from a
 # first value: Doom's P_FindLowestCeilingSurrounding and its kin.
@@ -299,6 +323,11 @@ def Sim.noise.lift() -> S.Sim.Noise:
 # T_MoveFloor's: the floor grinds as it moves and stops aloud.
 def Sim.noise.floor() -> S.Sim.Noise:
   S.Noise{0, 0, Sn.Sound.pstop(), Sn.Sound.pstop(), 0, Sn.Sound.stnmov()}
+
+# EV_DoPlat's start and T_PlatRaise's grinding, stop and obstruction
+# sounds for a plat that raises and changes.
+def Sim.noise.plat() -> S.Sim.Noise:
+  S.Noise{Sn.Sound.stnmov(), 0, Sn.Sound.pstop(), Sn.Sound.pstop(), Sn.Sound.pstart(), Sn.Sound.stnmov()}
 
 # The level's lights
 # ------------------
@@ -441,11 +470,103 @@ def Sim.start(~make: @+level: L.Level -> @+sector: U32 -> @s: S.State -> S.State
     case sector <> rest:
       Sim.start(~make, rest, make(S.State.level(s), sector, s))
 
-# Doom's lowerFloorToLowest: 1 a tic down to the lowest floor around,
-# its own included.
+# Doom's P_FindLowestFloorSurrounding: the lowest floor around, its own
+# included.
+def Sim.floor.lowest(+level: L.Level, +sector: U32) -> U32:
+  Sim.extreme(~F.Fixed.min, ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))
+
+# Doom's P_FindNextHighestFloor: the lowest floor around above the
+# sector's own, else its own. Every floor found is above it, so the
+# first one found replaces it.
+def Sim.floor.above(+own: U32, +acc: U32, +floor: U32) -> U32:
+  Bool.pick(U32, F.Fixed.gt(floor, own), Bool.pick(U32, U32.is_eq(acc, own), floor, F.Fixed.min(acc, floor)), acc)
+
+def Sim.floor.next.go(sectors: List<&2, U32>, +level: L.Level, +own: U32, +acc: U32) -> U32:
+  match sectors:
+    case []:
+      acc
+    case s <> rest:
+      Sim.floor.next.go(rest, level, own, Sim.floor.above(own, acc, L.Level.floor(level, s)))
+
+def Sim.floor.next(+level: L.Level, +sector: U32) -> U32:
+  Sim.floor.next.go(Sim.around(level, sector), level, L.Level.floor(level, sector), L.Level.floor(level, sector))
+
+def Sim.floor.to(+sector: U32, +down: Bool, +dest: U32, s: S.State) -> S.State:
+  Sim.mover.begin(sector, False{}, 65536, [S.Travel{down, dest}], Sim.noise.floor(), s)
+
+# Doom's lowerFloorToLowest: 1 a tic down to the lowest floor around.
 def Sim.floor.low(+level: L.Level, +sector: U32, s: S.State) -> S.State:
-  Sim.mover.begin(sector, False{}, 65536, [S.Travel{True{}, Sim.extreme(~F.Fixed.min,
-    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}], Sim.noise.floor(), s)
+  Sim.floor.to(sector, True{}, Sim.floor.lowest(level, sector), s)
+
+# Doom's raiseFloor: 1 a tic up to the lowest ceiling around, or to its
+# own when that is lower.
+def Sim.floor.raise(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.floor.to(sector, False{}, Sim.extreme(~F.Fixed.min, ~L.Level.ceil, Sim.around(level, sector), level,
+    L.Level.ceil(level, sector)), s)
+
+# Doom's raiseFloorToNearest: 1 a tic up to the next floor.
+def Sim.floor.nearest(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.floor.to(sector, False{}, Sim.floor.next(level, sector), s)
+
+# Doom's raiseToNearestAndChange plat, the floor already changed: half a
+# unit a tic up to the next floor.
+def Sim.plat.nearest(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  Sim.mover.begin(sector, False{}, 32768, [S.Travel{False{}, Sim.floor.next(level, sector)}], Sim.noise.plat(), s)
+
+def Sim.plat.changed.go(sectors: List<&2, U32>, +flat: U32, s: S.State) -> S.State:
+  match sectors:
+    case []:
+      s
+    case sector <> rest:
+      Sim.plat.changed.go(rest, flat, Sim.floor.change(sector, flat, 0, s))
+
+# EV_DoPlat's raiseToNearestAndChange before the plats start: each
+# sector takes the floor flat in front of the line and loses its
+# special, damage and all.
+def Sim.plat.changed(+sectors: List<&2, U32>, +line: U32, +s: S.State) -> S.State:
+  Sim.plat.changed.go(sectors, L.Level.floorpic(S.State.level(s),
+    L.Level.side.sector(S.State.level(s), L.Level.line.side(S.State.level(s), line, 0))), s)
+
+# Doom's EV_DoDonut. Across the pillar's first line is the ring; under
+# is the back of the ring's first line whose back is not the pillar,
+# read as vanilla reads it, whichever way the line faces. The ring rises
+# half a unit a tic to under's floor and takes its flat and no special
+# as it lands; the pillar sinks as slowly to the same height. A ring
+# that is no sector starts nothing, where Chocolate Doom gives up on the
+# tag's later sectors too. One pillar's donut can start another's
+# sector, so each pillar is passed over if it is moving by its turn.
+def Sim.donut.past(+pillar: U32, line: L.Level.Line, rest: List<&2, U32>) -> List<&2, U32>:
+  L.Line{x1, y1, x2, y2, flags, front, +back} = line
+  V.Vec.keep(~U32, Bool.not(U32.is_eq(back, pillar)), back, rest)
+
+def Sim.donut.start(under: List<&2, U32>, +ring: U32, +pillar: U32, +level: L.Level, s: S.State) -> S.State:
+  match under:
+    case []:
+      s
+    case +at <> rest:
+      Sim.mover.begin(pillar, False{}, 32768, [S.Travel{True{}, L.Level.floor(level, at)}], Sim.noise.floor(),
+        Sim.mover.begin(ring, False{}, 32768, [S.Travel{False{}, L.Level.floor(level, at)},
+          S.Change{L.Level.floorpic(level, at), 0}], Sim.noise.floor(), s))
+
+def Sim.donut.ring(across: List<&2, U32>, +pillar: U32, +level: L.Level, s: S.State) -> S.State:
+  match across:
+    case []:
+      s
+    case +ring <> rest:
+      Sim.donut.start(Sim.over(~Sim.donut.past, Sim.lines(level, ring), level, pillar), ring, pillar, level, s)
+
+def Sim.donut.at(lines: List<&2, U32>, +pillar: U32, +level: L.Level, s: S.State) -> S.State:
+  match lines:
+    case []:
+      s
+    case i <> rest:
+      Sim.donut.ring(Sim.around.of(pillar, L.Level.line(level, i), []), pillar, level, s)
+
+def Sim.donut(+level: L.Level, +sector: U32, s: S.State) -> S.State:
+  S.State{player, now, things, sidetex, S.Thinkers{+ran, +due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  Sim.donut.at(Bool.pick(List<&2, U32>, Bool.or(Sim.moving(ran, sector), Sim.moving(due, sector)), [],
+    Sim.lines(level, sector)), sector, level,
+    S.State{player, now, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets})
 
 # Which of a side's three textures is a switch: the top, else the
 # middle, else the bottom; 3 when none is.
@@ -542,8 +663,7 @@ def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> @s: S.State -> S.S
 # Doom's downWaitUpStay lift: 4 a tic down to the lowest floor around,
 # its own included, 105 tics there, and back up to where it was.
 def Sim.lift(+level: L.Level, +sector: U32, s: S.State) -> S.State:
-  Sim.mover.begin(sector, False{}, 262144, [S.Travel{True{}, Sim.extreme(~F.Fixed.min,
-    ~L.Level.floor, Sim.around(level, sector), level, L.Level.floor(level, sector))}, S.Hold{105},
+  Sim.mover.begin(sector, False{}, 262144, [S.Travel{True{}, Sim.floor.lowest(level, sector)}, S.Hold{105},
     S.Travel{False{}, L.Level.floor(level, sector)}], Sim.noise.lift(), s)
 
 def Sim.light.dark(+level: L.Level, +sector: U32, s: S.State) -> S.State:
@@ -578,7 +698,16 @@ def Sim.floor.turbo(+level: L.Level, +sector: U32, s: S.State) -> S.State:
     ~L.Level.floor, Sim.around(level, sector), level, 4262199296), L.Level.floor(level, sector))}],
     Sim.noise.floor(), s)
 
+# Doom's raiseToNearestAndChange from a line that is walked over, and
+# from a switch that works once.
+def Sim.plat(+sectors: List<&2, U32>, +line: U32, s: S.State) -> S.State:
+  Sim.start(~Sim.plat.nearest, sectors, Sim.plat.changed(sectors, line, s))
+
+def Sim.plat.switch(+sectors: List<&2, U32>, +line: U32, s: S.State) -> S.State:
+  Sim.use.once(~Sim.plat.nearest, sectors, line, Sim.plat.changed(sectors, line, s))
+
 # One-shot crossings consume their special whether or not a sector starts.
+
 def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
   match special:
     case 2:
@@ -589,6 +718,16 @@ def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
       Sim.once(line, Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s))
     case 88:
       Sim.start(~Sim.lift, Sim.tagged(s, line), s)
+    case 5:
+      Sim.once(line, Sim.start(~Sim.floor.raise, Sim.tagged(s, line), s))
+    case 22:
+      Sim.once(line, Sim.plat(Sim.tagged(s, line), line, s))
+    case 82:
+      Sim.start(~Sim.floor.low, Sim.tagged(s, line), s)
+    case 91:
+      Sim.start(~Sim.floor.raise, Sim.tagged(s, line), s)
+    case 98:
+      Sim.start(~Sim.floor.turbo, Sim.tagged(s, line), s)
     case _:
       s
 
@@ -612,6 +751,7 @@ def Sim.cross(lines: List<&2, S.Sim.Cross>, +s: S.State) -> S.State:
 # ---
 
 # Player use dispatch, including normal and secret exit switches.
+
 def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.State:
   match special:
     case 1:
@@ -624,6 +764,14 @@ def Sim.use.special(special: U32, +i: U32, inv: I.Inventory, +s: S.State) -> S.S
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case 62:
       Sim.use.again(~Sim.lift, Sim.tagged(s, i), i, s)
+    case 9:
+      Sim.use.once(~Sim.donut, Sim.tagged(s, i), i, s)
+    case 18:
+      Sim.use.once(~Sim.floor.nearest, Sim.tagged(s, i), i, s)
+    case 20:
+      Sim.plat.switch(Sim.tagged(s, i), i, s)
+    case 70:
+      Sim.use.again(~Sim.floor.turbo, Sim.tagged(s, i), i, s)
     case 11:
       State.end(False{}, Sim.once(i, Sim.switch(False{}, i, s)))
     case 51:
