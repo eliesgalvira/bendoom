@@ -874,16 +874,10 @@ def Play.sounds(before: S.Sim.Exit, +after: S.State) -> List<&2, Sn.Sound.Event>
     case _:
       []
 
-# The attack and use WI_checkForAccelerate reads from the command, use
-# with the game's window adding Space and Enter.
-def Play.down(+held: Bool, +cmd: K.Cmd) -> U32:
-  Inter.buttons(K.Cmd.attack(cmd), Bool.or(held, K.Cmd.use(cmd)))
-
 # A tic of the play on the map as loaded: the level's tic while it
-# runs, then the tally's. Held is a key outside the command that
-# accelerates the tally, which the level pays no heed. A reload makes
+# runs, then the tally's. A reload makes
 # the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
-def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
+def Play.step(+level: L.Level, +cmd: K.Cmd, play: Play) -> Play.Step:
   match play:
     case Playing{+state, map, didsecret, pointer}:
       +ended = S.State.ended(state)
@@ -891,7 +885,7 @@ def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Ste
       +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
       Step{Play.after(pointer, map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
     case Showing{+wi, after, trip}:
-      +down = Play.down(held, cmd)
+      +down = Inter.buttons(K.Cmd.attack(cmd), K.Cmd.use(cmd))
       +ticked = Inter.tic(down, wi)
       Step{Showing{ticked, after, trip}, Inter.sound(Inter.pressed(down, wi), wi, ticked)}
 
@@ -966,9 +960,9 @@ def Play.World.stepped(mem: Array<U32>, gfx: G.Gfx, tables: P.Project.Tables, le
   (World{play, mem, gfx, tables, level}, sounds)
 
 # A tic of the play in its world.
-def Play.World.step(cmd: K.Cmd, held: Bool, w: Play.World) -> Play.World & List<&2, Sn.Sound.Event>:
+def Play.World.step(cmd: K.Cmd, w: Play.World) -> Play.World & List<&2, Sn.Sound.Event>:
   World{play, mem, gfx, tables, +level} = w
-  Play.World.stepped(mem, gfx, tables, level, Play.step(level, cmd, held, play))
+  Play.World.stepped(mem, gfx, tables, level, Play.step(level, cmd, play))
 
 # A play in its world after some tics, and the sounds they started, in
 # order.
@@ -979,16 +973,16 @@ def Play.heard(sounds: List<&2, Sn.Sound.Event>, p: Play.World & List<&2, Sn.Sou
   (world, more) = p
   Ran{world, List.append(&2, Sn.Sound.Event, sounds, more)}
 
-# A tic for each command, with a key held throughout, each after the
+# A tic for each command, each after the
 # map the play asks for, if it asks for one, has loaded.
-def Play.run(cmds: List<&2, K.Cmd>, +held: Bool, run: Play.Run) -> IO(Play.Run):
+def Play.run(cmds: List<&2, K.Cmd>, run: Play.Run) -> IO(Play.Run):
   match cmds:
     case []:
       IO.pure(Play.Run, run)
     case +cmd <> rest:
       Ran{world, sounds} = run
       IO.bind(Play.World, Play.Run, Play.load(world),
-        loaded => Play.run(rest, held, Play.heard(sounds, Play.World.step(cmd, held, loaded))))
+        loaded => Play.run(rest, Play.heard(sounds, Play.World.step(cmd, loaded))))
 
 # The scene's song, as S_Start and WI_Start name it: the map's own,
 # mus_e1m1 plus the episode's nine maps before it and the map's place,
