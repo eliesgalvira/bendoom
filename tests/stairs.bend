@@ -14,7 +14,7 @@ def geometry(lines: List<&2, U32>, sides: List<&2, U32>, +level: L.Level) -> L.L
   L.Level{L.Geo{ls, ss, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
     boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = level
   L.Level{L.Geo{V.Vec.of_list(lines, 10), V.Vec.of_list(sides, 9), verts, segs, subs, nodes, root, blockmap,
-    things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+    things, texnames, ["STEP", "CEIL", "STEP", "CEIL", "STEP", "CEIL"], sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
     sectors, V.Vec.of_list([8, 7, 0, 0], 4), heard}
 
 def level(lines: List<&2, U32>, sides: List<&2, U32>) -> L.Level:
@@ -75,6 +75,7 @@ def roots() -> S.State:
 def main() -> IO(Unit):
   do IO<Unit>:
     planned("chain", Sp.Sim.stairs(0, chain()))
+    planned("same flat name", Sp.Sim.stairs(0, changed(changed(chain(), 1, 2, 2), 2, 2, 4)))
     planned("reverse", Sp.Sim.stairs(0, reverse()))
     planned("different flat", Sp.Sim.stairs(0, changed(chain(), 1, 2, 1)))
     planned("occupied candidate", Sp.Sim.stairs(0, occupied()))
@@ -95,6 +96,7 @@ def main() -> IO(Unit):
     IO.print("monster use " ++ Bool.show(Sp.Sim.thing.use.special(7)))
 
 #|chain 0:8.000000 1:16.000000 2:24.000000
+#|same flat name 0:8.000000 1:16.000000 2:24.000000
 #|reverse 0:8.000000 1:16.000000
 #|different flat 0:8.000000
 #|occupied candidate 0:8.000000 2:24.000000
