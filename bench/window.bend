@@ -24,6 +24,8 @@ import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
 import ../src/game.bend as M
+import ../src/stream.bend as A
+import ../src/wad.bend as W
 import ../tools/script.bend as T
 
 def Bench.input(+walk: Bool) -> K.Input:
@@ -40,19 +42,25 @@ def Bench.dry(dry: Maybe<U32>) -> String:
     case Some{n}:
       ", the device's queue empty on " ++ U32.show(n) ++ " of them"
 
-def Bench.run(+t0: Nat, input: K.Input, script: List<&2, K.Cmd>, world: Array<U32> & G.Gfx & L.Level) ->
+def Bench.run(+t0: Nat, input: K.Input, script: List<&2, K.Cmd>, world: Array<U32> & G.Gfx & L.Level, music: Maybe<A.Stream>) ->
   IO(Unit):
   do IO<Unit>:
-    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, L.Name{1, 1}, world)
+    dry : Maybe<U32> <- M.Game.start(600n, input, script, None{}, t0, L.Name{1, 1}, world, music)
     t1 : Nat <- IO.now()
     IO.print(Bench.rate(t0, t1) ++ Bench.dry(dry))
+
+def Bench.start(input: K.Input, script: List<&2, K.Cmd>, p: Array<U32> & G.Gfx & L.Level & Maybe<A.Stream>) -> IO(Unit):
+  (mem, gfx, level, music) = p
+  do IO<Unit>:
+    t0 : Nat <- IO.now()
+    Bench.run(t0, input, script, (mem, gfx, level), music)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     walk : Result<&1, &1, U32 & String, String> <- IO.get_env("WALK")
     script : Result<&1, &1, U32 & String, String> <- IO.get_env("SCRIPT")
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
-    t0 : Nat <- IO.now()
-    Bench.run(t0, Bench.input(Result.is_done(&1, &1, U32 & String, String, walk)),
+    wad : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    ready : Array<U32> & G.Gfx & L.Level & Maybe<A.Stream> <- M.Game.load(L.Name{1, 1}, wad)
+    Bench.start(Bench.input(Result.is_done(&1, &1, U32 & String, String, walk)),
       List.concat(&2, K.Cmd, T.Script.runs(String.split(Result.default(&1, &1, U32 & String, String, script, ""), ' '))),
-      world)
+      ready)

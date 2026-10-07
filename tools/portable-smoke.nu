@@ -1,12 +1,6 @@
 #!/usr/bin/env nu
 
-def wait-for [attempts: int, ready: closure, message: string] {
-  for _ in 0..<$attempts {
-    if (do $ready) { return }
-    sleep 100ms
-  }
-  error make {msg: $message}
-}
+source xvfb.nu
 
 def has-audio [file: path]: nothing -> bool {
   ($file | path exists) and ((open --raw $file | into binary | bytes remove --all 0x[00] | bytes length) > 0)
@@ -16,7 +10,6 @@ def check-archive [archive: path, audio: string] {
   let dir = mktemp --directory
   let capture = $dir | path join audio.raw
   let result = $dir | path join result.json
-  let display_file = $dir | path join display
   let alsa = $dir | path join alsa.conf
   try {
     mkdir ($dir | path join game)
@@ -34,13 +27,9 @@ def check-archive [archive: path, audio: string] {
           ^parec $"--device=($name).monitor" --raw --format=s16le --rate=44100 --channels=2 --latency-msec=10 o> $capture
         } | ignore
       }
-      job spawn --description $dir {
-        ^Xvfb -displayfd 1 -screen 0 1280x960x24 o> $display_file e> ($dir | path join xvfb.log)
-      } | ignore
-      wait-for 100 { ($display_file | path exists) and ((open --raw $display_file | str trim) != "") } "Xvfb did not start"
-      let display = $":(open --raw $display_file | str trim)"
+      let display = xvfb $dir 1280x960
       let game = job spawn --description $dir {
-        hide-env --ignore-errors WAYLAND_DISPLAY BENDOOM_IWAD BENDOOM_SOUNDS ALSA_PLUGIN_DIR
+        hide-env --ignore-errors WAYLAND_DISPLAY BENDOOM_IWAD ALSA_PLUGIN_DIR
         with-env {DISPLAY: $display} {
           (^bwrap --ro-bind / / --dev-bind /dev /dev --proc /proc --tmpfs /nix
             --bind $dir $dir --die-with-parent

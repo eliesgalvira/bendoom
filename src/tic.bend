@@ -33,22 +33,23 @@ def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn
 
 # A new game at a place: G_InitNew clears the random indices, and
 # G_PlayerReborn hands out the pistol start with use down, so a key held
-# since before the level does nothing. M_Random's index stands at 64,
-# since the melt that wipes the level in draws once a screen column, 320.
+# since before the level does nothing. The first two commands precede
+# the startup melt and its 320 M_Random draws.
 def State.at(+level: L.Level, place: L.Level.Start) -> S.State:
-  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(), S.Sim.Face.start(64), True{})
+  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(),
+    S.Sim.Face.melt.wait(2, S.Sim.Face.start(0)), True{})
 
 def State.start(+level: L.Level) -> S.State:
   State.at(level, L.Level.start_of(level))
 
 # G_DoLoadLevel after a level that came before, which neither random
 # index restarts from: the map from its start with the player, use and
-# attack as the caller hands them, and ST_Start's bar, whose melt draws
-# M_Random 320 times more.
+# attack as the caller hands them, and ST_Start's bar. Its melt waits
+# until the first ST_Ticker has chosen the face.
 def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, attackdown: Bool, +mrnd: U32,
   face: V.Vec) -> S.State:
   State.at.spawned(level, L.Level.start_of(level), H.Thing.spawn(level, rnd), inv,
-    S.Sim.Face.restart(I.Inventory.weapons(inv), attackdown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
+    S.Sim.Face.melt.wait(1, S.Sim.Face.restart(I.Inventory.weapons(inv), attackdown, mrnd, face)), usedown)
 
 # G_DoReborn's reload: the dead player's map again from a pistol start,
 # as G_PlayerReborn leaves the player.
@@ -930,14 +931,14 @@ def Sim.think(t: S.Thinker, s: S.State) -> S.State:
   match t:
     case S.Mobj{id}:
       Sim.thing(id, s)
-    case S.Mover{sector, ceiling, speed, [], plan, noise}:
-      s
     case S.Mover{+sector, ceiling, speed, S.Hold{+tics} <> +rest, plan, +noise}:
       Sp.Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(tics, 1), rest,
         S.Hold{(tics - 1 : U32)} <> rest), plan, noise,
         S.Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sp.Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
     case S.Mover{sector, ceiling, speed, S.Travel{down, dest} <> rest, plan, noise}:
       Sp.Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
+    case S.Mover{sector, ceiling, speed, steps, plan, noise}:
+      Sp.Sim.mover.kept(sector, ceiling, speed, steps, plan, noise, s)
     case S.Button{side, slot, texture, +tics}:
       Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
     case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
@@ -1143,7 +1144,7 @@ def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, 
 def Sim.st.ticker(s: S.State) -> S.State:
   S.State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd)), reborn, secrets}
+    S.Sim.Face.melt.tic(S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd))), reborn, secrets}
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: S.State) -> S.State:

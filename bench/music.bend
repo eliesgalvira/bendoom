@@ -7,6 +7,8 @@
 #   SONG=D_E1M6 ./music --threads 1
 import Base
 import ../src/song.bend as S
+import ../src/channel.bend as C
+import ../src/stream.bend as A
 
 def Bench.dropped(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
   (deck, frames) = p
@@ -35,6 +37,6 @@ def main() -> IO(Unit):
   do IO<Unit>:
     named : Result<&1, &1, U32 & String, String> <- IO.get_env("SONG")
     +song : String = Result.default(&1, &1, U32 & String, String, named, "D_E1M1")
-    deck : S.Song.Deck <- S.Song.Deck.load([song])
+    loaded : S.Song.Deck & C.Channel.Bank <- A.Stream.load([song], [])
     t0 : Nat <- IO.now()
-    Bench.run(song, deck, t0)
+    Bench.run(song, Pair.fst(S.Song.Deck, C.Channel.Bank, loaded), t0)
