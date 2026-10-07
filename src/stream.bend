@@ -71,7 +71,7 @@ def Stream.voice.over(+left: U32, +right: U32, words: List<&2, U32>, q: Array<U3
 def Stream.voice.read(+left: U32, +right: U32, +at: U32, +n: U32, p: Array<U32> & List<&2, U32>) ->
   Array<U32> & List<&2, U32>:
   (a, words) = p
-  Stream.voice.over(left, right, words, B.Bytes.file.list(a, at, n))
+  Stream.voice.over(left, right, words, B.Bytes.list(a, at, n))
 
 def Stream.voice(+want: U32, c: Maybe<&2, C.Channel>, p: Array<U32> & List<&2, U32>) -> Array<U32> & List<&2, U32>:
   match c:
