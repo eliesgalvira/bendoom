@@ -24,8 +24,8 @@ import ./sound.bend as Sn
 # graphics, redrawn each frame from the play's latest tic, the level or
 # the tally after it. The level is the map as loaded, which a death
 # loads again. Again is whether Space or Enter is down,
-# which accelerates the tally. The demo is the one being recorded, until
-# the level ends, and the music the mixer, if there is a sound device.
+# which accelerates the tally. The demo stays open until the game quits,
+# and the music is the mixer, if there is a sound device.
 type Game is Type:
   Game{level: L.Level, gfx: G.Gfx, tables: P.Project.Tables, play: I.Play, input: K.Input,
     again: Bool, last: Nat, owed: Nat, mem: Array<U32>, demo: Maybe<D.Demo.Rec>, music: Maybe<M.Stream>}
@@ -80,31 +80,18 @@ def Game.owed(capped: Bool, due: Nat) -> Nat:
     case False{}:
       Nat.mod(due, 1000n)
 
-# The frame whose tics ended the level ends the demo, as vanilla's
-# G_CheckDemoStatus does at the exit.
-def Game.ended(ending: Bool, demo: Maybe<D.Demo.Rec>) -> IO(Maybe<D.Demo.Rec>):
-  match ending:
-    case True{}:
-      do IO<Maybe<D.Demo.Rec>>:
-        D.Demo.stop(demo)
-        return None{}
-    case False{}:
-      IO.pure(Maybe<D.Demo.Rec>, demo)
-
-def Game.started(was: Bool, demo: Maybe<D.Demo.Rec>, input: K.Input, +again: Bool, last: Nat, owed: Nat,
+def Game.started(demo: Maybe<D.Demo.Rec>, input: K.Input, again: Bool, last: Nat, owed: Nat,
   music: Maybe<M.Stream>, steps: I.Play.Run) -> IO(Bool & Game):
-  I.Ran{I.World{+next, mem, gfx, tables, level}, events} = steps
-  do IO<Bool & Game>:
-    kept : Maybe<D.Demo.Rec> <- Game.ended(Bool.and(was, Bool.not(I.Play.playing(next))), demo)
-    return (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, kept, M.Stream.hear(events, music)})
+  I.Ran{I.World{next, mem, gfx, tables, level}, events} = steps
+  IO.pure(Bool & Game, (False{}, Game{level, gfx, tables, next, input, again, last, owed, mem, demo,
+    M.Stream.hear(events, music)}))
 
-def Game.advanced(+play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
+def Game.advanced(play: I.Play, played: Maybe<D.Demo.Rec> & List<&2, K.Cmd>, level: L.Level, gfx: G.Gfx,
   tables: P.Project.Tables, input: K.Input, +again: Bool, last: Nat, owed: Nat, mem: Array<U32>,
   music: Maybe<M.Stream>) -> IO(Bool & Game):
   (demo, cmds) = played
-  +was = I.Play.playing(play)
   IO.bind(I.Play.Run, Bool & Game, I.Play.run(cmds, again, I.Ran{I.World{play, mem, gfx, tables, level}, []}),
-    steps => Game.started(was, demo, input, again, last, owed, music, steps))
+    steps => Game.started(demo, input, again, last, owed, music, steps))
 
 # The play runs the tics the clock owes since the last frame, each on
 # the command built from the held keys, as the demo holds it, and with

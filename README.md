@@ -99,8 +99,9 @@ For shareware:
 env RECORD=run.lmp nix run --accept-flake-config github:eliesgalvira/bendoom
 ```
 
-Play, then **quit with Esc or close the window**. Recording also ends when
-you finish the level. Ctrl+C aborts the recording; an existing demo is preserved.
+Recording starts on the map you launch, including one chosen with `-warp 1 2`,
+and continues through exits, intermissions and the next maps. **Quit with Esc
+or close the window** to save it. Ctrl+C aborts the recording; an existing demo is preserved.
 Wait until the game exits and your terminal prompt returns
 before exporting.
 
@@ -112,9 +113,10 @@ From the same directory:
 nix run --accept-flake-config github:eliesgalvira/bendoom#film -- run.lmp run.mp4
 ```
 
-The video is 1600 × 1200 at 35 frames per second, with music and sound effects.
-A completed level includes the intermission count-up and a three-second hold
-on the final scores. The exporter refuses to overwrite an existing video;
+The video is 1600 × 1200 at 35 frames per second, with each map's music,
+intermission music and sound effects. It follows the recording through map changes.
+If you quit on the score tally, the exporter completes its count-up and holds
+the final scores for three seconds. The exporter refuses to overwrite an existing video;
 choose another output filename to export again.
 
 ### Recording Freedoom

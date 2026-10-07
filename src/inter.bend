@@ -990,14 +990,6 @@ def Play.run(cmds: List<&2, K.Cmd>, +held: Bool, run: Play.Run) -> IO(Play.Run):
       IO.bind(Play.World, Play.Run, Play.load(world),
         loaded => Play.run(rest, held, Play.heard(sounds, Play.World.step(cmd, held, loaded))))
 
-# Whether the level is still running, which the demo is recorded for.
-def Play.playing(play: Play) -> Bool:
-  match play:
-    case Playing{state, map, didsecret, pointer}:
-      True{}
-    case Showing{inter, after, trip}:
-      False{}
-
 # The scene's song, as S_Start and WI_Start name it: the map's own,
 # mus_e1m1 plus the episode's nine maps before it and the map's place,
 # which is D_ before the map's name, or D_INTER through the tally.
