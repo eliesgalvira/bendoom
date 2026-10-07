@@ -15,20 +15,18 @@ type Inventory is Data:
   Inventory{health: U32, armour: U32, armourtype: U32, cards: U32, ammo: V.Vec, caps: V.Vec, backpack: Bool,
     weapons: U32, powers: V.Vec, items: U32, bonus: U32, line: U32, kills: U32, secrets: U32}
 
-# 100 health, the fist and the pistol, fifty bullets, maxammo's caps.
+def Inventory.unpowered() -> V.Vec:
+  V.Vec.of_list([0, 0, 0, 0, 0, 0], 6)
+
+# The line with no message up, a weapon ready and none pending.
+def Inventory.readied(+ready: U32) -> U32:
+  ((ready << 16n : U32) .|. (255 << 24n : U32) : U32)
+
+# 100 health, the fist and the pistol, fifty bullets, maxammo's caps,
+# the pistol ready.
 def Inventory.start() -> Inventory:
   Inventory{100, 0, 0, 0, V.Vec.of_list([50, 0, 0, 0], 4), V.Vec.of_list([200, 50, 300, 50], 4), False{}, 3,
-    V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0, 0, 4278255616, 0, 0}
-
-# What crosses into the next level: G_PlayerFinishLevel takes the keys,
-# the powers and the pickup flash, P_SetupLevel zeroes the counts, and
-# P_SpawnPlayer clears the message and brings the ready weapon up again.
-# Health, armour, ammo, caps, backpack and weapons are kept.
-def Inventory.finished(inv: Inventory) -> Inventory:
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills,
-    secrets} = inv
-  Inventory{health, armour, armourtype, 0, ammo, caps, backpack, weapons, V.Vec.of_list([0, 0, 0, 0, 0, 0], 6), 0,
-    0, ((line .&. 16711680 : U32) .|. 4278190080 : U32), 0, 0}
+    Inventory.unpowered(), 0, 0, Inventory.readied(1), 0, 0}
 
 def Inventory.items(inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line,
@@ -125,6 +123,16 @@ def Inventory.owns(+weapon: U32, inv: Inventory) -> Bool:
 
 def Inventory.want(+weapon: U32, +inv: Inventory) -> Inventory:
   Inventory.weaponstate(Inventory.ready(inv), weapon, inv)
+
+# What crosses into the next level: G_PlayerFinishLevel takes the keys,
+# the powers and the pickup flash, P_SetupLevel zeroes the counts, and
+# P_SpawnPlayer clears the message and brings the ready weapon up again.
+# Health, armour, ammo, caps, backpack and weapons are kept.
+def Inventory.finished(+inv: Inventory) -> Inventory:
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills,
+    secrets} = inv
+  Inventory{health, armour, armourtype, 0, ammo, caps, backpack, weapons, Inventory.unpowered(), 0, 0,
+    Inventory.readied(Inventory.ready(inv)), 0, 0}
 
 # The rounds of an ammo type and the cap on them, Doom's ammo[t] and
 # maxammo[t].
@@ -496,8 +504,8 @@ def Inventory.grant(kind: U32, dropped: Bool, +inv: Inventory) -> Maybe<&2, Inve
 # 2022 to 2026, and the item's for the rest.
 def Inventory.sound(+kind: U32) -> U32:
   Bool.pick(U32, Bool.and(U32.is_ge(kind, 2001), U32.is_le(kind, 2005)), Sn.Sound.wpnup(),
-    Bool.pick(U32, Bool.and(U32.is_ge(kind, 2022), U32.is_le(kind, 2026)) || U32.is_eq(kind, 2013)
-      || U32.is_eq(kind, 2045), Sn.Sound.getpow(), Sn.Sound.itemup()))
+    Bool.pick(U32, Bool.or(Bool.and(U32.is_ge(kind, 2022), U32.is_le(kind, 2026)),
+      Bool.or(U32.is_eq(kind, 2013), U32.is_eq(kind, 2045))), Sn.Sound.getpow(), Sn.Sound.itemup()))
 
 # The end of P_TouchSpecialThing for a thing taken: the tally counts an
 # item flagged for it, and the flash grows by 6.
@@ -512,13 +520,22 @@ def Inventory.power.tic(+powers: V.Vec, +power: U32, +step: U32) -> V.Vec:
   +n = V.Vec.get(powers, power)
   V.Vec.set(powers, power, (n + step * Inventory.on(n) : U32))
 
-# P_PlayerThink's counters, with HU_Ticker's: strength counts up once
-# on, the timed powers run down, the flash fades by one a tic, and so
-# does the heads-up line's counter, which goes out at zero.
+# A timed power's step a tic, -1.
+def Inventory.down() -> U32:
+  4294967295
+
+# P_PlayerThink's power counters: strength counts up once on, and the
+# timed powers run down.
+def Inventory.powers.tic(+powers: V.Vec) -> V.Vec:
+  +strong = Inventory.power.tic(powers, Inventory.pw_strength(), 1)
+  +unseen = Inventory.power.tic(strong, Inventory.pw_invisibility(), Inventory.down())
+  +lit = Inventory.power.tic(unseen, Inventory.pw_infrared(), Inventory.down())
+  Inventory.power.tic(lit, Inventory.pw_ironfeet(), Inventory.down())
+
+# P_PlayerThink's counters, with HU_Ticker's: the powers', the flash's,
+# which fades by one a tic, and the heads-up line's, which does too and
+# goes out at zero.
 def Inventory.tic(inv: Inventory) -> Inventory:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, +bonus, +line, kills, secrets} = inv
-  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons,
-    Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(Inventory.power.tic(powers, Inventory.pw_strength(), 1),
-      Inventory.pw_invisibility(), 4294967295), Inventory.pw_infrared(), 4294967295), Inventory.pw_ironfeet(),
-      4294967295), items,
+  Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, Inventory.powers.tic(powers), items,
     (bonus - Inventory.on(bonus) : U32), (line - Inventory.on((line .&. 255 : U32)) : U32), kills, secrets}

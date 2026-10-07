@@ -383,53 +383,98 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
     S.Sim.eye(L.Level{geo, sectors, specials, heard}, 0,
       S.Sim.move(L.Level{geo, sectors, specials, heard}, K.Cmd.idle(), rest_player(x, y))))
 
-# The think a tic from rest makes, once the nukage's flag is known: a
-# level the law says nothing about leaves that flag stuck, and the blow
-# it may deal writes the health, the wound and the momentum, never the
-# place.
-def rest_think(+due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+# Floor damage and secret discovery preserve the player's place.
+def rest_counted(+nukage: Bool, +hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
+  +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
-    Tic.Sim.player.thinks(K.Cmd.idle(), Sp.Sim.sector.hurt(due, rest_walked(geo, sectors, specials, heard, x, y))))
+    Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.damage.enter.acted, ~Sp.Sim.shoot, K.Cmd.idle(),
+      Tic.Sim.weapon.select(K.Cmd.idle(), Sp.Sim.sector.secret.count(counts, sector,
+        Sp.Sim.sector.damage(nukage, hellslime, 0, rest_walked(geo, sectors, specials, heard, x, y)))))))
 
-def rest_due(due: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
+def rest_think(+nukage: Bool, +hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+  Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
+    Tic.Sim.player.thinks(K.Cmd.idle(), Sp.Sim.sector.damage(nukage, hellslime, 0,
+      rest_walked(geo, sectors, specials, heard, x, y))))
+
+def rest_due(nukage: Bool, hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
+  +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, heard, x, y)))),
+      rest_counted(nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))),
     S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(due, geo, sectors, specials, heard, x, y)))))
+      rest_counted(nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))))
     == (x, y) : U32 & U32}:
-  match due:
-    case True{}:
+  match nukage hellslime counts:
+    case True{} _ False{}:
       {==}
-    case False{}:
+    case True{} _ True{}:
       {==}
+    case False{} True{} False{}:
+      {==}
+    case False{} True{} True{}:
+      {==}
+    case False{} False{} False{}:
+      {==}
+    case False{} False{} True{}:
+      {==}
+
+def rest_sector(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> U32:
+  L.Level.sector_at(L.Level{geo, sectors, specials, heard},
+    S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+    S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))))
+
+def rest_counts(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> Bool:
+  Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials, heard},
+      rest_sector(geo, sectors, specials, heard, x, y)), 9),
+    U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+      L.Level.floor(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y))))
+
+# Damage cases expose the state before the symbolic secret test.
+def rest_secret(nukage: Bool, hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) ->
+  {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))),
+    S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))))
+    == (x, y) : U32 & U32}:
+  match nukage hellslime:
+    case True{} _:
+      rest_due(True{}, hellslime, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+    case False{} True{}:
+      rest_due(False{}, True{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+    case False{} False{}:
+      rest_due(False{}, False{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+
+def rest_at(+grounded: Bool, +special: U32, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+  +heard: V.Vec, +x: U32, +y: U32) ->
+  {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+        geo, sectors, specials, heard, x, y)))),
+    S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
+      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+        geo, sectors, specials, heard, x, y)))))
+    == (x, y) : U32 & U32}:
+  rest_secret(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+    geo, sectors, specials, heard, x, y)
 
 def Laws.tic_rest(level, x, y):
   match level:
     case L.Level{geo, sectors, specials, heard}:
-      rest_due(Bool.and(U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials, heard},
-          L.Level.sector_at(L.Level{geo, sectors, specials, heard},
-            S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-            S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))))), 7),
-        Bool.and(U32.is_zero((0 .&. 31 : U32)),
-          U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-            L.Level.floor(L.Level{geo, sectors, specials, heard},
-              L.Level.sector_at(L.Level{geo, sectors, specials, heard},
-                S.Player.x(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
-                S.Player.y(S.State.player(rest_walked(geo, sectors, specials, heard, x, y)))))))),
+      rest_at(U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+          L.Level.floor(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y))),
+        L.Level.sector.special(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y)),
         geo, sectors, specials, heard, x, y)
 
 def Laws.tic_counts(cmd, p, level, clock, secret):
-  match level secret:
-    case L.Level{geo, sectors, specials, heard} True{}:
-      {==}
-    case L.Level{geo, sectors, specials, heard} False{}:
+  match level:
+    case L.Level{geo, sectors, specials, heard}:
       {==}
 
 def Laws.eye_rest(x, y):
   {==}
 
 def Laws.use_fires_once(forward, side, turn, buttons, next, player, level, things, sidetex, thinkers, rnd, clock, usedown,
-  sounds, mrnd, reborn, secrets, held):
+  sounds, mrnd, reborn, totalsecret, held):
   match level:
     case L.Level{geo, sectors, specials, heard}:
       %held : {Tic.Sim.pressed(next, _) == False{} : Bool}
@@ -451,7 +496,7 @@ def vec_get_set(v: V.Vec, odd: Bool, +i: U32, +x: U32) ->
 
 def Laws.once_clears(line, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       Equal.sym(U32, 0, V.Vec.get.go(V.Vec.set.go(specials, V.Vec.odd(L.Level.at(line, 2, 0)),
         L.Level.at(line, 2, 0), 0), V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0)),
         vec_get_set(specials, V.Vec.odd(L.Level.at(line, 2, 0)), L.Level.at(line, 2, 0), 0))
@@ -1170,7 +1215,7 @@ def held_y(x: U32, y: U32, after: S.Player) ->
 def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, before)) ->
   Held(geo, Tic.State.held(geo, S.Player.x(S.State.player(before)), S.Player.y(S.State.player(before)), after)):
   match before after:
-    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wsecrets} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{+was, +wlevel, wthings, wsidetex, wthinkers, wrnd, wclock, wended, wusedown, wsounds, wmrnd, wreborn, wtotal} S.State{+player, L.Level{g, +sectors, +specials, +heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       %held_x(S.Player.x(was), S.Player.y(was), player)
         : {True{} == S.Sim.free(L.Level{geo, sectors, specials, heard}, _,
           S.Player.y(Tic.Player.held(S.Player.x(was), S.Player.y(was), player))) : Bool}
@@ -1183,13 +1228,13 @@ def held_free(+geo: L.Level.Geo, before: S.State, after: S.State, h: Held(geo, b
 
 def kept_held(geo: L.Level.Geo, s: S.State, t: S.Thinker, h: Held(geo, s)) -> Held(geo, S.State.kept(s, t)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
 
 def moved_held(geo: L.Level.Geo, +sa: V.Vec, +pa: V.Vec, +ha: V.Vec, t: S.Sim.Try, s: S.State,
   ht: Free(L.Level{geo, sa, pa, ha}, S.Sim.Try.player(t))) -> Held(geo, S.State.moved(t, L.Level{geo, sa, pa, ha}, s)):
   match t s:
-    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.Try{ok, p, got} S.State{player, old, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       ht
 
 # The player's own turn: its move is checked against the geometry, and
@@ -1217,32 +1262,32 @@ def turn_held(mine: Bool, t: S.Thinker, +cmd: K.Cmd, +geo: L.Level.Geo, +s: S.St
 def run_held(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, Tic.Sim.thinkers.go(fuel, cmd, geo, s)):
   match fuel s:
-    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case [] S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
-    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case x <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
-    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +secrets}:
+    case x <> rest S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +totalsecret}:
       run_held(rest, cmd, geo, Tic.Sim.turn(Tic.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}),
         turn_held(Tic.Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, h))
 
 def all_held(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State, h: Held(geo, s)) ->
   Held(geo, Tic.Sim.thinkers.all(fuel, cmd, geo, s)):
   match fuel s:
-    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case 0n S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
-    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
-    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +secrets}:
+    case 1n+f S.State{+player, +level, +things, +sidetex, S.Thinkers{+ran, +t <> +due}, +rnd, +clock, +ended, +usedown, +sounds, +mrnd, +reborn, +totalsecret}:
       all_held(f, cmd, geo, Tic.Sim.thinkers.go(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}),
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}),
         run_held(t <> due, cmd, geo,
-          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}, h))
+          S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}, h))
 
 def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, Tic.State.rested(s)):
   match s:
-    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
 
 # Reporting a sound keeps the place: it writes the sounds and the index
@@ -1250,7 +1295,7 @@ def rested_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, Tic.
 def heard_held(geo: L.Level.Geo, e: Sn.Sound.Event, s: S.State, h: Held(geo, s)) ->
   Held(geo, S.State.heard(e, s)):
   match s:
-    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       h
 
 def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.State, h: Held(geo, s)) ->
@@ -1263,18 +1308,16 @@ def told_go_held(+geo: L.Level.Geo, events: List<&2, Sn.Sound.Event>, +s: S.Stat
 
 def told_held(geo: L.Level.Geo, s: S.State, h: Held(geo, s)) -> Held(geo, S.State.told(s)):
   match s:
-    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, level, H.Things{tree, count, you, cells, sectors, heard}, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, +totalsecret}:
       told_go_held(geo, heard,
         S.State{player, level, H.Things{tree, count, you, cells, sectors, []}, sidetex, thinkers, rnd, clock, ended,
-          usedown, sounds, mrnd, reborn, secrets}, h)
+          usedown, sounds, mrnd, reborn, totalsecret}, h)
 
 def Laws.tic_keeps_geometry(cmd, s):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Normal{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +totalsecret}:
       {==}
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Secret{}, usedown, sounds, mrnd, reborn, +secrets}:
-      {==}
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, +totalsecret}:
       {==}
 
 # The rest of a live tic: the think, the use and the thinkers all run
@@ -1294,14 +1337,12 @@ def tic_done_free(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +before: S.State,
 
 def Laws.tic_keeps_free(cmd, s, free):
   match s:
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Normal{}, usedown, sounds, mrnd, reborn, +secrets}:
+    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Ended{secret}, usedown, sounds, mrnd, reborn, +totalsecret}:
       free
-    case S.State{player, L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, S.Secret{}, usedown, sounds, mrnd, reborn, +secrets}:
-      free
-    case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, S.Unended{}, +usedown, sounds, +mrnd, +reborn, +secrets}:
+    case S.State{+player, L.Level{+geo, +sectors, +specials, +heard}, +things, +sidetex, +thinkers, +rnd, +clock, S.Unended{}, +usedown, sounds, +mrnd, +reborn, +totalsecret}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       +before = {S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, [], mrnd,
-        reborn, secrets} : S.State}
+        reborn, totalsecret} : S.State}
       tic_done_free(cmd, geo, clock, before,
         Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(player)), Tic.Sim.pressed(cmd, usedown)),
           Tic.Sim.player(S.Player.dead(player), cmd, level, clock, before)), free)

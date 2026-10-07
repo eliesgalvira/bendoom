@@ -378,9 +378,9 @@ def maxed(inv: I.Inventory) -> I.Inventory:
     kills, secrets}
 
 def full(s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{S.Player.holding(p, maxed(I.Inventory.start())), level, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn, secrets}
+    usedown, sounds, mrnd, reborn, totalsecret}
 
 # The oracle's chaingun scripts: from the start, with the chaingun put
 # 64 ahead in record 40, a net game's, and a zombieman 316 ahead in

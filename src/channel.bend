@@ -1,18 +1,120 @@
 # Doom's s_sound.c channels: the eight voices a level's sounds are
 # allotted. They live outside the sim's state because vanilla frees a
 # channel when the device has finished it and not on a tic. A channel is
-# the open file of the sound it plays, the sound and the source that
-# made it, and the left and right volumes the device was given for it.
-# The mixer reads the files; this module allots them.
+# the span of the bank its sound has left to play, the sound and the
+# source that made it, and the left and right volumes the device was
+# given for it. The bank is every sound expanded once from the opened
+# WAD, end to end in one array; the mixer plays from it, and this module
+# allots the spans.
 import Base
+import ./vec.bend as V
 import ./sound.bend as Sn
+import ./sfx.bend as X
+import ./bytes.bend as B
+import ./wad.bend as W
 
-# A playing sound, its file open at the frame the mixer writes next.
-type Channel is Type:
-  Chan{file: File, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32}
+# A playing sound: the bank's frames from the one the mixer writes next
+# to the one past its last.
+type Channel is Data:
+  Chan{at: U32, sfx: U32, source: Sn.Sound.Source, left: U32, right: U32, end: U32}
+
+# A sound of the table, by its number, and its span of the bank.
+type Channel.Sound is Data:
+  Sound{id: U32, at: U32, end: U32}
+
+# The expanded frames, 16-bit samples one a slot, and where each sound's
+# lie.
+type Channel.Bank is Type:
+  Bank{frames: Array<U32>, sounds: List<&2, Channel.Sound>}
+
+def Channel.length(m: Maybe<&2, X.Sfx.Sound>) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{s}:
+      X.Sfx.length(s)
+
+type Channel.Plan is Type:
+  Plan{wad: Array<U32>, sounds: List<&2, Channel.Sound>, end: U32}
+
+def Channel.plan.read(+id: U32, +at: U32, sounds: List<&2, Channel.Sound>, +size: U32,
+  p: Array<U32> & List<&2, U32>) -> Channel.Plan:
+  (a, bytes) = p
+  +end = (at + Channel.length(X.Sfx.read.sized(size, bytes)) : U32)
+  Plan{a, Sound{id, at, end} <> sounds, end}
+
+def Channel.plan.at(id: U32, p: Channel.Plan, q: U32 & U32) -> Channel.Plan:
+  Plan{a, sounds, at} = p
+  (pos, +size) = q
+  Channel.plan.read(id, at, sounds, size, B.Bytes.file.list(a, pos, U32.min(size, 8)))
+
+def Channel.plan.one(row: Sn.Sound.Sfx, +dir: List<&2, W.Wad.Lump>, p: Channel.Plan) -> Channel.Plan:
+  Sn.Sfx{id, +lump, priority} = row
+  Channel.plan.at(id, p, W.Wad.find(dir, lump))
+
+def Channel.plan(rows: List<&2, Sn.Sound.Sfx>, +dir: List<&2, W.Wad.Lump>, p: Channel.Plan) -> Channel.Plan:
+  match rows:
+    case []:
+      p
+    case row <> rest:
+      Channel.plan(rest, dir, Channel.plan.one(row, dir, p))
+
+def Channel.expand(m: Maybe<&2, X.Sfx.Sound>, +at: U32, a: Array<U32>) -> Array<U32>:
+  match m:
+    case None{}:
+      a
+    case Some{s}:
+      X.Sfx.expand(s, a, at)
+
+def Channel.fill.read(+at: U32, bank: Array<U32>, p: Array<U32> & List<&2, U32>) -> Array<U32> & Array<U32>:
+  (wad, bytes) = p
+  (wad, Channel.expand(X.Sfx.read(bytes), at, bank))
+
+def Channel.fill.at(at: U32, p: Array<U32> & Array<U32>, q: U32 & U32) -> Array<U32> & Array<U32>:
+  (wad, bank) = p
+  (pos, size) = q
+  Channel.fill.read(at, bank, B.Bytes.file.list(wad, pos, size))
+
+def Channel.fill.one(row: Sn.Sound.Sfx, sound: Channel.Sound, +dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Array<U32>) -> Array<U32> & Array<U32>:
+  Sn.Sfx{id, +lump, priority} = row
+  Sound{number, at, end} = sound
+  Channel.fill.at(at, p, W.Wad.find(dir, lump))
+
+def Channel.fill(rows: List<&2, Sn.Sound.Sfx>, sounds: List<&2, Channel.Sound>, +dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Array<U32>) -> Array<U32> & Array<U32>:
+  match rows sounds:
+    case row <> rs sound <> ss:
+      Channel.fill(rs, ss, dir, Channel.fill.one(row, sound, dir, p))
+    case _ _:
+      p
+
+def Channel.filled(sounds: List<&2, Channel.Sound>, p: Array<U32> & Array<U32>) -> Array<U32> & Channel.Bank:
+  (wad, frames) = p
+  (wad, Bank{frames, sounds})
+
+def Channel.planned(rows: List<&2, Sn.Sound.Sfx>, dir: List<&2, W.Wad.Lump>, p: Channel.Plan) ->
+  Array<U32> & Channel.Bank:
+  Plan{wad, +sounds, end} = p
+  +ordered = List.reverse(&2, Channel.Sound, sounds)
+  Channel.filled(ordered, Channel.fill(rows, ordered, dir, (wad, Array.new(U32, V.Vec.depth(end), 0))))
+
+# The rows' sounds expanded one lump at a time from the opened WAD.
+# A lump CacheSFX refuses is a sound of no frames.
+def Channel.load(+rows: List<&2, Sn.Sound.Sfx>, p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Channel.Bank:
+  (wad, +dir) = p
+  Channel.planned(rows, dir, Channel.plan(rows, dir, Plan{wad, [], 0}))
+
+# A sound's span in the bank, none for a sound it lacks.
+def Channel.find(sounds: List<&2, Channel.Sound>, +sfx: U32) -> Channel.Sound:
+  match sounds:
+    case []:
+      Sound{sfx, 0, 0}
+    case Sound{+id, +at, +end} <> rest:
+      Bool.pick(Channel.Sound, U32.is_eq(id, sfx), Sound{id, at, end}, Channel.find(rest, sfx))
 
 # snd_channels at Chocolate Doom's default, every one free.
-def Channel.none() -> List<Maybe<Channel>>:
+def Channel.none() -> List<&2, Maybe<&2, Channel>>:
   [None{}, None{}, None{}, None{}, None{}, None{}, None{}, None{}]
 
 # One side of I_SDL_UpdateSoundParams: a share of the separation times
@@ -30,70 +132,40 @@ def Channel.left(+vol: U32, +sep: U32) -> U32:
 def Channel.right(+vol: U32, +sep: U32) -> U32:
   Channel.side(sep, vol)
 
-# The file the sounds node left for a sound, beside the others.
-def Channel.path(+dir: String, +sfx: U32) -> String:
-  dir ++ "/" ++ Sn.Sound.lump(Sn.Sound.table(), sfx) ++ ".raw"
-
-def Channel.hush.gone(+hit: Bool, file: File, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32) ->
-  IO(Maybe<Channel>):
+def Channel.kept(hit: Bool, c: Channel) -> Maybe<&2, Channel>:
   match hit:
     case True{}:
-      do IO<Maybe<Channel>>:
-        File.close(file)
-        return None{}
+      None{}
     case False{}:
-      IO.pure(Maybe<Channel>, Some{Chan{file, sfx, source, left, right}})
+      Some{c}
 
-def Channel.hush.slot(+source: Sn.Sound.Source, c: Maybe<Channel>) -> IO(Maybe<Channel>):
+def Channel.hush.slot(+source: Sn.Sound.Source, c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
-      IO.pure(Maybe<Channel>, None{})
-    case Some{Chan{file, sfx, +was, left, right}}:
-      Channel.hush.gone(Sn.Sound.Source.same(source, was), file, sfx, was, left, right)
+      None{}
+    case Some{Chan{at, sfx, +was, left, right, end}}:
+      Channel.kept(Sn.Sound.Source.same(source, was), Chan{at, sfx, was, left, right, end})
 
-# S_StopSound: the source's channel is freed and its file closed. A
-# source holds one channel at a time, so there is at most one to free.
-def Channel.hush(+source: Sn.Sound.Source, chans: List<Maybe<Channel>>) -> IO(List<Maybe<Channel>>):
+# S_StopSound: the source's channel is freed. A source holds one channel
+# at a time, so there is at most one to free.
+def Channel.hush(+source: Sn.Sound.Source, chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   match chans:
     case []:
-      IO.pure(List<Maybe<Channel>>, [])
+      []
     case c <> rest:
-      do IO<List<Maybe<Channel>>>:
-        kept : Maybe<Channel> <- Channel.hush.slot(source, c)
-        cs : List<Maybe<Channel>> <- Channel.hush(source, rest)
-        return kept <> cs
-
-# A sound with no channel to play it is dropped, and the file opened for
-# it closes again.
-def Channel.put.gone(new: Channel) -> IO(List<Maybe<Channel>>):
-  Chan{file, sfx, source, left, right} = new
-  do IO<List<Maybe<Channel>>>:
-    File.close(file)
-    return []
-
-def Channel.put.here(new: Channel, rest: List<Maybe<Channel>>, old: Maybe<Channel>) ->
-  IO(List<Maybe<Channel>>):
-  match old:
-    case None{}:
-      IO.pure(List<Maybe<Channel>>, Some{new} <> rest)
-    case Some{Chan{file, sfx, source, left, right}}:
-      do IO<List<Maybe<Channel>>>:
-        File.close(file)
-        return Some{new} <> rest
+      Channel.hush.slot(source, c) <> Channel.hush(source, rest)
 
 # The sound put in the channel of that number, whose own sound stops,
 # S_GetChannel's S_StopChannel. A number past the last channel is the
 # sound dropped.
-def Channel.put(chans: List<Maybe<Channel>>, n: Nat, new: Channel) -> IO(List<Maybe<Channel>>):
+def Channel.put(chans: List<&2, Maybe<&2, Channel>>, n: Nat, new: Channel) -> List<&2, Maybe<&2, Channel>>:
   match chans n:
     case [] _:
-      Channel.put.gone(new)
+      []
     case c <> rest 0n:
-      Channel.put.here(new, rest, c)
+      Some{new} <> rest
     case c <> rest 1n+m:
-      do IO<List<Maybe<Channel>>>:
-        cs : List<Maybe<Channel>> <- Channel.put(rest, m, new)
-        return c <> cs
+      c <> Channel.put(rest, m, new)
 
 type Channel.Pick is Data:
   Pick{free: Nat, victim: Nat, size: Nat}
@@ -235,105 +307,71 @@ def Channel.model.protected(+priority: Nat, slots: List<&2, Maybe<&2, Nat>>) -> 
     case Some{old} <> rest:
       Bool.and(Bool.not(Nat.is_le(priority, old)), Channel.model.protected(priority, rest))
 
-def Channel.keys.slot(c: Maybe<Channel>) -> Maybe<Channel> & Maybe<&2, Nat>:
+def Channel.key(c: Maybe<&2, Channel>) -> Maybe<&2, Nat>:
   match c:
     case None{}:
-      (None{}, None{})
-    case Some{Chan{file, +sfx, source, left, right}}:
-      (Some{Chan{file, sfx, source, left, right}},
-        Some{U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx))})
+      None{}
+    case Some{Chan{at, sfx, source, left, right, end}}:
+      Some{U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx))}
 
-def Channel.keys.cons(p: Maybe<Channel> & Maybe<&2, Nat>,
-  q: List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>) -> List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>:
-  (kept, key) = p
-  (cs, keys) = q
-  (kept <> cs, key <> keys)
-
-def Channel.keys(chans: List<Maybe<Channel>>) -> List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>:
+def Channel.keys(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Nat>>:
   match chans:
     case []:
-      ([], [])
+      []
     case c <> rest:
-      Channel.keys.cons(Channel.keys.slot(c), Channel.keys(rest))
-
-def Channel.opened(+sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32, chans: List<Maybe<Channel>>,
-  n: Nat, r: Result<&1, &1, U32 & String, File>) -> IO(List<Maybe<Channel>>):
-  match r:
-    case Fail{e}:
-      IO.pure(List<Maybe<Channel>>, chans)
-    case Done{f}:
-      Channel.put(chans, n, Chan{f, sfx, source, left, right})
+      Channel.key(c) <> Channel.keys(rest)
 
 # S_GetChannel: a free channel takes the sound, or else the first
 # channel of no greater importance is kicked out, and if every one is
-# more important the sound is dropped. A sound whose file will not open
-# is dropped too, which is the game with no sounds directory.
-def Channel.start(+dir: String, +sfx: U32, source: Sn.Sound.Source, +left: U32, +right: U32,
-  p: List<Maybe<Channel>> & List<&2, Maybe<&2, Nat>>) -> IO(List<Maybe<Channel>>):
-  (chans, keys) = p
-  IO.bind(Result<&1, &1, U32 & String, File>, List<Maybe<Channel>>, File.open(Channel.path(dir, sfx), "r"),
-    r => Channel.opened(sfx, source, left, right, chans,
-      Channel.choice(U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx)), keys), r))
+# more important the sound is dropped. A sound the bank holds no frames
+# of takes its channel too, as one whose lump CacheSFX refuses does, and
+# frees it at the next mix.
+def Channel.start(s: Channel.Sound, source: Sn.Sound.Source, +left: U32, +right: U32,
+  +chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
+  Sound{+sfx, at, end} = s
+  Channel.put(chans, Channel.choice(U32.to_nat(Sn.Sound.priority(Sn.Sound.table(), sfx)), Channel.keys(chans)),
+    Chan{at, sfx, source, left, right, end})
 
 # What the sim reported, played: S_StartSound's tail after the
 # audibility test, where the source's old sound is stopped and the new
 # one takes a channel at the sides the volume and separation give.
-def Channel.event(+dir: String, e: Sn.Sound.Event, chans: List<Maybe<Channel>>) ->
-  IO(List<Maybe<Channel>>):
+def Channel.event(+sounds: List<&2, Channel.Sound>, e: Sn.Sound.Event, chans: List<&2, Maybe<&2, Channel>>) ->
+  List<&2, Maybe<&2, Channel>>:
   match e:
-    case Sn.Start{+sfx, +source, +vol, +sep}:
-      do IO<List<Maybe<Channel>>>:
-        hushed : List<Maybe<Channel>> <- Channel.hush(source, chans)
-        Channel.start(dir, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep),
-          Channel.keys(hushed))
+    case Sn.Start{sfx, +source, +vol, +sep}:
+      Channel.start(Channel.find(sounds, sfx), source, Channel.left(vol, sep), Channel.right(vol, sep),
+        Channel.hush(source, chans))
     case Sn.Stop{source}:
       Channel.hush(source, chans)
 
 # The channels after the sounds of a frame's tics, in the order the tics
 # made them.
-def Channel.hear(+dir: String, events: List<&2, Sn.Sound.Event>, chans: List<Maybe<Channel>>) ->
-  IO(List<Maybe<Channel>>):
+def Channel.hear(+sounds: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Event>,
+  chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   match events:
     case []:
-      IO.pure(List<Maybe<Channel>>, chans)
+      chans
     case e <> rest:
-      do IO<List<Maybe<Channel>>>:
-        cs : List<Maybe<Channel>> <- Channel.event(dir, e, chans)
-        Channel.hear(dir, rest, cs)
+      Channel.hear(sounds, rest, Channel.event(sounds, e, chans))
 
-def Channel.moved(c: Channel, p: U32 & U32) -> IO(Maybe<Channel>):
-  Chan{file, sfx, source, left, right} = c
+def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
+  Chan{at, sfx, source, left, right, end} = c
   (+vol, +sep) = p
-  Channel.hush.gone(U32.is_zero(vol), file, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep))
+  Channel.kept(U32.is_zero(vol), Chan{at, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), end})
 
 def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
-  c: Maybe<Channel>) -> IO(Maybe<Channel>):
+  c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
-      IO.pure(Maybe<Channel>, None{})
-    case Some{Chan{file, sfx, +source, left, right}}:
-      Channel.moved(Chan{file, sfx, source, left, right}, params(ctx, source))
+      None{}
+    case Some{Chan{at, sfx, +source, left, right, end}}:
+      Channel.moved(Chan{at, sfx, source, left, right, end}, params(ctx, source))
 
 # S_UpdateSounds follows the current listener and source positions.
 def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
-  chans: List<Maybe<Channel>>) -> IO(List<Maybe<Channel>>):
+  chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   match chans:
     case []:
-      IO.pure(List<Maybe<Channel>>, [])
+      []
     case c <> rest:
-      do IO<List<Maybe<Channel>>>:
-        moved : Maybe<Channel> <- Channel.update.slot(~Ctx, ~params, ctx, c)
-        cs : List<Maybe<Channel>> <- Channel.update(~Ctx, ~params, ctx, rest)
-        return moved <> cs
-
-# Every channel's file closed, when the game lets the device go.
-def Channel.stop(chans: List<Maybe<Channel>>) -> IO(Unit):
-  match chans:
-    case []:
-      IO.pure(Unit, Unit{})
-    case None{} <> rest:
-      Channel.stop(rest)
-    case Some{Chan{file, sfx, source, left, right}} <> rest:
-      do IO<Unit>:
-        File.close(file)
-        Channel.stop(rest)
+      Channel.update.slot(~Ctx, ~params, ctx, c) <> Channel.update(~Ctx, ~params, ctx, rest)

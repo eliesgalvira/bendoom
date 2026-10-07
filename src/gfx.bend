@@ -419,7 +419,7 @@ def Gfx.copies(jobs: List<&2, Gfx.Job>, st: Gfx.Copy) -> Gfx.Copy:
     case []:
       st
     case Job{from, to, count} <> rest:
-      Gfx.copies(rest, Gfx.copy(~B.Bytes.at, ~Gfx.same, U32.to_nat(count), 1, from, to, st))
+      Gfx.copies(rest, Gfx.copy(~B.Bytes.file.at, ~Gfx.same, U32.to_nat(count), 1, from, to, st))
 
 # A palette entry's three bytes, read as a little-endian word, as the
 # window's 0xRRGGBB.
@@ -1033,8 +1033,12 @@ def Gfx.wi.anims(n: Nat, +j: U32) -> List<&2, String>:
     case 1n+m:
       List.append(&2, String, Gfx.wi.anim(j), Gfx.wi.anims(m, (j + 1 : U32)))
 
+# The prefix of episode 1's map names, from WILV00 for E1M1 to WILV08.
+def Gfx.wi.level() -> String:
+  "WILV0"
+
 def Gfx.wi.names() -> List<&2, String>:
-  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, "WILV0", 0),
+  List.concat(&2, String, [["WIMAP0"], Gfx.bar.numbered(9n, Gfx.wi.level(), 0),
     ["WIF", "WIENTER", "WIOSTK", "WIOSTI", "WISCRT2", "WITIME", "WIPAR", "WISUCKS", "WIPCNT", "WICOLON"],
     Gfx.bar.numbered(10n, "WINUM", 0), ["WISPLAT", "WIURH0", "WIURH1"],
     Gfx.wi.anims(List.length(&2, Gfx.Spot, Gfx.wi.spots()), 0)])
@@ -1148,7 +1152,7 @@ def Gfx.build(base: Gfx.Base, +tn: Gfx.Names, +fbases: List<&2, U32>, plumps: Li
         [Gfx.jobs(Gfx.flat.lumps(flats), Gfx.lumps()), Gfx.jobs(plumps, Gfx.last(fbases)),
           Gfx.jobs(slumps, Gfx.Asm.comp(asm)), Gfx.jobs(bar, Gfx.last(sbases)),
           Gfx.jobs(font, Gfx.last(bbases))]),
-      Gfx.copy(~B.Bytes.u32, ~Gfx.rgb, U32.to_nat(3584), 3, Gfx.lump.pos(pal), Gfx.palette(),
+      Gfx.copy(~B.Bytes.file.u32, ~Gfx.rgb, U32.to_nat(3584), 3, Gfx.lump.pos(pal), Gfx.palette(),
         Copy{a, Array.new(U32, V.Vec.depth((Gfx.last(hbases) + 128 : U32)), 0)})))),
     Gfx{V.Vec.of(fbases), V.Vec.of(Gfx.Names.numbers(fl)), Gfx.Names.number(fl, "F_SKY1"),
       Gfx.Asm.texs(asm), Gfx.Asm.cols(asm), sidetex, Gfx.Names.number(tn, "SKY1"),
@@ -1173,7 +1177,7 @@ def Gfx.layout(a: Array<U32>, +base: Gfx.Base, tn: Gfx.Names, headers: List<&2, 
       Patches{V.Vec.of(pbases), V.Vec.of(ws), V.Vec.of(Gfx.starts(ws, 0)),
         V.Vec.of(List.concat(&2, U32, colofs))},
       Asm{[], [0, 0, 0, 0, 0], [], Gfx.last(pbases), 0}),
-    B.Bytes.each(~U32, ~B.Bytes.u16, Gfx.plan(slumps, [0, 4, 6]), a))
+    B.Bytes.each(~U32, ~B.Bytes.file.u16, Gfx.plan(slumps, [0, 4, 6]), a))
 
 # A run of count records of stride bytes from each lump's position plus
 # skip, the counts given lump by lump.
@@ -1198,12 +1202,12 @@ def Gfx.load.widths(+base: Gfx.Base, tn: Gfx.Names, headers: List<&2, U32>, word
   Array<U32> & Gfx & L.Level:
   (a, +widths) = p
   Gfx.load.cols(base, tn, headers, words, indices, plumps, widths,
-    B.Bytes.lists(~U32, ~B.Bytes.u32, Gfx.runs(plumps, widths, 8, 4, [0]), a))
+    B.Bytes.lists(~U32, ~B.Bytes.file.u32, Gfx.runs(plumps, widths, 8, 4, [0]), a))
 
 def Gfx.load.patches(+base: Gfx.Base, tn: Gfx.Names, headers: List<&2, U32>, words: List<&2, U32>,
   indices: List<&2, U32>, a: Array<U32>, +plumps: List<&2, W.Wad.Lump>) -> Array<U32> & Gfx & L.Level:
   Gfx.load.widths(base, tn, headers, words, indices, plumps,
-    B.Bytes.each(~U32, ~B.Bytes.u16, Gfx.plan(plumps, [0]), a))
+    B.Bytes.each(~U32, ~B.Bytes.file.u16, Gfx.plan(plumps, [0]), a))
 
 # The patches numbered by name, so one used by several textures is
 # copied once.
@@ -1246,7 +1250,7 @@ def Gfx.load.headers(+base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, tn: Gfx.Names,
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +headers) = p
   Gfx.load.words(base, dir, tn, headers, pnames,
-    B.Bytes.lists(~U32, ~B.Bytes.u16, Gfx.runs(defs, Gfx.counts(headers), 22, 10, [0, 2, 4]), a))
+    B.Bytes.lists(~U32, ~B.Bytes.file.u16, Gfx.runs(defs, Gfx.counts(headers), 22, 10, [0, 2, 4]), a))
 
 # The definitions by name, an earlier one winning, as Doom's search
 # runs from the first.
@@ -1291,7 +1295,7 @@ def Gfx.load.names(base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, pnames: W.Wad.Lump
       "R_TextureNumForName"),
     +defs => Gfx.load.headers(Base{level, fl, pal, cmap, flats, sprites, Anims{flatanim,
         Gfx.anim.of(frames, 1, Gfx.Names.next(tn)), clock}, bar, font},
-      dir, tn, defs, pnames, B.Bytes.each(~U32, ~B.Bytes.u16, Gfx.plan(defs, [12, 14, 20]), a)))
+      dir, tn, defs, pnames, B.Bytes.each(~U32, ~B.Bytes.file.u16, Gfx.plan(defs, [12, 14, 20]), a)))
 
 # A texture lump's definition offsets made absolute, lump after lump.
 def Gfx.absolute(lumps: List<&2, W.Wad.Lump>, lists: List<&2, List<&2, U32>>) -> List<&2, U32>:
@@ -1313,7 +1317,7 @@ def Gfx.load.counts(+base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, pnames: W.Wad.Lu
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, counts) = p
   Gfx.load.offs(base, dir, pnames, texlumps,
-    B.Bytes.lists(~U32, ~B.Bytes.u32, Gfx.runs(texlumps, counts, 4, 4, [0]), a))
+    B.Bytes.lists(~U32, ~B.Bytes.file.u32, Gfx.runs(texlumps, counts, 4, 4, [0]), a))
 
 def Gfx.present(l: W.Wad.Lump) -> Bool:
   Bool.not(U32.is_eq(Gfx.lump.pos(l), Gfx.none()))
@@ -1327,7 +1331,7 @@ def Gfx.texlumps(+dir: Map<&2, W.Wad.Lump>, texture1: W.Wad.Lump) -> List<&2, W.
 def Gfx.load.textures(+base: Gfx.Base, +dir: Map<&2, W.Wad.Lump>, a: Array<U32>, pnames: W.Wad.Lump,
   +texture1: W.Wad.Lump) -> Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   Gfx.load.counts(base, dir, pnames, Gfx.texlumps(dir, texture1),
-    B.Bytes.each(~U32, ~B.Bytes.u32, Gfx.plan(Gfx.texlumps(dir, texture1), [0]), a))
+    B.Bytes.each(~U32, ~B.Bytes.file.u32, Gfx.plan(Gfx.texlumps(dir, texture1), [0]), a))
 
 def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
