@@ -116,7 +116,7 @@ def p_random(s: S.State) -> String:
   " p_random " ++ U32.show(S.State.rnd(s))
 
 def spawned(s: S.State) -> String:
-  S.State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   " light " ++ U32.show(L.Level.sector.light(level, 1)) ++ " p_random " ++ U32.show(rnd) ++
     " sector_special " ++ U32.show(L.Level.sector.special(level, 1))
 

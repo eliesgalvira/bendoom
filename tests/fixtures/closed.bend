@@ -32,14 +32,14 @@ def Closed.unarmed() -> S.Psprites:
 # over every level can compute.
 def Closed.state(p: S.Player, level: L.Level, clock: U32) -> S.State:
   S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], [S.Mobj{H.Thing.you()}]}, 0, clock, S.Unended{}, False{},
-    [], S.Sim.Face.start(0), False{}, V.Leaf{0}}
+    [], S.Sim.Face.start(0), False{}, 0}
 
 # A state with the player as given and some thinkers, among things named
 # under 128, all of them entered: linked where they stand, their mobjs
 # thinking.
 def Closed.at(p: S.Player, level: L.Level, ts: List<&2, S.Thinker>, things: List<&2, H.Thing>) -> S.State:
   S.State.populated(things, 128, S.State{p, level, Closed.none(), V.Leaf{0}, S.Thinkers{[], ts}, 0, 0, S.Unended{},
-    False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+    False{}, [], S.Sim.Face.start(0), False{}, 0})
 
 # The thinkers running that are no mobj's.
 def Closed.running.go(ts: List<&2, S.Thinker>) -> List<&2, S.Thinker>:
@@ -184,7 +184,7 @@ def Closed.switched(special: U32) -> S.State:
   S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.textured(L.Level.special.put(L.Level.plane.put(L.Level.plane.put(Closed.level(3145728, V.Leaf{0}, 0), 1,
       False{}, 4292870144), 1, True{}, 8388608), 0, special), V.Vec.of_list([0, 0, 1], 12), V.Vec.of_list([0, 2, 1], 3)),
-    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+    Closed.none(), V.Vec.of_list([0, 0, 1], 12), S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, 0})
 
 def Closed.lifts() -> S.State:
   Closed.switched(62)
@@ -208,7 +208,7 @@ def Closed.coincident(starting: Bool) -> U32 & U32:
 def Closed.lit(+special: U32, west: U32) -> S.State:
   Sp.Sim.light.spawn(special, 1, S.State.populated([], 128, S.State{Closed.player(2097152, 4194304, 0, 8388608),
     L.Level.sector.put(L.Level.light.put(Closed.doors(), 0, west), 1, 5, special), Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 1, 0, S.Unended{}, False{},
-    [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+    [], S.Sim.Face.start(0), False{}, 0}))
 
 def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
@@ -414,7 +414,7 @@ def Closed.ranked(you: U32, x: U32, momx: U32) -> S.State:
   S.State.populated([Closed.thing(2, 15, 2097152, 2097152, 0), Closed.thing(5, 15, 2097152, 2097152, 0),
     Closed.thing(9, 15, 2097152, 2097152, 0)], 128, S.State{S.Player{x, 4194304, 0, 0, momx, 0, 0, 0, 8388608, 2686976,
       0, 2686976, [], I.Inventory.start(), Closed.unarmed(), S.Sim.Hurt.start()}, Closed.doors(), H.Things.none(0, you, 0, 0), V.Leaf{0},
-    S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+    S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, 0})
 
 # The mobjs the one cell lists.
 def Closed.cell(s: S.State) -> List<&2, U32>:
