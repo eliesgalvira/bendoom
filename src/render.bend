@@ -23,7 +23,7 @@ import ./inventory.bend as I
 
 def Render.eye(+tables: P.Project.Tables, +p: S.Player) -> P.View:
   P.View.make(tables, S.Player.x(p), S.Player.y(p), S.Player.viewz(p), S.Player.angle(p),
-    S.Player.extralight(p))
+    S.Player.extralight(p), I.Inventory.fixedcolormap(S.Player.inv(p)))
 
 # After the walk, the planes, then the sprites of the things in the
 # sectors it saw and the masked middle textures, in depth order.
@@ -38,22 +38,22 @@ def Render.light(+level: L.Level, +p: S.Player, +extralight: U32) -> U32:
   P.Project.lightnum(L.Level.sector.light(level, L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))),
     extralight)
 
-def Render.psprite(psp: S.Psprite, gfx: G.Gfx, lightnum: U32, mem: Array<U32>) -> Array<U32>:
+def Render.psprite(psp: S.Psprite, gfx: G.Gfx, lightnum: U32, fixedcolormap: U32, mem: Array<U32>) -> Array<U32>:
   match psp:
     case S.Psprite{None{}, tics, sx, sy}:
       mem
     case S.Psprite{Some{state}, tics, sx, sy}:
-      T.Sprites.psprite(gfx, state, sx, sy, lightnum, mem)
+      T.Sprites.psprite(gfx, state, sx, sy, lightnum, fixedcolormap, mem)
 
 # Doom's R_DrawPlayerSprites: the weapon, then its flash, those that
 # show, over the view.
-def Render.psprites(ps: S.Psprites, +gfx: G.Gfx, +lightnum: U32, mem: Array<U32>) -> Array<U32>:
+def Render.psprites(ps: S.Psprites, +gfx: G.Gfx, +lightnum: U32, +fixedcolormap: U32, mem: Array<U32>) -> Array<U32>:
   S.Psprites{weapon, flash} = ps
-  Render.psprite(flash, gfx, lightnum, Render.psprite(weapon, gfx, lightnum, mem))
+  Render.psprite(flash, gfx, lightnum, fixedcolormap, Render.psprite(weapon, gfx, lightnum, fixedcolormap, mem))
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, +p: S.Player,
   mem: Array<U32>) -> Array<U32>:
-  Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p, P.View.extralight(view)),
+  Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p, P.View.extralight(view)), P.View.fixedcolormap(view),
     Render.rest(view, level, gfx, things, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem))))
 
 # The heads-up line
@@ -113,11 +113,9 @@ def Render.hud(on: Bool, +gfx: G.Gfx, shown: U32, tics: U32, mem: Array<U32>) ->
 # The palette
 # -----------
 
-# ST_doPaletteStuff's pick for the player: the damage count, the berserk
-# power's counter and the pickup flash name one of PLAYPAL's fourteen.
 def Render.palette(+p: S.Player) -> U32:
   Y.Bar.palette(S.Sim.Hurt.damage(S.Player.hurt(p)), I.Inventory.strength(S.Player.inv(p)),
-    I.Inventory.bonus(S.Player.inv(p)))
+    I.Inventory.bonus(S.Player.inv(p)), I.Inventory.power.of(I.Inventory.pw_ironfeet(), S.Player.inv(p)))
 
 def Render.paletted(+palette: U32, mem: Array<U32>) -> Array<U32> & U32:
   (mem, palette)

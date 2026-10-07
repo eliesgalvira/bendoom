@@ -147,15 +147,16 @@ type Planes.Step is Data:
 
 # The colormap of a span at a distance: Doom's zlight at the distance's
 # light index, which the table's end caps.
-def Planes.colormap(light: U32, distance: U32) -> U32:
-  (G.Gfx.colormap() + P.Project.zlight(light, U32.min((distance >> 20n : U32), 127)) * 256 : U32)
+def Planes.colormap(fixedcolormap: U32, light: U32, distance: U32) -> U32:
+  (G.Gfx.colormap() + P.Project.colormap(fixedcolormap,
+    P.Project.zlight(light, U32.min((distance >> 20n : U32), 127))) * 256 : U32)
 
 def Planes.step.at(+view: P.View, +distance: U32, xscale: U32, yscale: U32, light: U32, +angle: U32,
   +length: U32) -> Planes.Step:
-  P.View{vx, vy, z, va, sin, cos, tables, extralight} = view
+  P.View{vx, vy, z, va, sin, cos, tables, extralight, fixedcolormap} = view
   Step{(vx + F.Fixed.mul(A.Angle.cos(P.View.sine(view), angle), length) : U32),
     (F.Fixed.neg(vy) - F.Fixed.mul(A.Angle.sin(P.View.sine(view), angle), length) : U32),
-    F.Fixed.mul(distance, xscale), F.Fixed.mul(distance, yscale), Planes.colormap(light, distance)}
+    F.Fixed.mul(distance, xscale), F.Fixed.mul(distance, yscale), Planes.colormap(fixedcolormap, light, distance)}
 
 def Planes.step.far(+view: P.View, +distance: U32, xscale: U32, yscale: U32, light: U32, +x1: U32) ->
   Planes.Step:

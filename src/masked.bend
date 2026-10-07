@@ -31,17 +31,17 @@ def Masked.post(mem: Array<U32>, +src: U32, +delta: U32, +len: U32, +col: Masked
 # range's first column with its scale and step, the texture's row at
 # the eye's height, and the light number.
 type Masked.Range is Data:
-  Range{gfx: G.Gfx, tex: U32, x1: U32, scale1: U32, step: U32, mid: U32, lightnum: U32}
+  Range{gfx: G.Gfx, tex: U32, x1: U32, scale1: U32, step: U32, mid: U32, lightnum: U32, fixedcolormap: U32}
 
 # Doom's R_RenderMaskedSegRange for one column: the posts start three
 # before the texture column's texels.
 def Masked.column(mem: Array<U32>, +x: U32, texcol: U32, cc: U32, fc: U32, range: Masked.Range) ->
   Array<U32>:
-  Range{gfx, tex, x1, scale1, step, +mid, lightnum} = range
+  Range{gfx, tex, x1, scale1, step, +mid, lightnum, fixedcolormap} = range
   +scale = (scale1 + (x - x1) * step : U32)
   G.Gfx.posts(~Masked.Col, ~Masked.post, 256n, G.Post{False{}, mem, (G.Gfx.column(gfx, tex, texcol) - 3 : U32)},
     Col{x, (P.Project.centery() - F.Fixed.mul(mid, scale) : U32), scale, mid, S.Segs.iscale(scale),
-      S.Segs.colormap(lightnum, scale), cc, fc})
+      S.Segs.colormap(fixedcolormap, lightnum, scale), cc, fc})
 
 # The texture column left in a column once drawn: Doom's SHRT_MAX, here
 # a value no texture column takes.
@@ -87,7 +87,7 @@ def Masked.range(+view: P.View, +level: L.Level, +gfx: G.Gfx, +seg: L.Level.Seg,
   Range{gfx, G.Gfx.mid(gfx, side), x1, scale1, step,
     Masked.mid(L.Level.sector(level, front), L.Level.sector(level, back), L.Level.side(level, side), flags,
       G.Gfx.tex.height(gfx, G.Gfx.mid(gfx, side)), P.View.z(view)),
-    S.Segs.lightnum(seg, L.Level.sector.light(level, front), P.View.extralight(view))}
+    S.Segs.lightnum(seg, L.Level.sector.light(level, front), P.View.extralight(view)), P.View.fixedcolormap(view)}
 
 def Masked.wall.left(wall: D.Draw.Wall, st: Array<U32> & List<&2, U32>) -> Array<U32> & D.Draw.Wall:
   D.Wall{seg, x1, x2, scale1, scale2, step, sil, bsil, tsil, texcols, tops, bottoms} = wall
