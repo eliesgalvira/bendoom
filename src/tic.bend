@@ -630,6 +630,19 @@ def Sim.explode.acted(m: Maybe<&2, H.Thing>, +s: S.State) -> S.State:
     case Some{+th}:
       S.Sim.blast.with(~Sim.damage.enter.acted, S.Sim.body.of(th), H.Thing.target(th), 128, s)
 
+def Sim.missile.enter.action(action: H.Thing.Action, +id: U32, +th: H.Thing, +state: U32, +s: S.State) -> S.State:
+  match action:
+    case H.Explode{}:
+      +entered = S.Sim.damage.enter(id, th, state, s)
+      Sim.explode.acted(S.State.thing(id, entered), entered)
+    case H.Chase{}:
+      Sim.damage.enter.acted(id, th, state, s)
+    case _:
+      S.Sim.damage.enter(id, th, state, s)
+
+def Sim.missile.enter.acted(+id: U32, th: H.Thing, +state: U32, s: S.State) -> S.State:
+  Sim.missile.enter.action(H.Thing.Row.action(H.Thing.row(state)), id, th, state, s)
+
 # One bullet of a former human's attack: the spread of a P_SubRandom
 # turn, the damage of a draw, 3 to 15, and P_LineAttack, which is the
 # player's own.
@@ -712,10 +725,9 @@ def Sim.sposattack(+id: U32, +s: S.State) -> S.State:
   +target = S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.target())
   Sim.sposattack.target(S.Sim.body(S.State.things(s), S.State.player(s), target), id, target, s)
 
-def Sim.melee.damage(+target: U32, +factor: U32, +id: U32, s: S.State) -> S.State:
+def Sim.melee.damage(+target: U32, +factor: U32, +sides: U32, +id: U32, s: S.State) -> S.State:
   +after = S.Sim.drawn(s)
-  Sim.damage(target, (((M.Random.at(S.State.rnd(after)) % Bool.pick(U32, U32.is_eq(factor, 3), 8, 10) : U32) + 1 : U32)
-    * factor : U32), id, id, after)
+  Sim.damage(target, (((M.Random.at(S.State.rnd(after)) % sides : U32) + 1 : U32) * factor : U32), id, id, after)
 
 def Sim.missile.ready(th: H.Thing, +cut: U32) -> H.Thing:
   H.Thing{tid, kind, x, y, +z, floorz, ceilz, angle, sector, state, +tics, +momz, hurt} = th
@@ -724,7 +736,7 @@ def Sim.missile.ready(th: H.Thing, +cut: U32) -> H.Thing:
 
 def Sim.missile.first.ready(+ready: H.Thing, +id: U32, +s: S.State) -> S.State:
   H.Thing{tid, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = ready
-  S.Sim.thing.fit.with(~Sim.damage.enter.acted, id, H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
+  S.Sim.thing.fit.with(~Sim.missile.enter.acted, id, H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
     (x + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momx())) : U32),
     (y + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momy())) : U32), s)
 
@@ -737,38 +749,41 @@ def Sim.missile.first(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
       +ready = Sim.missile.ready(th, (M.Random.at(S.State.rnd(after)) .&. 3 : U32))
       Sim.missile.first.ready(ready, id, S.State.thing.put(id, ready, after))
 
-def Sim.troopattack.throw(+target: U32, +id: U32, +s: S.State) -> S.State:
+def Sim.monster.throw(+kind: U32, +target: U32, +id: U32, +s: S.State) -> S.State:
   +missile = H.Things.count(S.State.things(s))
-  +spawned = S.Sim.missile.spawn(Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), id),
+  +spawned = S.Sim.missile.spawn(kind, Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), id),
       S.Player.body(S.State.player(s), H.Things.you(S.State.things(s)))),
     Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), target),
       S.Player.body(S.State.player(s), H.Things.you(S.State.things(s)))), id, s)
   Sim.missile.first(H.Things.get(S.State.things(spawned), missile), missile, spawned)
 
-def Sim.troopattack.hit(near: Bool, +target: U32, +id: U32, +s: S.State) -> S.State:
+def Sim.monster.hit(near: Bool, +kind: U32, +factor: U32, +target: U32, +id: U32, +s: S.State) -> S.State:
   match near:
     case True{}:
-      Sim.melee.damage(target, 3, id, S.Sim.sound(Sn.Sound.claw(), Sn.Thing{id}, s))
+      Sim.melee.damage(target, factor, 8, id, S.Sim.sound(Sn.Sound.claw(), Sn.Thing{id}, s))
     case False{}:
-      Sim.troopattack.throw(target, id, s)
+      Sim.monster.throw(kind, target, id, s)
 
-def Sim.troopattack.target(mt: Maybe<&2, S.Sim.Body>, +id: U32, +target: U32, +s: S.State) -> S.State:
+def Sim.monster.target(mt: Maybe<&2, S.Sim.Body>, +kind: U32, +factor: U32, +id: U32, +target: U32, +s: S.State) -> S.State:
   match mt:
     case None{}:
       s
     case Some{+t}:
-      +faced = Sim.chase.face(id, target, s)
-      Sim.troopattack.hit(Sim.chase.melee(S.State.level(faced),
-        Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(faced), S.State.player(faced), id), t), t), target, id, faced)
+      Sim.monster.hit(Sim.chase.melee(S.State.level(s),
+        Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), id), t), t), kind, factor, target, id, s)
+
+def Sim.monster.attack(+kind: U32, +factor: U32, +id: U32, +s: S.State) -> S.State:
+  +target = S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.target())
+  Sim.monster.target(S.Sim.body(S.State.things(s), S.State.player(s), target), kind, factor, id, target, s)
 
 def Sim.troopattack(+id: U32, +s: S.State) -> S.State:
-  +target = S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.target())
-  Sim.troopattack.target(S.Sim.body(S.State.things(s), S.State.player(s), target), id, target, s)
+  Sim.monster.attack(H.Thing.fireball(), 3, id,
+    Sim.chase.face(id, S.Sim.thing.target(S.State.things(s), id), s))
 
 def Sim.sargattack.hit(near: Bool, +target: U32, +id: U32, +s: S.State) -> S.State:
   match near:
     case True{}:
-      Sim.melee.damage(target, 4, id, s)
+      Sim.melee.damage(target, 4, 10, id, s)
     case False{}:
       s
 
@@ -802,6 +817,8 @@ def Sim.thing.act(action: H.Thing.Action, +id: U32, +s: S.State) -> S.Sim.Acted:
       S.Acted{None{}, Sim.sposattack(id, s)}
     case H.TroopAttack{}:
       S.Acted{None{}, Sim.troopattack(id, s)}
+    case H.BruisAttack{}:
+      S.Acted{None{}, Sim.monster.attack(H.Thing.baronball(), 10, id, s)}
     case H.SargAttack{}:
       S.Acted{None{}, Sim.sargattack(id, s)}
     case H.Explode{}:
@@ -850,7 +867,7 @@ def Sim.missile.z.hit(sky: Bool, +id: U32, +s: S.State) -> S.State:
     case True{}:
       S.Sim.remove(id, s)
     case False{}:
-      S.Sim.missile.burst(id, s)
+      S.Sim.missile.burst.with(~Sim.missile.enter.acted, id, s)
 
 def Sim.missile.z.move(hit: Bool, sky: Bool, +th: H.Thing, +id: U32, +s: S.State) -> S.State:
   match hit:
@@ -918,7 +935,7 @@ def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
     case None{}:
       s
     case Some{+th}:
-      +after = S.Sim.thing.xy.with(~Sim.damage.enter.acted, id, th, s)
+      +after = S.Sim.thing.xy.with(~Sim.missile.enter.acted, id, th, s)
       Sim.thing.stepped(S.State.thing(id, after), id, after)
 
 def Sim.thing(+id: U32, +s: S.State) -> S.State:

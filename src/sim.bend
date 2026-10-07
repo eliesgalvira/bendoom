@@ -2663,16 +2663,16 @@ def Sim.missile.put(m: Maybe<&2, H.Thing>, +id: U32, +angle: U32, +momx: U32, +m
     case Some{th}:
       State.thing.put(id, Sim.missile.thing(th, angle, momx, momy, momz, source), s)
 
-def Sim.missile.spawn(m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> State:
+def Sim.missile.spawn(+kind: U32, m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> State:
   Body{mi, +x, +y, +z, mr, mh, mf} = m
   Body{ti, +tx, +ty, +tz, tr, th, tf} = t
   +angle = A.Angle.of(L.Level.tanto(State.level(s)), (tx - x : U32), (ty - y : U32))
   +fine = A.Angle.fine(angle)
-  +speed = {655360 : U32}
+  +speed = H.Thing.speed(kind)
   +dist = U32.max((F.Fixed.approx((tx - x : U32), (ty - y : U32)) / speed : U32), 1)
   +id = H.Things.count(State.things(s))
-  +spawned = Sim.spawn(H.Thing.info(H.Thing.fireball()), x, y, (z + 2097152 : U32), s)
-  Sim.sound(Sn.Sound.firsht(), Sn.Thing{id}, Sim.missile.put(H.Things.get(State.things(spawned), id), id, angle,
+  +spawned = Sim.spawn(H.Thing.info(kind), x, y, (z + 2097152 : U32), s)
+  Sim.sound(H.Thing.seesound(kind), Sn.Thing{id}, Sim.missile.put(H.Things.get(State.things(spawned), id), id, angle,
     F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(spawned)), fine)),
     F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(spawned)), fine)),
     F.Fixed.quot((tz - z : U32), dist), source, spawned))
@@ -4307,26 +4307,32 @@ def Sim.thing.relink(+id: U32, was: H.Thing, now: H.Thing, fit: Sim.Fit, s: Stat
   State{player, level, H.Things.moved(things, L.Level.blockmap_of(level), was,
       H.Thing.between(now, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
-def Sim.missile.burst.entered(entered: H.Thing, +tics: U32) -> H.Thing:
-  H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, was, momz, +hurt} = entered
+def Sim.missile.stopped(th: H.Thing) -> H.Thing:
+  H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = th
   H.Thing{id, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, 0,
-    V.Vec.set(V.Vec.set(V.Vec.set(hurt, H.Thing.hurt.momx(), 0), H.Thing.hurt.momy(), 0),
-      H.Thing.hurt.flags(), (V.Vec.get(hurt, H.Thing.hurt.flags()) .&. U32.not(65536) : U32))}
+    V.Vec.set(V.Vec.set(hurt, H.Thing.hurt.momx(), 0), H.Thing.hurt.momy(), 0)}
 
-def Sim.missile.burst.thing(th: H.Thing, +tics: U32) -> H.Thing:
-  Sim.missile.burst.entered(H.Thing.entering(th, 198), tics)
-
-def Sim.missile.burst.some(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
+def Sim.missile.burst.finished(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
   match m:
     case None{}:
       s
-    case Some{th}:
-      +after = Sim.drawn(s)
-      +tics = F.Fixed.max((6 - (M.Random.at(State.rnd(after)) .&. 3 : U32) : U32), 1)
-      Sim.sound(Sn.Sound.firxpl(), Sn.Thing{id}, State.thing.put(id, Sim.missile.burst.thing(th, tics), after))
+    case Some{+th}:
+      +sound = H.Thing.deathsound(H.Thing.kind(th))
+      +after = Sim.kill.thing.tics(id, s)
+      Sim.sound(sound, Sn.Thing{id}, Sim.thing.cleared(id, 65536, after))
 
-def Sim.missile.burst(+id: U32, +s: State) -> State:
-  Sim.missile.burst.some(H.Things.get(State.things(s), id), id, s)
+def Sim.missile.burst.some.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
+  m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      +after = enter(id, Sim.missile.stopped(th), H.Thing.deathstate(H.Thing.kind(th)), s)
+      Sim.missile.burst.finished(State.thing(id, after), id, after)
+
+def Sim.missile.burst.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
+  +id: U32, +s: State) -> State:
+  Sim.missile.burst.some.with(~enter, State.thing(id, s), id, s)
 
 def Sim.missile.damage.same(mt: Maybe<&2, H.Thing>, ms: Maybe<&2, H.Thing>) -> Bool:
   match mt ms:
@@ -4339,19 +4345,27 @@ def Sim.missile.damage(+target: U32, +source: U32, +things: H.Things) -> Bool:
   Bool.or(U32.is_eq(target, H.Things.you(things)),
     Sim.missile.damage.same(H.Things.get(things, target), H.Things.get(things, source)))
 
+def Sim.missile.damage.of(m: Maybe<&2, H.Thing>) -> U32:
+  match m:
+    case None{}:
+      0
+    case Some{th}:
+      H.Thing.damage(H.Thing.kind(th))
+
 def Sim.missile.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, damage: Bool, +target: U32, +id: U32, +source: U32, +s: State) -> State:
   match damage:
     case False{}:
-      Sim.missile.burst(id, s)
+      Sim.missile.burst.with(~enter, id, s)
     case True{}:
       +after = Sim.drawn(s)
-      Sim.missile.burst(id, Sim.damage.with(~enter, target,
-        (3 * ((M.Random.at(State.rnd(after)) % 8 : U32) + 1 : U32) : U32), id, source, after))
+      Sim.missile.burst.with(~enter, id, Sim.damage.with(~enter, target,
+        (Sim.missile.damage.of(State.thing(id, after))
+          * ((M.Random.at(State.rnd(after)) % 8 : U32) + 1 : U32) : U32), id, source, after))
 
 def Sim.missile.hurt.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, hit: Maybe<&2, U32>, +id: U32, +source: U32, +s: State) -> State:
   match hit:
     case None{}:
-      Sim.missile.burst(id, s)
+      Sim.missile.burst.with(~enter, id, s)
     case Some{+target}:
       Sim.missile.hit.with(~enter, Sim.missile.damage(target, source, State.things(s)), target, id, source, s)
 
