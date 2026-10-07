@@ -40,6 +40,8 @@
 # one past what follows the header are refused; a length of 49 that fits
 # is played.
 import Base
+import ../src/bytes.bend as B
+import ../src/vec.bend as V
 import ../src/fnv.bend as H
 import ../src/wad.bend as W
 import ../src/sfx.bend as X
@@ -89,12 +91,21 @@ def Test.shape(s: X.Sfx.Sound) -> String:
   X.Sound{rate, count, bytes} = s
   U32.show(rate) ++ " Hz " ++ U32.show(count) ++ " bytes\n"
 
+def Test.listed(p: Array<U32> & List<&2, U32>) -> List<&2, U32>:
+  (a, samples) = p
+  samples
+
+# A sound's expansion, written into an array of its own and read back.
+def Test.expansion(+s: X.Sfx.Sound) -> List<&2, U32>:
+  +n = X.Sfx.length(s)
+  Test.listed(B.Bytes.list(X.Sfx.expand(s, Array.new(U32, V.Vec.depth(n), 0), 0), 0, n))
+
 def Test.sound(m: Maybe<&2, X.Sfx.Sound>, at: List<&2, U32>) -> String:
   match m:
     case None{}:
       "refused"
     case Some{+s}:
-      Test.shape(s) ++ Test.expanded(X.Sfx.expand(s), at)
+      Test.shape(s) ++ Test.expanded(Test.expansion(s), at)
 
 # Each sound's lines, with the frames to show.
 def Test.sounds(lumps: List<&2, List<&2, U32>>, names: List<&2, String>, ats: List<&2, List<&2, U32>>) ->
