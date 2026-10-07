@@ -214,10 +214,10 @@ def Closed.light(s: S.State) -> U32:
   L.Level.sector.light(S.State.level(s), 1)
 
 # The west room's player holding an inventory, beside the door with
-# line 0 made vanilla's blue locked door, special 26.
-def Closed.locked(inv: I.Inventory) -> S.State:
+# line 0 given a special.
+def Closed.door(special: U32, inv: I.Inventory) -> S.State:
   Closed.at(S.Player.holding(Closed.player(2097152, 4194304, 0, 8388608), inv),
-    L.Level.special.put(Closed.doors(), 0, 26), [], [])
+    L.Level.special.put(Closed.doors(), 0, special), [], [])
 
 # The west room's player holding an inventory at (x, 64), on the floor
 # under a ceiling at 128, moving by a momentum a tic, among things named
@@ -463,7 +463,7 @@ def Closed.lowering(n: Nat) -> List<&2, H.Thing>:
 # player at (32, 64) in the one cell.
 def Closed.closing(th: H.Thing) -> S.State:
   Closed.moving.among(L.Level.plane.put(Closed.doors(), 1, True{}, 4456448),
-    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door()},
+    S.Mover{1, True{}, 131072, [S.Travel{True{}, 0}], [S.Travel{False{}, 4456448}, S.Hold{150}, S.Travel{True{}, 0}], Sp.Sim.noise.door(Sn.Sound.doropn(), Sn.Sound.dorcls())},
     2097152, [th])
 
 def Closed.over_barrel() -> S.State:

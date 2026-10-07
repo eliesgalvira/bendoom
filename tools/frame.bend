@@ -10,7 +10,9 @@
 #
 #   bend tools/frame.bend -o frame
 #   DEMO=script.lmp ./frame
+#   BENDOOM_MESSAGES=1 DEMO=script.lmp ./frame
 import Base
+import ./script.bend as T
 import ../src/bytes.bend as B
 import ../src/level.bend as L
 import ../src/gfx.bend as G
@@ -42,23 +44,24 @@ def Frame.palette(p: Array<U32> & U32) -> Array<U32> & String:
   (mem, palette) = p
   (mem, B.Bytes.hex([palette]))
 
-def Frame.draw(ran: I.Play.Run) -> IO(Unit):
+def Frame.draw(messages: Bool, ran: I.Play.Run) -> IO(Unit):
   I.Ran{I.World{play, mem, gfx, tables, level}, sounds} = ran
   do IO<Unit>:
-    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(tables, gfx, play, False{}, mem)))
+    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(tables, gfx, play, messages, mem)))
     Frame.rows(200n, 0, rest)
 
-def Frame.load(script: List<&2, K.Cmd>, +map: L.Level.Name) -> IO(Unit):
+def Frame.load(messages: Bool, script: List<&2, K.Cmd>, +map: L.Level.Name) -> IO(Unit):
   do IO<Unit>:
     w : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
     ran : I.Play.Run <- I.Play.run(script, False{}, I.Ran{I.Play.World.start(map, w), []})
-    Frame.draw(ran)
+    Frame.draw(messages, ran)
 
-def Frame.demo(+demo: List<&2, U32>) -> IO(Unit):
-  Frame.load(D.Demo.play(demo), D.Demo.map(demo))
+def Frame.demo(messages: Bool, +demo: List<&2, U32>) -> IO(Unit):
+  Frame.load(messages, D.Demo.play(demo), D.Demo.map(demo))
 
 def main() -> IO(Unit):
   do IO<Unit>:
     path : String <- IO.try(String, IO.get_env("DEMO"))
     demo : List<&2, U32> <- D.Demo.read(path)
-    Frame.demo(demo)
+    messages : Result<&1, &1, U32 & String, String> <- IO.get_env("BENDOOM_MESSAGES")
+    Frame.demo(U32.is_eq(T.Script.int(Result.default(&1, &1, U32 & String, String, messages, "0")), 1), demo)
