@@ -61,7 +61,7 @@ def Film.outro.tics(fuel: Nat, screen: I.Inter.Screen, +wi: I.Inter) -> List<&2,
     case _ I.Count{10}:
       List.replicate(K.Cmd, 105n, K.Cmd.idle())
     case 1n+f I.Count{sp}:
-      +next = I.Inter.tic(False{}, wi)
+      +next = I.Inter.tic(0, wi)
       K.Cmd.idle() <> Film.outro.tics(f, I.Inter.screen(next), next)
     case _ _:
       []

@@ -3,6 +3,8 @@
 # runs the tics the clock owes. The game runs it without end; the window
 # bench runs it for a count of frames.
 import Base
+import ./fixed.bend as F
+import ./wad.bend as W
 import ./level.bend as L
 import ./gfx.bend as G
 import ./keys.bend as K
@@ -243,11 +245,22 @@ def Game.warp.go(args: List<String>, here: Bool) -> L.Level.Name:
     case +arg <> rest False{}:
       Game.warp.go(rest, String.eq(String.to_lower(arg), "-warp"))
 
-# The map a game starts on: E1M1, or the one Chocolate Doom's -warp
-# names outside Doom II. M_CheckParmWithArgs finds the first -warp in any
-# case with an argument after it; the episode is that argument's first
-# character, and the map the next argument's, or 1 when there is none.
-# G_InitNew's clamps are not applied, so a map the WAD lacks fails as
-# W_GetNumForName does.
-def Game.warp(args: List<String>) -> L.Level.Name:
-  Game.warp.go(args, False{})
+# G_InitNew's clamps, on C ints compared signed, by the game mode
+# D_IdentifyVersion reads from the WAD's lumps: Ultimate Doom's, with
+# E4M1, plays episode 0 as 4 and holds no other; registered's, with
+# E3M1, holds the episode to 1 through 3, and shareware's to 1. The map
+# is held to 1 through 9.
+def Game.clamped(+lumps: List<&2, W.Wad.Lump>, at: L.Level.Name) -> L.Level.Name:
+  L.Name{+episode, map} = at
+  L.Name{Bool.pick(U32, Maybe.is_some(&1, Nat, W.Wad.index("E4M1", lumps)), Bool.pick(U32, U32.is_eq(episode, 0), 4, episode),
+      F.Fixed.max(1, F.Fixed.min(Bool.pick(U32, Maybe.is_some(&1, Nat, W.Wad.index("E3M1", lumps)), 3, 1), episode))),
+    F.Fixed.max(1, F.Fixed.min(9, map))}
+
+# The map a game starts on, in a WAD of these lumps: E1M1, or the one
+# Chocolate Doom's -warp names outside Doom II. M_CheckParmWithArgs
+# finds the first -warp in any case with an argument after it; the
+# episode is that argument's first character, and the map the next
+# argument's, or 1 when there is none. A map the WAD lacks after the
+# clamps fails as W_GetNumForName does.
+def Game.warp(+lumps: List<&2, W.Wad.Lump>, args: List<String>) -> L.Level.Name:
+  Game.clamped(lumps, Game.warp.go(args, False{}))
