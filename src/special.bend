@@ -599,6 +599,82 @@ def Sim.floor.next(+level: L.Level, +sector: U32) -> U32:
 def Sim.floor.to(+sector: U32, +down: Bool, +dest: U32, s: S.State) -> S.State:
   Sim.mover.begin(sector, False{}, 65536, [S.Travel{down, dest}], Sim.noise.floor(), s)
 
+# EV_BuildStairs follows front-to-back lines in linedef order. A matching
+# occupied neighbour still increments the destination before it is skipped.
+type Sim.Stair is Data:
+  Stair{next: Bool, sector: U32, height: U32}
+
+def Sim.stair.offer(matches: Bool, +moving: Bool, +sector: U32, height: U32, was: Sim.Stair) -> Sim.Stair:
+  match matches:
+    case False{}:
+      was
+    case True{}:
+      Stair{Bool.not(moving), sector, (height + 524288 : U32)}
+
+def Sim.stair.line(+level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: String, +sector: U32,
+  line: L.Level.Line, +was: Sim.Stair) -> Sim.Stair:
+  L.Line{x1, y1, x2, y2, +flags, +front, +back} = line
+  Stair{next, at, height} = was
+  Sim.stair.offer(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
+    Bool.and(U32.is_eq(front, sector), Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
+      String.eq(L.Level.flat.name(level, L.Level.floorpic(level, back)), flat)))),
+    Sim.moving(thinkers, back), back, height, was)
+
+def Sim.stair.scan(lines: List<&2, U32>, +level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: String,
+  +sector: U32, was: Sim.Stair) -> Sim.Stair:
+  match lines was:
+    case _ Stair{True{}, at, height}:
+      Stair{True{}, at, height}
+    case [] Stair{False{}, at, height}:
+      Stair{False{}, sector, height}
+    case i <> rest +st:
+      Sim.stair.scan(rest, level, thinkers, flat, sector,
+        Sim.stair.line(level, thinkers, flat, sector, L.Level.line(level, i), st))
+
+type Sim.Stairs is Data:
+  Stairs{done: Bool, sector: U32, state: S.State}
+
+def Sim.stair.chain(fuel: Nat, +flat: String, stair: Sim.Stair, +s: S.State) -> Sim.Stairs:
+  match fuel stair:
+    case _ Stair{False{}, sector, height}:
+      Stairs{False{}, sector, s}
+    case 0n Stair{next, sector, height}:
+      Stairs{False{}, sector, s}
+    case 1n+n Stair{True{}, +sector, +height}:
+      +begun = Sim.mover.begin(sector, False{}, 16384, [S.Travel{False{}, height}], Sim.noise.floor(), s)
+      +level = S.State.level(begun)
+      +thinkers = S.State.thinkers(begun)
+      Sim.stair.chain(n, flat, Sim.stair.scan(Sim.lines(level, sector), level, thinkers, flat, sector,
+        Stair{False{}, sector, height}), begun)
+
+def Sim.stair.root(sectors: List<&2, U32>, +s: S.State) -> Sim.Stairs:
+  match sectors:
+    case []:
+      Stairs{True{}, 0, s}
+    case +sector <> rest:
+      +level = S.State.level(s)
+      Sim.stair.chain(U32.to_nat(L.Level.nsectors(level)),
+        L.Level.flat.name(level, L.Level.floorpic(level, sector)),
+        Stair{True{}, sector, (L.Level.floor(level, sector) + 524288 : U32)}, s)
+
+# Vanilla resumes its tag search after the chain's last sector.
+def Sim.stairs.go(fuel: Nat, +tag: U32, built: Sim.Stairs) -> S.State:
+  match fuel built:
+    case _ Stairs{True{}, sector, s}:
+      s
+    case 0n Stairs{False{}, sector, s}:
+      s
+    case 1n+n Stairs{False{}, +sector, +s}:
+      +level = S.State.level(s)
+      +thinkers = S.State.thinkers(s)
+      Sim.stairs.go(n, tag, Sim.stair.root(Sim.tagged.go(
+        U32.to_nat((L.Level.nsectors(level) - sector - 1 : U32)), True{}, level, thinkers, tag,
+        (sector + 1 : U32)), s))
+
+def Sim.stairs(+line: U32, +s: S.State) -> S.State:
+  Sim.stairs.go(U32.to_nat(L.Level.nsectors(S.State.level(s))), L.Level.tag(S.State.level(s), line),
+    Stairs{False{}, 4294967295, s})
+
 # Doom's lowerFloorToLowest: 1 a tic down to the lowest floor around.
 def Sim.floor.low(+level: L.Level, +sector: U32, s: S.State) -> S.State:
   Sim.floor.to(sector, True{}, Sim.floor.lowest(level, sector), s)
@@ -770,6 +846,13 @@ def Sim.use.once(~make: @+level: L.Level -> @+sector: U32 -> @s: S.State -> S.St
     case sector <> rest:
       Sim.once(line, Sim.switch(False{}, line, Sim.start(~make, sector <> rest, s)))
 
+def Sim.stairs.switch(sectors: List<&2, U32>, +line: U32, s: S.State) -> S.State:
+  match sectors:
+    case []:
+      s
+    case sector <> rest:
+      Sim.once(line, Sim.switch(False{}, line, Sim.stairs(line, s)))
+
 # A switch that works again: when its tag starts a mover, its texture is
 # swapped for 35 tics.
 def Sim.use.again(~make: @+level: L.Level -> @+sector: U32 -> @s: S.State -> S.State, sectors: List<&2, U32>, line: U32,
@@ -821,6 +904,8 @@ def Sim.plat.switch(+sectors: List<&2, U32>, +line: U32, s: S.State) -> S.State:
 
 def Sim.cross.special(special: U32, +line: U32, +s: S.State) -> S.State:
   match special:
+    case 8:
+      Sim.once(line, Sim.stairs(line, s))
     case 2:
       Sim.once(line, Sim.start(~Sim.door.open, Sim.tagged(s, line), s))
     case 16:
@@ -915,6 +1000,8 @@ def Sim.use.special(special: U32, +i: U32, +player: Bool, +s: S.State) -> S.Stat
       Sim.door.locked(player, Sim.key(s, I.Inventory.yellowcard()), Msg.Message.pd_yellowk(), False{}, i, s)
     case 117:
       Sim.door(True{}, i, player, 524288, Sim.noise.blazing(), s)
+    case 7:
+      Sim.stairs.switch(Sim.tagged(s, i), i, s)
     case 23:
       Sim.use.once(~Sim.floor.low, Sim.tagged(s, i), i, s)
     case 62:
