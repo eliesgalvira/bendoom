@@ -798,6 +798,13 @@ def Sim.teleport.of(you: Bool, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.Stat
 def Sim.teleport(+who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
   Sim.teleport.of(U32.is_eq(who, H.Things.you(S.State.things(s))), who, c, s)
 
+def Sim.teleport.once(once: Bool, line: U32, s: S.State) -> S.State:
+  match once:
+    case True{}:
+      Sim.once(line, s)
+    case False{}:
+      s
+
 # The monsters' teleports, 125 and 126: the player crossing one is not
 # taken and leaves 125's special as it was.
 def Sim.teleport.monster(you: Bool, once: Bool, +line: U32, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
@@ -805,8 +812,7 @@ def Sim.teleport.monster(you: Bool, once: Bool, +line: U32, +who: U32, c: S.Sim.
     case True{}:
       s
     case False{}:
-      +taken = Sim.teleport(who, c, s)
-      Bool.pick(S.State, once, Sim.once(line, taken), taken)
+      Sim.teleport.once(once, line, Sim.teleport(who, c, s))
 
 def Sim.light.dark(+level: L.Level, +sector: U32, s: S.State) -> S.State:
   S.State{player, was, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
@@ -1036,51 +1042,46 @@ def Sim.thing.uses(lines: List<&2, U32>, w: S.Sim.Walk) -> S.Sim.Walk:
     case i <> rest:
       Sim.thing.uses(rest, Sim.thing.use(i, w))
 
-# The walk-over specials a thing that is not the player may fire. Doom's
-# P_CrossSpecialLine allows seven: the lift's retrigger, 88, and the
-# four teleports, 39, 97, 125 and 126, are those the shareware maps
-# carry.
-def Sim.thing.cross.special(special: U32) -> Bool:
+def Sim.thing.teleports(special: U32) -> Bool:
   match special:
-    case 88:
-      True{}
-    case 39:
-      True{}
-    case 97:
-      True{}
     case 125:
       True{}
     case 126:
       True{}
     case _:
-      False{}
+      S.Sim.teleports(special)
+
+# The shareware walk-over specials a monster may fire.
+def Sim.thing.cross.special(+special: U32) -> Bool:
+  Bool.or(U32.is_eq(special, 88), Sim.thing.teleports(special))
 
 # A crossed line fires its special when a thing may fire it, else none.
 def Sim.thing.cross.one(+special: U32, +line: U32, +who: U32, c: S.Sim.Cross, +s: S.State) -> S.State:
   Sim.cross.special(Bool.pick(U32, Sim.thing.cross.special(special), special, 0), line, who, c, s)
 
-# Whether a thing no longer stands where its move put it: a teleport
-# took it.
-def Sim.thing.away(m: Maybe<&2, H.Thing>, +x: U32, +y: U32) -> Bool:
+# P_TeleportMove clears numspechit before it can reject a blocker.
+def Sim.thing.cross.clears(m: Maybe<&2, H.Thing>, +special: U32, line: U32, x: U32, y: U32, level: L.Level) -> Bool:
   match m:
     case None{}:
-      True{}
-    case Some{+th}:
-      Bool.not(Bool.and(U32.is_eq(H.Thing.x(th), x), U32.is_eq(H.Thing.y(th), y)))
+      False{}
+    case Some{th}:
+      Maybe.is_some(&2, S.Sim.Dest, S.Sim.teleport.if(
+        Bool.and(Sim.thing.teleports(special), Bool.not(H.Thing.flagged(th, 65536))), level, line, x, y))
 
-# The walk-over specials a thing's move to (x, y) crossed, each fired
-# from there with the thing's height and facing before the move, until
-# one teleports it, since P_TeleportMove empties spechit.
-def Sim.thing.crossed(lines: List<&2, U32>, away: Bool, +id: U32, +x: U32, +y: U32, +z: U32, +angle: U32,
+# Crossed specials end at the first P_TeleportMove attempt, even when
+# blocked or when it lands at unchanged XY.
+def Sim.thing.crossed(lines: List<&2, U32>, cleared: Bool, +id: U32, +x: U32, +y: U32, +z: U32, +angle: U32,
   +s: S.State) -> S.State:
-  match lines away:
+  match lines cleared:
     case [] _:
       s
     case _ True{}:
       s
     case +line <> rest False{}:
-      +after = Sim.thing.cross.one(L.Level.special(S.State.level(s), line), line, id, S.Cross{line, x, y, z, angle}, s)
-      Sim.thing.crossed(rest, Sim.thing.away(S.State.thing(id, after), x, y), id, x, y, z, angle, after)
+      +special = L.Level.special(S.State.level(s), line)
+      +stop = Sim.thing.cross.clears(S.State.thing(id, s), special, line, x, y, S.State.level(s))
+      Sim.thing.crossed(rest, stop, id, x, y, z, angle,
+        Sim.thing.cross.one(special, line, id, S.Cross{line, x, y, z, angle}, s))
 
 # The sector's special
 # --------------------
