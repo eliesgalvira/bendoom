@@ -93,7 +93,7 @@ def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
 
 def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
   match play:
-    case I.Playing{state, map, didsecret}:
+    case I.Playing{state, map, didsecret, pointer}:
       told(tag, state, g)
     case I.Showing{wi, after, trip}:
       do IO<Maybe<M.Game>>:
@@ -134,7 +134,7 @@ def route() -> List<&2, K.Cmd>:
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
   M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
-  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}}, input, again, last, owed, mem, demo, music}
+  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}, False{}}, input, again, last, owed, mem, demo, music}
 
 def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
   match m:
@@ -179,7 +179,7 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("beside", beside))
     IO.print(clicked(Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}, False{}},
+      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}, False{}, False{}},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
     g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
@@ -210,8 +210,8 @@ def main() -> IO(Unit):
 #|beside tic 6 ended none at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 73
 #|dead space tic 6 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 125
-#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 83
-#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 83
-#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
-#|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
+#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 147
+#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 147
+#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
+#|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
 #|esc quit

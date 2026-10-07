@@ -307,13 +307,16 @@ def Sim.face.attackdown() -> U32:
 def Sim.face.startweapons() -> U32:
   8
 
+def Sim.face.melt() -> U32:
+  9
+
 # ST_initData at a fresh game, with M_Random's index where the caller
 # says: the face index, its count and the priority are what the program
 # started with, the health seen last is -1, the weapons owned are the
 # ones G_PlayerReborn hands out, and attackdown starts true there.
 def Sim.Face.start(+mrnd: U32) -> V.Vec:
   V.Vec.of_list([0, 0, 0, 4294967295, 4294967295, I.Inventory.weapons(I.Inventory.start()), mrnd, 1,
-    I.Inventory.weapons(I.Inventory.start())], 9)
+    I.Inventory.weapons(I.Inventory.start()), 0], 10)
 
 # ST_initData at a later level's start: the face index and the health
 # seen last start again, both weapon sets are the ones owned now, and
@@ -349,6 +352,25 @@ def Sim.Face.drew(draws: Bool, +f: V.Vec) -> V.Vec:
       f
     case True{}:
       V.Vec.set(f, Sim.face.mrnd(), M.Random.next(Sim.Face.mrnd(f)))
+
+def Sim.Face.melt.wait(remaining: U32, f: V.Vec) -> V.Vec:
+  V.Vec.set(f, Sim.face.melt(), remaining)
+
+# D_DoomLoop runs a command before D_RunFrame's first command and draw.
+# Later scene changes draw after one command. Their melts consume 320
+# M_Random draws after ST_Ticker has selected that frame's face.
+def Sim.Face.melted(+remaining: U32, +f: V.Vec) -> V.Vec:
+  match remaining:
+    case 0:
+      f
+    case 1:
+      V.Vec.set(V.Vec.set(f, Sim.face.mrnd(), ((Sim.Face.mrnd(f) + 320 : U32) .&. 255 : U32)),
+        Sim.face.melt(), 0)
+    case _:
+      V.Vec.set(f, Sim.face.melt(), (remaining - 1 : U32))
+
+def Sim.Face.melt.tic(+f: V.Vec) -> V.Vec:
+  Sim.Face.melted(V.Vec.get(f, Sim.face.melt()), f)
 
 # Doom's ST_calcPainOffset: the first of the eight faces of the pain
 # level a health falls in, five levels over 101 points. Its static cache
