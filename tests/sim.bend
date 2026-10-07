@@ -482,8 +482,8 @@ def keyed(tag: String, +id: U32, n: Nat, cmd: K.Cmd, s: S.State) -> IO(S.State):
 
 # The state with the player holding an inventory.
 def holding(inv: I.Inventory, s: S.State) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
-  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+  S.State{p, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  S.State{S.Player.holding(p, inv), level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The blue key, record 87, taken strafing past it, the oracle's script:
 # 20 idle tics, a turn to 157.5, strafing left. Then the blue key door,
@@ -607,12 +607,12 @@ def opens(+open: S.State) -> IO(Unit):
 # where it now stands, as P_UnsetThingPosition and P_SetThingPosition
 # relink one that is put somewhere else.
 def south(d: U32, degrees: U32, s: S.State) -> S.State:
-  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{+p, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +x = F.Fixed.of_map(832)
   +y = F.Fixed.of_map((528 - d : U32))
   S.State{S.Player.at(level, L.Start{x, y, A.Angle.of_thing(degrees)}, I.Inventory.start()), level,
     S.Sim.relink(level, things, S.Player.x(p), S.Player.y(p), x, y), sidetex, thinkers, rnd, clock, ended, usedown,
-    sounds, mrnd, reborn, secrets}
+    sounds, mrnd, reborn, totalsecret}
 
 def listen(tag: String, d: U32, degrees: U32, open: S.State) -> IO(Unit):
   do IO<Unit>:
@@ -1273,9 +1273,9 @@ def dying(+level: L.Level) -> IO(Unit):
     IO.print("-")
 
 def struck.in(s: S.State, +rnd: U32, thing: H.Thing) -> S.State:
-  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{p, level, things, sidetex, thinkers, was, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{p, level, H.Things.put(H.Things.none(1, H.Thing.you(), 1, 1), 0, Some{thing}), sidetex, thinkers, rnd,
-    clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # A state in the one-sector room, Level.room: the player at rest
 # at the origin facing east with some health, the random index a blow's
@@ -1311,9 +1311,9 @@ def blows() -> IO(Unit):
 # it here.
 def sliding(momx: U32, momy: U32, s: S.State) -> S.State:
   S.State{S.Player{x, y, z, angle, mx, my, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv,
-    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    psprites, hurt}, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # The player killed on the spot by a blow from nobody.
 def killed(+s: S.State) -> S.State:
