@@ -1,63 +1,23 @@
 #!/usr/bin/env nu
-# Diffs a frame of ours against vanilla's at the same tic of the same
-# demo. Chocolate Doom plays the demo, followed by a tic whose buttons
-# press pause (BT_SPECIAL with BTS_PAUSE) and a minute of idle tics, in
-# real time in a scratch directory, at screen size 10, on a headless X
-# server of its own; a paused game runs no playsim tic but keeps reading
-# the demo, so the tail holds the frame of the demo's last tic for a
-# minute, and one paletted screenshot is taken inside it. A shot counts
-# once it shows the pause graphic. It is compared with the frame
-# tools/frame.bend dumps after the same demo on the same IWAD, over all
-# 200 rows but for the pause graphic and the box the marine's face
-# covers: the status bar's ticker runs on while the playsim is paused,
-# so the face keeps changing under the screenshot. The report counts
-# that box separately, as `face`, which is 0 only where the face holds
-# still under the pause, as the dead one does.
+# Compares a frame after the same demo commands on the same IWAD.
+# Scripts contain space-separated "count,forward,side,turn,buttons" runs
+# (tools/demo.nu); --map defaults to E1M1. G_PlayerReborn leaves attack
+# and use held, so either on the first command does nothing.
 #
-# The demo is a command script from a place, or the first tics of a
-# recorded one. A script is runs a space apart, each
-# "count,forward,side,turn,buttons" (tools/demo.nu), played on --map
-# (E1M1 when not given) from a copy of the IWAD whose player 1 starts
-# at x, y facing angle; the default script idles 20 tics, past the
-# pistol's rise. G_PlayerReborn leaves use and attack held, so either
-# on the first tic does nothing. `demo` takes a demo lump of the IWAD,
-# such as DEMO1, or a .lmp file, and plays its first tics on the map its
-# header names. Bendoom plays Hurt Me Plenty with player 1 alone and no
-# options, and a header that asks for anything else is refused. Either
-# way --things rewrites the map's records it names in the copy and
-# leaves its other things as they are.
+# The default Chocolate lane pauses the level, or waits on an intermission,
+# and takes a PCX on a private X server. It masks the pause graphic and
+# moving face on levels, and WIMAP0 animations on intermissions.
+# --capture supplies a diagnostic Chocolate binary that writes its normal
+# D_Display output at exactly the requested command. --unmasked compares
+# all 64000 pixels and requires that lane. An undrawn command is unavailable.
+# Palette reports Bend's selection; the raw/PCX palette is PLAYPAL 0.
 #
-# --screen tally compares the tally the exit leads to instead. Its demo
-# takes the exit and then idles long enough for WI_updateStats to
-# settle, after which the screen stands still until a press, so no
-# pause tic is written: its buttons byte carries BT_ATTACK, which
-# WI_checkForAccelerate would read as that press, and vanilla would
-# leave the counts and load the next level. A shot counts once it shows
-# "Finished!" where WI_drawLF puts it under the map's name, and the mask
-# is the ten animations of WIMAP0, which keep turning on the wall clock
-# while the shot is taken, and not the bar's face, which the tally
-# covers.
-#
-# --screen entering compares the map screen after the tally the same
-# way. Its demo presses after the counts settle, and ends within the 12
-# tics after the press that WI_updateShowNextLoc shows the pointer,
-# since vanilla's four seconds on that screen leave room for a few
-# shots. A shot counts once it shows "Entering", the name of the map
-# after the one played (E1M4 after E1M9) and the pointer on that map's
-# place. The default, --screen level, compares the paused level.
-#
-# Needs chocolate-doom, Xvfb and xdotool (all in the dev shell) and the
-# frame dump built:
-#
-#   bend tools/frame.bend -o frame
-#   tools/oracle.nu -416 256 0
-#   tools/oracle.nu -416 256 0 "20,0,0,0,0 34,50,0,0,0" --frame ./frame --keep
-#   tools/oracle.nu 832 384 90 "40,25,0,0,0 1,0,0,0,1" --things "35,2035,800,528"
-#   tools/oracle.nu -363 1316 180 "1,0,0,16,0 5,0,0,0,0 1,0,0,0,1 250,0,0,0,0" --screen tally
+# Build tools/frame.bend first. Examples:
+#   tools/oracle.nu -416 256 0 --frame ./frame
 #   tools/oracle.nu -224 -624 90 --map E1M5 --wad doom1.wad
-#   tools/oracle.nu 1920 -2304 0 "1,0,0,0,0 1,0,0,0,1 300,0,0,0,0 1,0,0,0,1 5,0,0,0,0" --map E1M7 --wad doom1.wad --screen entering
 #   tools/oracle.nu demo DEMO3 300 --wad doom1.wad
-#   tools/oracle.nu demo run.lmp 1000
+# --things rewrites only the named THINGS records in the oracle's WAD copy.
+# Both engines play Hurt Me Plenty, player 1 alone, without demo options.
 
 source demo.nu
 source xvfb.nu
@@ -218,12 +178,55 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $shot | first
 }
 
+# A diagnostic Chocolate Doom build can dump I_VideoBuffer after D_Display
+# at the requested demo command. It consumes the normal melt and sound
+# draws, and changes no game logic. Its raw dump avoids wall-clock animation
+# and face drift when comparing the pixels normally masked below.
+# Official timedemo mode supplies one command per frame; undrawn tics
+# are rejected by the diagnostic binary rather than drawing extra frames.
+def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path]: nothing -> record<indices: list<string>, palette: string> {
+  $iwad | save --force ($dir | path join $name)
+  $script | save --force ($dir | path join script.lmp)
+  "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
+  "show_endoom 0\n" | save --force ($dir | path join extra.cfg)
+  let target = $dir | path join frame.raw
+  let result = try {
+    let display = xvfb $dir 1024x768
+    cd $dir
+    hide-env --ignore-errors WAYLAND_DISPLAY
+    with-env {XDG_DATA_HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy,
+      BENDOOM_CAPTURE_TIC: ($count | into string), BENDOOM_CAPTURE_FRAME: $target} {
+      ^$binary -iwad $name -timedemo script -config default.cfg -extraconfig extra.cfg -window -nosound o> ($dir | path join capture.log) e> ($dir | path join trace.log)
+    }
+    let trace = open --raw ($dir | path join trace.log)
+    let frames = $trace | lines | parse 'CAPTURE tic {tic} gamestate {gamestate} wi {wi}'
+    if ($frames | is-empty) { error make {msg: $"Chocolate did not capture command ($count): ($trace | lines | last)"} }
+    let scene = $frames | first
+    let right = match $screen {
+      level => ($scene.gamestate == "0")
+      tally => ($scene.gamestate == "1" and $scene.wi == "0")
+      entering => ($scene.gamestate == "1" and $scene.wi in ["1" "-1"])
+    }
+    if not $right { error make {msg: $"captured frame is not ($screen): ($scene)"} }
+    let raw = open --raw $target
+    if ($raw | bytes length) != 64000 { error make {msg: "capture is not a 320 by 200 frame"} }
+    let playpal = $iwad | lump-pos PLAYPAL
+    {indices: ($raw | encode hex | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '),
+      palette: ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase)}
+  } finally {
+    for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+  }
+  $result
+}
+
 # Our frame and vanilla's after the tics of a demo on the IWAD copy
 # given, and where they differ. The run is the flags both commands take.
 def compare [
   iwad: binary, header: binary, tics: binary
-  run: record<wad: path, frame: path, screen: string, keep: bool>
+  run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool>
 ]: nothing -> record {
+  if $run.unmasked and $run.capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
+  let capture = if $run.capture == "" { "" } else { $run.capture | path expand }
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
   let m = $header | bytes at 3..3 | into int
@@ -234,16 +237,21 @@ def compare [
     _ => (error make {msg: $"--screen ($run.screen) is none of level, tally or entering"})
   }
   let inter = $run.screen != level
-  let dir = mktemp --directory
+  let scratch = pwd | path join research oracle
+  mkdir $scratch
+  let dir = mktemp --directory --tmpdir-path $scratch oracle.XXXXXX
   let name = $run.wad | path basename
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
   let tail = if $inter { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
-  let shot = vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
+  let shot = if $run.capture == "" {
+    vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
+  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir }
   $tics | demo $header | save ($dir | path join ours.lmp)
   let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
+  if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
   let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
   let face = face-box $iwad
-  let masked = if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
+  let masked = if $run.unmasked { [] } else if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
   let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
   let differing = $off | where $it not-in $masked
   let playpal = $iwad | lump-pos PLAYPAL
@@ -269,12 +277,14 @@ def main [
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --screen: string = "level"              # level, or tally or entering after the exit the script takes
+  --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
+  --unmasked                               # include animations and the face; requires --capture
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep})
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked})
 }
 
 # The first tics of a recorded demo.
@@ -285,6 +295,8 @@ def "main demo" [
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
   --screen: string = "level"              # level, or tally or entering after the exit the tics take
+  --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
+  --unmasked                               # include animations and the face; requires --capture
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
@@ -303,5 +315,5 @@ def "main demo" [
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
   | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
-    {wad: $wad, frame: $frame, screen: $screen, keep: $keep})
+    {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked})
 }
