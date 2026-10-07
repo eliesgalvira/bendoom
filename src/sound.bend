@@ -1,7 +1,7 @@
-# Doom's sounds.c for the sounds Bendoom starts, and the placing half of
-# s_sound.c: who makes a sound, what a tic reports of it, and
-# S_AdjustSoundParams, the volume and stereo separation a listener hears
-# a place at.
+# Doom's sounds.c for every sound the shareware game can start, and the
+# placing half of s_sound.c: who makes a sound, what a tic reports of
+# it, and S_AdjustSoundParams, the volume and stereo separation a
+# listener hears a place at.
 import Base
 import ./vec.bend as V
 import ./fixed.bend as F
@@ -116,7 +116,8 @@ def Sound.getpow() -> U32:
   93
 
 # A row of S_sfx: the sound's number, its lump, and its priority, where
-# less is more important.
+# less is more important. Left out: pdiehi, which only Doom II plays,
+# tink, the chat message's, and itmbk, a deathmatch item's return.
 type Sound.Sfx is Data:
   Sfx{id: U32, lump: String, priority: U32}
 
@@ -132,7 +133,8 @@ def Sound.table() -> List<&2, Sound.Sfx>:
     Sfx{62, "DSBGDTH1", 70}, Sfx{63, "DSBGDTH2", 70}, Sfx{64, "DSSGTDTH", 70}, Sfx{82, "DSBAREXP", 60},
     Sfx{2, "DSSHOTGN", 64}, Sfx{16, "DSFIRSHT", 70}, Sfx{17, "DSFIRXPL", 70}, Sfx{55, "DSCLAW", 70}, Sfx{83, "DSPUNCH", 64},
     Sfx{75, "DSPOSACT", 120}, Sfx{76, "DSBGACT", 120}, Sfx{77, "DSDMACT", 120}, Sfx{43, "DSBRSSIT", 94},
-    Sfx{67, "DSBRSDTH", 32}]
+    Sfx{67, "DSBRSDTH", 32}, Sfx{52, "DSSGTATK", 70}, Sfx{14, "DSRLAUNC", 64}, Sfx{15, "DSRXPLOD", 70},
+    Sfx{24, "DSSWTCHX", 78}, Sfx{35, "DSTELEPT", 32}]
 
 # Who makes a sound, S_StartSound's origin: a thing by its name, a
 # sector from the centre of its box, a fixed place, or nobody. A channel
@@ -190,7 +192,7 @@ def Sound.plain(sfx: U32, source: Sound.Source) -> Sound.Event:
   Start{sfx, source, Sound.volume(), Sound.centre()}
 
 # Whether S_StartSound draws a pitch for a start, which it never uses:
-# every sound but the item pickup's (and sfx_tink, which no E1M1 starts).
+# every sound but the item pickup's (and sfx_tink, which single play never starts).
 def Sound.Event.draws(e: Sound.Event) -> Bool:
   match e:
     case Start{sfx, source, vol, sep}:

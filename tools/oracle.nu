@@ -20,6 +20,7 @@
 # Both engines play Hurt Me Plenty, player 1 alone, without demo options.
 
 source demo.nu
+source xvfb.nu
 
 # The palette indices of a Chocolate Doom screenshot, row by row. It
 # writes every byte of 0xc0 and over as 0xc1 then the byte, and no other
@@ -144,9 +145,7 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $script | save --force ($dir | path join script.lmp)
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
   "key_menu_screenshot 59\n" | save --force ($dir | path join extra.cfg)
-  let server = job spawn { ^Xvfb -displayfd 1 -screen 0 1024x768x24 o> ($dir | path join display) }
-  sleep 1sec
-  let display = $":(open --raw ($dir | path join display) | str trim)"
+  let display = xvfb $dir 1024x768
   let game = job spawn {
     cd $dir
     hide-env --ignore-errors WAYLAND_DISPLAY
@@ -173,7 +172,7 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
     } | where {|shot| ($shot.indices | is-not-empty) and ($told | all {|p| ($shot.indices | get $p.at) == $p.colour }) } | first 1
   } } finally {
     job kill $game
-    job kill $server
+    for id in (job list | where description == $dir | get id) { job kill $id }
   }
   if ($shot | is-empty) { error make {msg: "no screenshot showed the patch asked for"} }
   $shot | first
@@ -191,10 +190,8 @@ def captured [iwad: binary, name: string, script: binary, count: int, binary: pa
   "screenblocks 10\nshow_messages 0\n" | save --force ($dir | path join default.cfg)
   "show_endoom 0\n" | save --force ($dir | path join extra.cfg)
   let target = $dir | path join frame.raw
-  let server = job spawn { ^Xvfb -displayfd 1 -screen 0 1024x768x24 o> ($dir | path join display) }
   let result = try {
-    sleep 1sec
-    let display = $":(open --raw ($dir | path join display) | str trim)"
+    let display = xvfb $dir 1024x768
     cd $dir
     hide-env --ignore-errors WAYLAND_DISPLAY
     with-env {XDG_DATA_HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy,
@@ -216,7 +213,9 @@ def captured [iwad: binary, name: string, script: binary, count: int, binary: pa
     let playpal = $iwad | lump-pos PLAYPAL
     {indices: ($raw | encode hex | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '),
       palette: ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase)}
-  } finally { job kill $server }
+  } finally {
+    for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+  }
   $result
 }
 

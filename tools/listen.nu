@@ -22,12 +22,12 @@
 # between the two keeps every frame the game writes, as float, and
 # ffmpeg makes 16-bit samples of it, which is exact, since each float is
 # a 16-bit sample over 32768. A frame the device found no sample for is
-# silence in the capture, as it is in the speaker. The game plays the
-# music alone unless --sounds keeps BENDOOM_SOUNDS. It runs until the
-# capture holds the length asked after the first note, or until it
-# quits, as the window bench does; the report adds what it printed. Keys
-# can be pressed in its window, one a second from the first note. The
-# desktop's sound and windows play no part.
+# silence in the capture, as it is in the speaker. The game plays its
+# sounds over the song, so a scene that starts none is the music alone.
+# It runs until the capture holds the length asked after the first note,
+# or until it quits, as the window bench does; the report adds what it
+# printed. Keys can be pressed in its window, one a second from the
+# first note. The desktop's sound and windows play no part.
 #
 # The sounds: a command script from a place, as tools/oracle.nu takes
 # them, played as a demo with no music, or over the song with --music.
@@ -69,7 +69,7 @@
 #   tools/listen.nu --wad doom1.wad --length 200sec --keep
 #   tools/listen.nu --wad doom1.wad --song D_E1M2 --keep
 #   tools/listen.nu game --binary ./doom --wad doom1.wad --song D_E1M2 --keep
-#   SCRIPT="35,50,0,0,0" tools/listen.nu game --binary ./window --sounds
+#   SCRIPT="35,50,0,0,0" tools/listen.nu game --binary ./window
 #   tools/listen.nu compare a/capture.raw b/capture.raw
 #   tools/listen.nu sounds -480 192 180 "20,0,0,0,0 1,0,0,0,1 30,0,0,0,0" --keep
 #   tools/listen.nu sounds -480 192 180 "80,0,0,0,0" --music --keep
@@ -77,6 +77,7 @@
 #   tools/listen.nu starts b/capture.raw --against a/capture.raw
 
 source demo.nu
+source xvfb.nu
 
 # A scratch directory holding the config, and the environment that runs
 # Chocolate Doom in it with the capture as its sound card.
@@ -167,29 +168,20 @@ def main [
   } | kept $run $keep
 }
 
-# Waits until a closure holds, a tenth of a second at a time.
-def wait-for [tries: int, ready: closure, message: string] {
-  for _ in 0..<$tries { if (do $ready) { return }; sleep 100ms }
-  error make {msg: $message}
-}
-
 def "main game" [
   --binary: path = ./doom       # the game, built natively: bend doom.bend -o doom
   --wad: path                   # the IWAD (default $env.BENDOOM_IWAD)
   --song: string                # a song to play in D_E1M1's place
   --length: duration = 270sec   # audio to record after the first note
-  --sounds                      # keep BENDOOM_SOUNDS, so the sounds play over the song
   --keys: string = ""           # keys a space apart, each held a fifth of a second, one a second from the first note
   --keep                        # keep the scratch directory and the capture
 ]: nothing -> record {
   hide-env --ignore-errors LD_LIBRARY_PATH WAYLAND_DISPLAY
-  if not $sounds { hide-env --ignore-errors BENDOOM_SOUNDS }
   let binary = $binary | path expand
   let frames = $length / 1sec * 44100 | into int
   let dir = mktemp --directory
   let float = $dir | path join capture.f32
   let socket = $dir | path join native
-  let display_file = $dir | path join display
   let wad = $wad | default $env.BENDOOM_IWAD | iwad $dir $song
   [
     $'pcm.!default { type file; slave.pcm "sink"; file "($float)"; format "raw" }'
@@ -197,9 +189,7 @@ def "main game" [
   ] | str join (char newline) | save ($dir | path join alsa.conf)
   mkdir ($dir | path join pulse)
   let failed = try {
-    job spawn --description $dir {
-      ^Xvfb -displayfd 1 -screen 0 1280x960x24 o> $display_file e> ($dir | path join xvfb.log)
-    } | ignore
+    let display = xvfb $dir 1280x960
     job spawn --description $dir {
       $env.DBUS_SESSION_BUS_ADDRESS = "disabled:"
       with-env {HOME: $dir, XDG_RUNTIME_DIR: ($dir | path join pulse), PULSE_RUNTIME_PATH: ($dir | path join pulse),
@@ -209,9 +199,7 @@ def "main game" [
           -L $"module-native-protocol-unix socket=($socket) auth-anonymous=1") e> ($dir | path join pulse.log)
       }
     } | ignore
-    wait-for 100 { ($display_file | path exists) and ((open --raw $display_file | str trim) != "") } "Xvfb did not start"
     wait-for 100 { $socket | path exists } "PulseAudio did not start"
-    let display = $":(open --raw $display_file | str trim)"
     let game = job spawn --description $dir {
       with-env {DISPLAY: $display, ALSA_CONFIG_PATH: ($dir | path join alsa.conf), PULSE_SERVER: $"unix:($socket)",
         BENDOOM_IWAD: $wad} {

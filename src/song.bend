@@ -7,7 +7,6 @@
 # microseconds from its last start, where the heap is empty, so a song
 # that loops for hours never wraps it.
 import Base
-import ./wad.bend as W
 import ./fixed.bend as F
 import ./opl.bend as O
 import ./midi.bend as M
@@ -423,17 +422,11 @@ def Song.Deck.open(genmidi: List<&2, U32>, songs: List<&2, Song.Lump>) -> Song.D
   +roms = O.Opl.roms()
   Deck{songs, "", Env{roms, P.Player.tabs(genmidi), Song.none()}, Song.silence(roms)}
 
+# The named songs, from GENMIDI and their lumps in that order, playing
+# none yet.
 def Song.Deck.of(names: List<&2, String>, lumps: List<&2, List<&2, U32>>) -> Song.Deck:
   match lumps:
     case []:
       Song.Deck.open([], [])
     case genmidi <> songs:
       Song.Deck.open(genmidi, Song.lumps(names, songs))
-
-# The named songs of the WAD BENDOOM_IWAD names, with its GENMIDI,
-# playing none yet.
-def Song.Deck.load(+names: List<&2, String>) -> IO(Song.Deck):
-  do IO<Song.Deck>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    lumps : List<&2, List<&2, U32>> <- W.Wad.read(path, "GENMIDI" <> names)
-    return Song.Deck.of(names, lumps)
