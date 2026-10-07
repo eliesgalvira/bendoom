@@ -77,7 +77,7 @@ def Stream.voice(+want: U32, c: Maybe<&2, C.Channel>, p: Array<U32> & List<&2, U
   match c:
     case None{}:
       p
-    case Some{C.Chan{+at, +end, sfx, source, +left, +right}}:
+    case Some{C.Chan{+at, sfx, source, +left, +right, +end}}:
       Stream.voice.read(left, right, at, U32.min(want, (end - at : U32)), p)
 
 # Every channel mixed in, in the order SDL_mixer takes them, since the
@@ -96,8 +96,8 @@ def Stream.played.slot(+want: U32, c: Maybe<&2, C.Channel>) -> Maybe<&2, C.Chann
   match c:
     case None{}:
       None{}
-    case Some{C.Chan{+at, +end, sfx, source, left, right}}:
-      C.Channel.kept(U32.is_ge((at + want : U32), end), C.Chan{(at + want : U32), end, sfx, source, left, right})
+    case Some{C.Chan{+at, sfx, source, left, right, +end}}:
+      C.Channel.kept(U32.is_ge((at + want : U32), end), C.Chan{(at + want : U32), sfx, source, left, right, end})
 
 # The channels past want frames.
 def Stream.played(+want: U32, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
@@ -244,11 +244,9 @@ def Stream.opened(audio: Result<&1, &1, U32 & String, Audio>, p: S.Song.Deck & C
   (deck, bank) = p
   Stream.device(audio, deck, bank)
 
-# The named songs and every sound of the opened WAD, and the device at
-# 44100 Hz, or silence.
-def Stream.open(+songs: List<&2, String>) -> IO(Maybe<Stream>):
+# The loaded songs and sounds on the device at 44100 Hz, or silence.
+def Stream.open(loaded: S.Song.Deck & C.Channel.Bank) -> IO(Maybe<Stream>):
   do IO<Maybe<Stream>>:
-    loaded : S.Song.Deck & C.Channel.Bank <- Stream.load(songs, Sn.Sound.table())
     audio : Result<&1, &1, U32 & String, Audio> <- Audio.open(44100)
     Stream.opened(audio, loaded)
 

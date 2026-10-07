@@ -14,19 +14,20 @@ import ./src/gfx.bend as G
 import ./src/keys.bend as K
 import ./src/demo.bend as D
 import ./src/game.bend as M
+import ./src/stream.bend as A
 
-def play(+map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
+def play(+map: L.Level.Name, p: Array<U32> & G.Gfx & L.Level & Maybe<A.Stream>) -> IO(Unit):
+  (mem, gfx, level, music) = p
   do IO<Unit>:
     record : Result<&1, &1, U32 & String, String> <- IO.get_env("RECORD")
     demo : Maybe<D.Demo.Rec> <- D.Demo.open(record, map)
     now : Nat <- IO.now()
-    dry : Maybe<U32> <- M.Game.start(U32.to_nat(4294967295), K.Input{K.Keys.none(), 0}, [], demo, now, map, world)
+    dry : Maybe<U32> <- M.Game.start(U32.to_nat(4294967295), K.Input{K.Keys.none(), 0}, [], demo, now, map, (mem, gfx, level), music)
     return Unit{}
 
 def load(+map: L.Level.Name, dir: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
-  L.Name{+episode, +number} = map
-  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(episode, number, dir)),
-    world => play(map, world))
+  IO.bind(Array<U32> & G.Gfx & L.Level & Maybe<A.Stream>, Unit, M.Game.load(map, dir),
+    ready => play(map, ready))
 
 def warp(args: List<String>, dir: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
   (bytes, +lumps) = dir

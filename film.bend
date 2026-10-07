@@ -18,6 +18,7 @@ import ./src/stream.bend as M
 import ./src/song.bend as Sg
 import ./src/show.bend as V
 import ./src/demo.bend as D
+import ./src/wad.bend as W
 
 def Film.rgb(colours: List<&2, U32>) -> List<&2, U32>:
   match colours:
@@ -104,12 +105,26 @@ def Film.start(demo: List<&2, U32>, audio: File, world: I.Play.World, loaded: Sg
   (deck, bank) = loaded
   Film.go(1n, D.Demo.play(demo), world, deck, C.Channel.none(), bank, audio)
 
-def Film.load(+demo: List<&2, U32>, audio: File) -> IO(Unit):
-  +map = D.Demo.map(demo)
+def Film.world(+map: L.Level.Name, demo: List<&2, U32>, audio: File, dir: Array<U32> & List<&2, W.Wad.Lump>,
+  loaded: Sg.Song.Deck & C.Channel.Bank) -> IO(Unit):
+  L.Name{+episode, +number} = map
+  IO.bind(Array<U32> & G.Gfx & L.Level, Unit,
+    IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(episode, number, dir)),
+    world => Film.start(demo, audio, I.Play.World.start(map, world), loaded))
+
+def Film.ready(+demo: List<&2, U32>, audio: File, dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Sg.Song.Deck & C.Channel.Bank) -> IO(Unit):
+  (a, deck, bank) = p
+  Film.world(D.Demo.map(demo), demo, audio, (a, dir), (deck, bank))
+
+def Film.open(demo: List<&2, U32>, audio: File, p: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  (a, +dir) = p
+  Film.ready(demo, audio, dir, M.Stream.read(I.Play.songs(), Sn.Sound.table(), (a, dir)))
+
+def Film.load(demo: List<&2, U32>, audio: File) -> IO(Unit):
   do IO<Unit>:
-    world : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
-    loaded : Sg.Song.Deck & C.Channel.Bank <- M.Stream.load(I.Play.songs(), Sn.Sound.table())
-    Film.start(demo, audio, I.Play.World.start(map, world), loaded)
+    wad : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    Film.open(demo, audio, wad)
 
 def main() -> IO(Unit):
   do IO<Unit>:
