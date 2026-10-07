@@ -2149,11 +2149,13 @@ def Sim.z(+p: Player) -> Player:
 # The state
 # ---------
 
-# A step of a mover's plan: its plane moves to a height, down or up, or
-# it waits some tics.
+# A step of a mover's plan: its plane moves to a height, down or up, it
+# waits some tics, or its sector takes a floor flat and a special the
+# moment the step before it ends.
 type Sim.Step is Data:
   Travel{down: Bool, dest: U32}
   Hold{tics: U32}
+  Change{flat: U32, special: U32}
 
 # The sounds a mover's sector makes, 0 for none: as it starts, as a wait
 # ends, as a travel up or down ends, as something in its way turns it
