@@ -18,6 +18,12 @@
 # repeating, as X sends it, a release and a press in one frame, skips
 # nothing, nor does its release, nor a press of Enter with no time gone,
 # since the tally reads a press on a tic. Esc quits.
+# Enter then runs five tics: press, held across frames, release, press,
+# release. WI_checkForAccelerate finishes the counts on the first press
+# and shows the next location on the second. Their recorded buttons
+# are BT_USE, BT_USE, 0, BT_USE, 0. The recording keeps all 33 tics and
+# closes on Esc: 13 header bytes, four per tic and the marker, 292 hex
+# characters. The last five commands and marker are checked as text.
 # Before the game, what a tic of use beside the switch is heard to
 # start, and M_Random's index after it. P_ChangeSwitchTexture clears the
 # line's special before it looks for the exit's 11, so the click is
@@ -50,6 +56,7 @@ import ../src/project.bend as P
 import ../src/game.bend as M
 import ../src/inter.bend as I
 import ../src/sound.bend as Sn
+import ../src/demo.bend as D
 
 def pressed(+level: L.Level, sidetex: V.Vec) -> Bool:
   U32.is_eq(V.Vec.get(sidetex, (615 * 3 + 2 : U32)),
@@ -100,15 +107,20 @@ def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
         IO.print(tag ++ " tally " ++ I.Inter.show(wi))
         return Some{g}
 
+def closed(tag: String, g: M.Game) -> IO(Maybe<M.Game>):
+  M.Game{level, gfx, tables, play, input, last, owed, mem, demo, music} = g
+  do IO<Maybe<M.Game>>:
+    D.Demo.stop(demo)
+    IO.print(tag ++ " quit")
+    return None{}
+
 def reported(quit: Bool, tag: String, g: M.Game) -> IO(Maybe<M.Game>):
   match quit:
     case True{}:
-      do IO<Maybe<M.Game>>:
-        IO.print(tag ++ " quit")
-        return None{}
+      closed(tag, g)
     case False{}:
-      M.Game{level, gfx, tables, +play, input, again, last, owed, mem, demo, music} = g
-      told.play(tag, play, M.Game{level, gfx, tables, play, input, again, last, owed, mem, demo, music})
+      M.Game{level, gfx, tables, +play, input, last, owed, mem, demo, music} = g
+      told.play(tag, play, M.Game{level, gfx, tables, play, input, last, owed, mem, demo, music})
 
 def report(tag: String, p: Bool & M.Game) -> IO(Maybe<M.Game>):
   (quit, g) = p
@@ -123,6 +135,34 @@ def frame(tag: String, now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Ma
     case Some{g}:
       IO.bind(Bool & M.Game, Maybe<M.Game>, M.Game.frame(now, events, g), after => report(tag, after))
 
+def enter.screen(play: I.Play) -> String:
+  match play:
+    case I.Showing{wi, after, trip}:
+      I.Inter.Screen.show(I.Inter.screen(wi))
+    case _:
+      "level"
+
+def enter.report(p: Bool & M.Game) -> IO(Maybe<M.Game>):
+  (quit, g) = p
+  M.Game{level, gfx, tables, +play, input, last, owed, mem, demo, music} = g
+  do IO<Maybe<M.Game>>:
+    IO.print("Enter " ++ enter.screen(play))
+    return Some{M.Game{level, gfx, tables, play, input, last, owed, mem, demo, music}}
+
+def enter.frame(now: Nat, events: List<Event>, m: Maybe<M.Game>) -> IO(Maybe<M.Game>):
+  match m:
+    case None{}:
+      IO.pure(Maybe<M.Game>, None{})
+    case Some{g}:
+      IO.bind(Bool & M.Game, Maybe<M.Game>, M.Game.frame(now, events, g), enter.report)
+
+def recording.text(bytes: List<&2, U32>) -> String:
+  match bytes:
+    case []:
+      ""
+    case c <> rest:
+      SCon{Char.from_u32(c), recording.text(rest)}
+
 # The turn to 202.5 degrees beside Freedoom's exit switch, where the use
 # reaches through the alcove past the shotgun guy of record 289. The
 # walk west that used to carry the player here is gone: with ticket 16
@@ -133,8 +173,8 @@ def route() -> List<&2, K.Cmd>:
 
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
-  M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
-  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}, False{}}, input, again, last, owed, mem, demo, music}
+  M.Game{level, gfx, tables, was, input, last, owed, mem, demo, music} = g
+  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}, False{}}, input, last, owed, mem, demo, music}
 
 def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
   match m:
@@ -178,14 +218,23 @@ def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
     IO.print(line("start", Tic.State.start(level)))
     IO.print(line("beside", beside))
     IO.print(clicked(Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
+    demo : Maybe<D.Demo.Rec> <- D.Demo.open(Done{"game-recording.hex"}, L.Name{1, 1})
     d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
       P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}, False{}, False{}},
-      K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
+      K.Input{K.Keys.none(), 0}, 0n, 0n, mem, demo, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
     g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
     g3 : Maybe<M.Game> <- frame("release", 800n, [Key{32, False{}}], g2)
     g4 : Maybe<M.Game> <- frame("enter", 800n, [Key{13, True{}}], g3)
-    g5 : Maybe<M.Game> <- frame("esc", 1400n, [Key{27, True{}}], g4)
+    g5 : Maybe<M.Game> <- enter.frame(829n, [], g4)
+    g6 : Maybe<M.Game> <- enter.frame(858n, [], g5)
+    g7 : Maybe<M.Game> <- enter.frame(886n, [Key{13, False{}}], g6)
+    g8 : Maybe<M.Game> <- enter.frame(915n, [Key{13, True{}}], g7)
+    g9 : Maybe<M.Game> <- enter.frame(944n, [Key{13, False{}}], g8)
+    done : Maybe<M.Game> <- frame("esc", 1400n, [Key{27, True{}}], g9)
+    +recorded : List<&2, U32> <- D.Demo.read("game-recording.hex")
+    IO.print("recording hex characters " ++ Nat.show(List.length(&2, U32, recorded)))
+    IO.print("Enter recording " ++ recording.text(List.drop(&2, U32, recorded, 250n)))
     return Unit{}
 
 def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
@@ -214,4 +263,11 @@ def main() -> IO(Unit):
 #|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 147
 #|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
 #|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
+#|Enter count 10
+#|Enter count 10
+#|Enter count 10
+#|Enter next
+#|Enter next
 #|esc quit
+#|recording hex characters 292
+#|Enter recording 000000020000000200000000000000020000000080

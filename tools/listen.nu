@@ -82,7 +82,7 @@ source xvfb.nu
 # A scratch directory holding the config, and the environment that runs
 # Chocolate Doom in it with the capture as its sound card.
 def scratch []: nothing -> record<dir: path, capture: path, sdl: record> {
-  let dir = mktemp --directory
+  let dir = ^mktemp --directory | str trim
   let capture = $dir | path join capture.raw
   "snd_musicdevice 3\nsnd_sfxdevice 3\nmusic_volume 8\nsfx_volume 8\nsnd_channels 8\n" | save ($dir | path join default.cfg)
   "snd_samplerate 44100\nsnd_maxslicetime_ms 28\nsnd_pitchshift 0\nuse_libsamplerate 0\nsnd_dmxoption \"\"\nshow_endoom 0\n"
@@ -179,7 +179,7 @@ def "main game" [
   hide-env --ignore-errors LD_LIBRARY_PATH WAYLAND_DISPLAY
   let binary = $binary | path expand
   let frames = $length / 1sec * 44100 | into int
-  let dir = mktemp --directory
+  let dir = ^mktemp --directory | str trim
   let float = $dir | path join capture.f32
   let socket = $dir | path join native
   let wad = $wad | default $env.BENDOOM_IWAD | iwad $dir $song
