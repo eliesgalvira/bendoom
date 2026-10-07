@@ -506,15 +506,16 @@ def Sim.stair.offer(matches: Bool, +moving: Bool, +sector: U32, height: U32, was
     case True{}:
       Stair{Bool.not(moving), sector, (height + 524288 : U32)}
 
-def Sim.stair.line(+level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: U32, +sector: U32,
+def Sim.stair.line(+level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: String, +sector: U32,
   line: L.Level.Line, +was: Sim.Stair) -> Sim.Stair:
   L.Line{x1, y1, x2, y2, +flags, +front, +back} = line
   Stair{next, at, height} = was
   Sim.stair.offer(Bool.and(Bool.not(U32.is_zero((flags .&. 4 : U32))),
     Bool.and(U32.is_eq(front, sector), Bool.and(Bool.not(U32.is_eq(back, L.Level.none())),
-      U32.is_eq(L.Level.floorpic(level, back), flat)))), Sim.moving(thinkers, back), back, height, was)
+      String.eq(L.Level.flat.name(level, L.Level.floorpic(level, back)), flat)))),
+    Sim.moving(thinkers, back), back, height, was)
 
-def Sim.stair.scan(lines: List<&2, U32>, +level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: U32,
+def Sim.stair.scan(lines: List<&2, U32>, +level: L.Level, +thinkers: List<&2, S.Thinker>, +flat: String,
   +sector: U32, was: Sim.Stair) -> Sim.Stair:
   match lines was:
     case _ Stair{True{}, at, height}:
@@ -528,7 +529,7 @@ def Sim.stair.scan(lines: List<&2, U32>, +level: L.Level, +thinkers: List<&2, S.
 type Sim.Stairs is Data:
   Stairs{done: Bool, sector: U32, state: S.State}
 
-def Sim.stair.chain(fuel: Nat, +flat: U32, stair: Sim.Stair, +s: S.State) -> Sim.Stairs:
+def Sim.stair.chain(fuel: Nat, +flat: String, stair: Sim.Stair, +s: S.State) -> Sim.Stairs:
   match fuel stair:
     case _ Stair{False{}, sector, height}:
       Stairs{False{}, sector, s}
@@ -547,7 +548,8 @@ def Sim.stair.root(sectors: List<&2, U32>, +s: S.State) -> Sim.Stairs:
       Stairs{True{}, 0, s}
     case +sector <> rest:
       +level = S.State.level(s)
-      Sim.stair.chain(U32.to_nat(L.Level.nsectors(level)), L.Level.floorpic(level, sector),
+      Sim.stair.chain(U32.to_nat(L.Level.nsectors(level)),
+        L.Level.flat.name(level, L.Level.floorpic(level, sector)),
         Stair{True{}, sector, (L.Level.floor(level, sector) + 524288 : U32)}, s)
 
 # Vanilla resumes its tag search after the chain's last sector.
