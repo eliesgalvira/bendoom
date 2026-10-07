@@ -226,6 +226,8 @@ def compare [
   iwad: binary, header: binary, tics: binary
   run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool>
 ]: nothing -> record {
+  if $run.unmasked and $run.capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
+  let capture = if $run.capture == "" { "" } else { $run.capture | path expand }
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
   let m = $header | bytes at 3..3 | into int
@@ -236,17 +238,15 @@ def compare [
     _ => (error make {msg: $"--screen ($run.screen) is none of level, tally or entering"})
   }
   let inter = $run.screen != level
-  let dir = if $run.capture == "" { mktemp --directory } else {
-    let scratch = pwd | path join research oracle
-    mkdir $scratch
-    mktemp --directory --tmpdir-path $scratch capture.XXXXXX
-  }
+  let scratch = pwd | path join research oracle
+  mkdir $scratch
+  let dir = mktemp --directory --tmpdir-path $scratch oracle.XXXXXX
   let name = $run.wad | path basename
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
   let tail = if $inter { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
   let shot = if $run.capture == "" {
     vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir
-  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $run.capture $run.screen $dir }
+  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir }
   $tics | demo $header | save ($dir | path join ours.lmp)
   let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp)} { ^$run.frame } | lines
   if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
@@ -282,8 +282,6 @@ def main [
   --unmasked                               # include animations and the face; requires --capture
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
-  if $unmasked and $capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
-  let capture = if $capture == "" { "" } else { $capture | path expand }
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
@@ -302,8 +300,6 @@ def "main demo" [
   --unmasked                               # include animations and the face; requires --capture
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
-  if $unmasked and $capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
-  let capture = if $capture == "" { "" } else { $capture | path expand }
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
   let lump = $bytes | lumps | where name == $demo | last 1 | get 0?
