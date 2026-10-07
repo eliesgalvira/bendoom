@@ -43,13 +43,16 @@ def Sfx.read.at(ok: Bool, rate: U32, +length: U32, rest: List<&2, U32>) -> Maybe
 
 # The sound in a lump's bytes, or none for a lump CacheSFX refuses; a
 # missing lump has no bytes, which it refuses.
-def Sfx.read(+lump: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
+def Sfx.read.sized(+size: U32, lump: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
   match lump:
     case f0 <> f1 <> r0 <> r1 <> l0 <> l1 <> l2 <> l3 <> rest:
       +length = B.Bytes.le32(l0, l1, l2, l3)
-      Sfx.read.at(Sfx.played(Sfx.size(lump, 0), B.Bytes.le16(f0, f1), length), B.Bytes.le16(r0, r1), length, rest)
+      Sfx.read.at(Sfx.played(size, B.Bytes.le16(f0, f1), length), B.Bytes.le16(r0, r1), length, rest)
     case _:
       None{}
+
+def Sfx.read(+lump: List<&2, U32>) -> Maybe<&2, Sfx.Sound>:
+  Sfx.read.sized(Sfx.size(lump, 0), lump)
 
 # The expansion
 # -------------

@@ -10,6 +10,8 @@ import Base
 import ./vec.bend as V
 import ./sound.bend as Sn
 import ./sfx.bend as X
+import ./bytes.bend as B
+import ./wad.bend as W
 
 # A playing sound: the bank's frames from the one the mixer writes next
 # to the one past its last.
@@ -40,15 +42,30 @@ def Channel.length(m: Maybe<&2, X.Sfx.Sound>) -> U32:
     case Some{s}:
       X.Sfx.length(s)
 
-# Each row's sound laid after the one before, from at.
-def Channel.layout(rows: List<&2, Sn.Sound.Sfx>, reads: List<&2, Maybe<&2, X.Sfx.Sound>>, +at: U32) ->
-  List<&2, Channel.Sound>:
-  match rows reads:
-    case Sn.Sfx{id, lump, priority} <> rs m <> ms:
-      +end = (at + Channel.length(m) : U32)
-      Sound{id, at, end} <> Channel.layout(rs, ms, end)
-    case _ _:
-      []
+type Channel.Plan is Type:
+  Plan{wad: Array<U32>, sounds: List<&2, Channel.Sound>, end: U32}
+
+def Channel.plan.read(+id: U32, +at: U32, sounds: List<&2, Channel.Sound>, +size: U32,
+  p: Array<U32> & List<&2, U32>) -> Channel.Plan:
+  (a, bytes) = p
+  +end = (at + Channel.length(X.Sfx.read.sized(size, bytes)) : U32)
+  Plan{a, Sound{id, at, end} <> sounds, end}
+
+def Channel.plan.at(id: U32, p: Channel.Plan, q: U32 & U32) -> Channel.Plan:
+  Plan{a, sounds, at} = p
+  (pos, +size) = q
+  Channel.plan.read(id, at, sounds, size, B.Bytes.list(a, pos, U32.min(size, 8)))
+
+def Channel.plan.one(row: Sn.Sound.Sfx, +dir: List<&2, W.Wad.Lump>, p: Channel.Plan) -> Channel.Plan:
+  Sn.Sfx{id, +lump, priority} = row
+  Channel.plan.at(id, p, W.Wad.find(dir, lump))
+
+def Channel.plan(rows: List<&2, Sn.Sound.Sfx>, +dir: List<&2, W.Wad.Lump>, p: Channel.Plan) -> Channel.Plan:
+  match rows:
+    case []:
+      p
+    case row <> rest:
+      Channel.plan(rest, dir, Channel.plan.one(row, dir, p))
 
 def Channel.expand(m: Maybe<&2, X.Sfx.Sound>, +at: U32, a: Array<U32>) -> Array<U32>:
   match m:
@@ -57,35 +74,44 @@ def Channel.expand(m: Maybe<&2, X.Sfx.Sound>, +at: U32, a: Array<U32>) -> Array<
     case Some{s}:
       X.Sfx.expand(s, a, at)
 
-def Channel.fill(reads: List<&2, Maybe<&2, X.Sfx.Sound>>, sounds: List<&2, Channel.Sound>, a: Array<U32>) -> Array<U32>:
-  match reads sounds:
-    case m <> ms Sound{id, at, end} <> ss:
-      Channel.fill(ms, ss, Channel.expand(m, at, a))
+def Channel.fill.read(+at: U32, bank: Array<U32>, p: Array<U32> & List<&2, U32>) -> Array<U32> & Array<U32>:
+  (wad, bytes) = p
+  (wad, Channel.expand(X.Sfx.read(bytes), at, bank))
+
+def Channel.fill.at(at: U32, p: Array<U32> & Array<U32>, q: U32 & U32) -> Array<U32> & Array<U32>:
+  (wad, bank) = p
+  (pos, size) = q
+  Channel.fill.read(at, bank, B.Bytes.list(wad, pos, size))
+
+def Channel.fill.one(row: Sn.Sound.Sfx, sound: Channel.Sound, +dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Array<U32>) -> Array<U32> & Array<U32>:
+  Sn.Sfx{id, +lump, priority} = row
+  Sound{number, at, end} = sound
+  Channel.fill.at(at, p, W.Wad.find(dir, lump))
+
+def Channel.fill(rows: List<&2, Sn.Sound.Sfx>, sounds: List<&2, Channel.Sound>, +dir: List<&2, W.Wad.Lump>,
+  p: Array<U32> & Array<U32>) -> Array<U32> & Array<U32>:
+  match rows sounds:
+    case row <> rs sound <> ss:
+      Channel.fill(rs, ss, dir, Channel.fill.one(row, sound, dir, p))
     case _ _:
-      a
+      p
 
-def Channel.end(m: Maybe<&2, Channel.Sound>) -> U32:
-  match m:
-    case None{}:
-      0
-    case Some{Sound{id, at, end}}:
-      end
+def Channel.filled(sounds: List<&2, Channel.Sound>, p: Array<U32> & Array<U32>) -> Array<U32> & Channel.Bank:
+  (wad, frames) = p
+  (wad, Bank{frames, sounds})
 
-def Channel.read(lumps: List<&2, List<&2, U32>>) -> List<&2, Maybe<&2, X.Sfx.Sound>>:
-  match lumps:
-    case []:
-      []
-    case l <> rest:
-      X.Sfx.read(l) <> Channel.read(rest)
+def Channel.planned(rows: List<&2, Sn.Sound.Sfx>, dir: List<&2, W.Wad.Lump>, p: Channel.Plan) ->
+  Array<U32> & Channel.Bank:
+  Plan{wad, +sounds, end} = p
+  +ordered = List.reverse(&2, Channel.Sound, sounds)
+  Channel.filled(ordered, Channel.fill(rows, ordered, dir, (wad, Array.new(U32, V.Vec.depth(end), 0))))
 
-def Channel.bank.of(+reads: List<&2, Maybe<&2, X.Sfx.Sound>>, +sounds: List<&2, Channel.Sound>) -> Channel.Bank:
-  Bank{Channel.fill(reads, sounds, Array.new(U32, V.Vec.depth(Channel.end(List.last(&2, Channel.Sound, sounds))), 0)), sounds}
-
-# The rows' sounds expanded from their lumps, the lumps in the rows'
-# order. A lump CacheSFX refuses is a sound of no frames.
-def Channel.bank(+rows: List<&2, Sn.Sound.Sfx>, lumps: List<&2, List<&2, U32>>) -> Channel.Bank:
-  +reads = Channel.read(lumps)
-  Channel.bank.of(reads, Channel.layout(rows, reads, 0))
+# The rows' sounds expanded one lump at a time from the opened WAD.
+# A lump CacheSFX refuses is a sound of no frames.
+def Channel.load(+rows: List<&2, Sn.Sound.Sfx>, p: Array<U32> & List<&2, W.Wad.Lump>) -> Array<U32> & Channel.Bank:
+  (wad, +dir) = p
+  Channel.planned(rows, dir, Channel.plan(rows, dir, Plan{wad, [], 0}))
 
 # A sound's span in the bank, none for a sound it lacks.
 def Channel.find(sounds: List<&2, Channel.Sound>, +sfx: U32) -> Channel.Sound:
