@@ -247,19 +247,26 @@ def Sim.mover.move(+sector: U32, +ceiling: Bool, +speed: U32, +down: Bool, +dest
     Bool.pick(U32, U32.is_zero((clock .&. 7 : U32)), grind, 0), stop, Bool.pick(U32, past, stop, crush),
     S.State{player, moved, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
-# Doom's button in P_UpdateSpecials: the tic its count reaches zero the
-# side shows its texture again. Vanilla sounds the pop-back from the
-# address of the button's origin where it means the origin, and reads a
-# place out of the next button's slot: the map's own origin, while that
-# slot is free.
-def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, s: S.State) -> S.State:
+def Sim.button.timer(thinkers: List<&2, S.Thinker>, +index: U32) -> U32:
+  match thinkers:
+    case []:
+      0
+    case S.Button{side, slot, texture, tics, at} <> rest:
+      Bool.pick(U32, U32.is_eq(at, index), tics, Sim.button.timer(rest, index))
+    case _ <> rest:
+      Sim.button.timer(rest, index)
+
+# On Chocolate's 64-bit ABI, &buttonlist[i].soundorg reads the next
+# slot's timer as mobj.x and its zero padding as mobj.y.
+def Sim.button(done: Bool, side: U32, slot: U32, texture: U32, tics: U32, index: U32, +s: S.State) -> S.State:
   match done:
     case True{}:
-      S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
-      S.Sim.sound(Sn.Sound.swtchn(), Sn.Spot{0, 0}, S.State{player, level, things,
-        V.Vec.set(sidetex, (side * 3 + slot : U32), texture), thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
+      S.State{player, level, things, sidetex, S.Thinkers{+ran, +due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+      +next = Sim.button.timer(List.append(&2, S.Thinker, List.reverse(&2, S.Thinker, ran), due), (index + 1 : U32))
+      S.Sim.sound(Sn.Sound.swtchn(), Sn.Spot{next, 0}, S.State{player, level, things,
+        V.Vec.set(sidetex, (side * 3 + slot : U32), texture), S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
     case False{}:
-      S.State.kept(s, S.Button{side, slot, texture, (tics - 1 : U32)})
+      S.State.kept(s, S.Button{side, slot, texture, (tics - 1 : U32), index})
 
 def Sim.line.touches(+sector: U32, line: L.Level.Line) -> Bool:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
@@ -646,33 +653,44 @@ def Sim.pressed.side(thinkers: List<&2, S.Thinker>, +side: U32) -> Bool:
   match thinkers:
     case []:
       False{}
-    case S.Button{pressed, slot, texture, tics} <> rest:
+    case S.Button{pressed, slot, texture, tics, index} <> rest:
       Bool.or(U32.is_eq(pressed, side), Sim.pressed.side(rest, side))
     case _ <> rest:
       Sim.pressed.side(rest, side)
 
-# P_ChangeSwitchTexture sounds a switch from the first button's origin
-# where it means the pressed line's: nobody while no button runs, else
-# the sector in front of the running button's line. Vanilla's first
-# button is a slot, which can be free while a later one runs; here it is
-# the first still running, the same while one runs at a time.
+# P_ChangeSwitchTexture uses button slot zero, including NULL after expiry.
 def Sim.switch.origin(thinkers: List<&2, S.Thinker>, +level: L.Level) -> Sn.Sound.Source:
   match thinkers:
     case []:
       Sn.Nobody{}
-    case S.Button{side, slot, texture, tics} <> rest:
-      Sn.Sector{L.Level.side.sector(level, side)}
+    case S.Button{side, slot, texture, tics, index} <> rest:
+      Bool.pick(Sn.Sound.Source, U32.is_zero(index), Sn.Sector{L.Level.side.sector(level, side)},
+        Sim.switch.origin(rest, level))
     case _ <> rest:
       Sim.switch.origin(rest, level)
 
+def Sim.button.used(thinkers: List<&2, S.Thinker>) -> U32:
+  match thinkers:
+    case []:
+      0
+    case S.Button{side, slot, texture, tics, index} <> rest:
+      ((1 << U32.to_nat(index)) .|. Sim.button.used(rest) : U32)
+    case _ <> rest:
+      Sim.button.used(rest)
+
+# P_StartButton takes the first free slot. not(mask) & (mask + 1) isolates it.
+def Sim.button.free(+mask: U32) -> U32:
+  U32.from_nat(U32.log2((U32.not(mask) .&. (mask + 1 : U32) : U32)))
+
 # A switch that works again starts a button of 35 tics for the texture
 # it showed, unless its side has one running.
-def Sim.switch.button(start: Bool, side: U32, slot: U32, showed: U32, s: S.State) -> S.State:
+def Sim.switch.button(start: Bool, side: U32, slot: U32, showed: U32, +s: S.State) -> S.State:
   match start:
     case False{}:
       s
     case True{}:
-      S.State.thinking(s, S.Button{side, slot, showed, 35})
+      +index = Sim.button.free(Sim.button.used(S.State.thinkers(s)))
+      S.State.thinking(s, S.Button{side, slot, showed, 35, index})
 
 # The switch's texture swapped for its partner, with a click. The exit
 # switch clicks like any other: vanilla clears a once-only line's special

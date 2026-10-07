@@ -10,11 +10,13 @@
 # or down ends, as it is turned back, and as it grinds. Every expected
 # value is worked by hand from vanilla's source, as each case says.
 import Base
+import ../src/keys.bend as K
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
 import ../src/level.bend as L
 import ../src/sim.bend as S
 import ../src/special.bend as Sp
+import ../src/tic.bend as Tic
 import ../src/sound.bend as Sn
 import ../src/inventory.bend as I
 import ./fixtures/closed.bend as Fx
@@ -53,7 +55,7 @@ def thinker(t: S.Thinker) -> String:
     case S.Mover{sector, ceiling, speed, ss, plan, n}:
       "mover sector " ++ U32.show(sector) ++ Bool.pick(String, ceiling, " ceiling", " floor") ++ " speed "
         ++ F.Fixed.show(speed) ++ " steps" ++ steps(ss) ++ " plan" ++ steps(plan) ++ noise(n)
-    case S.Button{side, slot, texture, tics}:
+    case S.Button{side, slot, texture, tics, index}:
       "button side " ++ U32.show(side) ++ " slot " ++ U32.show(slot) ++ " texture " ++ U32.show(texture)
         ++ " tics " ++ U32.show(tics)
     case S.Blink{sector, count, dark, bright, darktime, brighttime, random}:
@@ -462,6 +464,29 @@ def light.lines() -> IO(Unit):
       Sp.Sim.door.open(Fx.Closed.doors(), 1, Fx.Closed.west()))))
     IO.print(secret.exit(Sp.Sim.use.special(51, 0, True{}, Fx.Closed.switched(51))))
 
+# P_StartButton fills slots 0 then 1; P_UpdateSpecials clears slot 0
+# after its last tic. A still-active slot 1 cannot supply the press origin.
+def buttons.seed(s: S.State) -> S.State:
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
+  S.State{player, level, things, sidetex, S.Thinkers{[], [S.Button{0, 2, 1, 1, 0}, S.Button{1, 2, 1, 11, 1}]},
+    rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
+
+def buttons.gap() -> S.State:
+  Fx.Closed.idled(1n, buttons.seed(Fx.Closed.switched(46)))
+
+def buttons.seen(+s: S.State) -> String:
+  +ts = S.State.thinkers(s)
+  " origin " ++ Sn.Sound.Source.show(Sp.Sim.switch.origin(ts, S.State.level(s))) ++ " next timer " ++
+    U32.show(Sp.Sim.button.timer(ts, 1)) ++ " free " ++ U32.show(Sp.Sim.button.free(Sp.Sim.button.used(ts)))
+
+def buttons() -> IO(Unit):
+  do IO<Unit>:
+    IO.print("buttons before" ++ buttons.seen(buttons.seed(Fx.Closed.switched(46))))
+    IO.print("buttons thinkers" ++ buttons.seen(Tic.Sim.thinkers(K.Cmd.idle(), L.Level.geo(S.State.level(Fx.Closed.switched(46))), buttons.seed(Fx.Closed.switched(46)))))
+    IO.print("buttons gap" ++ buttons.seen(buttons.gap()))
+    IO.print("buttons reused" ++ buttons.seen(Sp.Sim.switch(True{}, 0, buttons.gap())))
+    IO.print("buttons reset" ++ sounds(buttons.gap()))
+
 def main() -> IO(Unit):
   do IO<Unit>:
     door()
@@ -482,6 +507,7 @@ def main() -> IO(Unit):
     lights()
     damage()
     light.lines()
+    buttons()
 
 #|door tic 1 ceiling 2.000000
 #|door tic 33 ceiling 66.000000
@@ -637,3 +663,8 @@ def main() -> IO(Unit):
 
 #|occupied lights 35 35 35 mover True special 0
 #|exit secret special 0 floor 0.000000 texture 2
+#|buttons before origin sector 0 next timer 11 free 2
+#|buttons thinkers origin sector 0 next timer 11 free 2
+#|buttons gap origin nobody next timer 10 free 0
+#|buttons reused origin sector 0 next timer 10 free 2
+#|buttons reset sounds (DSSWTCHN from spot 0.000167 0.000000 vol 64 sep 214)
