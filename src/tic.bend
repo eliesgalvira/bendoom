@@ -939,8 +939,8 @@ def Sim.think(t: S.Thinker, s: S.State) -> S.State:
       Sp.Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
     case S.Mover{sector, ceiling, speed, steps, plan, noise}:
       Sp.Sim.mover.kept(sector, ceiling, speed, steps, plan, noise, s)
-    case S.Button{side, slot, texture, +tics}:
-      Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
+    case S.Button{side, slot, texture, tics, index}:
+      S.State.kept(s, S.Button{side, slot, texture, tics, index})
     case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
       Sp.Sim.blink(U32.is_eq(count, 1), sector, (count - 1 : U32), dark, bright, darktime, brighttime, random, s)
     case S.Glow{sector, dark, bright, down}:
@@ -1060,6 +1060,28 @@ def State.rested(s: S.State) -> S.State:
 def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: S.State) -> S.State:
   State.rested(Sim.thinkers.all(8n, cmd, geo, s))
 
+def Sim.buttons.turn(t: S.Thinker, s: S.State) -> S.State:
+  match t:
+    case S.Button{side, slot, texture, +tics, index}:
+      Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, index, s)
+    case _:
+      S.State.kept(s, t)
+
+# P_UpdateSpecials handles buttons after every thinker, including those
+# started by gunfire during that run.
+def Sim.buttons.go(fuel: List<&2, S.Thinker>, s: S.State) -> S.State:
+  match fuel s:
+    case [] s:
+      State.rested(s)
+    case f <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
+      State.rested(S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
+    case f <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, +t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
+      Sim.buttons.go(rest, Sim.buttons.turn(t,
+        S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))
+
+def Sim.buttons(+s: S.State) -> S.State:
+  Sim.buttons.go(S.State.thinkers(s), s)
+
 # What a live tic makes of the state its thinkers left: the geometry it
 # began with, the clock counted, and whether use was down.
 def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: S.State) -> S.State:
@@ -1134,7 +1156,7 @@ def Sim.player(dead: Bool, +cmd: K.Cmd, +level: L.Level, +clock: U32, +s: S.Stat
 # An ended level stands still: no tic runs, so its sounds stay the last
 # live tic's, and whoever gathers sounds tic by tic passes over it.
 def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, after: S.State) -> S.State:
-  Sim.tic.kept(geo, clock, K.Cmd.use(cmd), S.State.told(Sim.thinkers(cmd, geo, State.held(geo, x, y, after))))
+  Sim.tic.kept(geo, clock, K.Cmd.use(cmd), S.State.told(Sim.buttons(Sim.thinkers(cmd, geo, State.held(geo, x, y, after)))))
 
 # Doom's ST_Ticker, which G_Ticker runs after P_Ticker, so its draw
 # comes after every sound that tic started: a number from M_Random for

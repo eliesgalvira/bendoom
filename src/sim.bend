@@ -2191,7 +2191,8 @@ type Sim.Noise is Data:
 # left, the whole plan, which a crushed or turned mover goes back to,
 # and its sounds. A button is a pressed switch waiting to pop back: the
 # side, which of its three textures, the texture it showed, and the tics
-# left. A blink is T_LightFlash and T_StrobeFlash in one: the tics left
+# left and its fixed Doom button index. A blink is T_LightFlash and
+# T_StrobeFlash in one: the tics left
 # at the sector's light, its dark and bright levels, the time at each,
 # and whether a time is the count or the mask of a random one. A glow is
 # T_Glow: the two levels and the way it is going.
@@ -2199,7 +2200,7 @@ type Thinker is Data:
   Mobj{id: U32}
   Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>,
     noise: Sim.Noise}
-  Button{side: U32, slot: U32, texture: U32, tics: U32}
+  Button{side: U32, slot: U32, texture: U32, tics: U32, index: U32}
   Blink{sector: U32, count: U32, dark: U32, bright: U32, darktime: U32, brighttime: U32, random: Bool}
   Glow{sector: U32, dark: U32, bright: U32, down: Bool}
 
