@@ -24,7 +24,6 @@ stdenvNoCC.mkDerivation {
       -sENVIRONMENT=web,worker -sEXIT_RUNTIME=1 \
       '-sEXPORTED_RUNTIME_METHODS=["ENV","callMain"]' \
       --preload-file ${bendoom.iwad}@/doom1.wad \
-      --preload-file ${bendoom.sounds}@/sounds \
       -o dist/game.js
     runHook postBuild
   '';

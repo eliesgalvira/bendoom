@@ -225,13 +225,20 @@ type Thing.Action is Data:
 type Thing.Row is Data:
   Row{sprite: String, frame: U32, bright: Bool, tics: U32, next: U32, action: Thing.Action, light: U32}
 
-# The state rows by Bendoom's number, appended a group at a time as
-# types and weapons arrived. Row 238 is vanilla's S_NULL row, which the
-# teleport destination stands in. A monster's second pain row leads back
-# to its see state. Only player sprites' rows have 0 tics: the A_ReFire
-# that ends the chainsaw's and the chaingun's attacks, and S_LIGHTDONE,
-# row 84, which carries A_Light0 in vanilla and here only puts the light
-# out by being the last row before S_NULL.
+# The state rows by Bendoom's number: corpses 0 to 5; pickups, the
+# barrel and scenery 6 to 58 and 239 to 260; the pistol 59, 60, 69 and
+# 79 to 83; the monsters' look rows 61 to 68, their chase rows 89 to
+# 120, their pain and death rows 121 to 175 and their attack rows 184 to
+# 195; the player 70 to 78; S_LIGHTDONE 84; the puff 85 to 88; the
+# barrel's explosion 176 to 180; blood 181 to 183; the imp's fireball
+# 196 to 200; the shotgun 201 to 214, the fist 215 to 222, the chainsaw
+# 223 to 229 and the chaingun 230 to 237; vanilla's S_NULL 238, which
+# the teleport destination stands in; and the baron 261 to 279. A
+# monster's second pain row leads back to its see state. Only player
+# sprites' rows have 0 tics: the A_ReFire that ends the chainsaw's and
+# the chaingun's attacks, and S_LIGHTDONE, which carries A_Light0 in
+# vanilla and here only puts the light out by being the last row before
+# S_NULL.
 def Thing.rows() -> List<&2, Thing.Row>:
   [Row{"PLAY", 13, False{}, 4294967295, 0, Null{}, 0}, Row{"PLAY", 22, False{}, 4294967295, 1, Null{}, 0},
     Row{"POSS", 11, False{}, 4294967295, 2, Null{}, 0}, Row{"SPOS", 11, False{}, 4294967295, 3, Null{}, 0},
@@ -612,8 +619,6 @@ def Thing.fight.row(kind: U32) -> List<&2, U32>:
       [60, 105, 39, 0, 153, 200, 27, 190, 190, 155, 160, 62, 8, 100, 76]
     case 3002:
       [150, 113, 41, 52, 168, 180, 26, 193, 0, 170, 4294967295, 64, 10, 400, 77]
-    case 58:
-      [150, 113, 41, 52, 168, 180, 26, 193, 0, 170, 4294967295, 64, 10, 400, 77]
     case 3003:
       [1000, 263, 43, 0, 271, 50, 26, 0, 0, 273, 4294967295, 67, 8, 1000, 77]
     case 2035:
@@ -623,8 +628,10 @@ def Thing.fight.row(kind: U32) -> List<&2, U32>:
     case _:
       [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 4294967295, 4294967295, 0, 0, 100, 0]
 
+# The spectre, 58, fights from the demon's row, which info.c repeats
+# for it.
 def Thing.fight(+kind: U32) -> V.Vec:
-  V.Vec.of(Thing.fight.row(kind))
+  V.Vec.of(Thing.fight.row(Bool.pick(U32, U32.is_eq(kind, 58), 3002, kind)))
 
 def Thing.spawnhealth(+kind: U32) -> U32:
   V.Vec.get(Thing.fight(kind), 0)
@@ -946,19 +953,16 @@ def Things.without(ids: List<&2, U32>, +id: U32) -> List<&2, U32>:
     case +h <> rest:
       V.Vec.keep(~U32, Bool.not(U32.is_eq(h, id)), h, Things.without(rest, id))
 
-# List i of some lists with an id put first in it, or taken out of it.
-def Things.edit(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, +lists: V.Tree<List<&2, U32>>, +i: U32,
-  id: U32) -> V.Tree<List<&2, U32>>:
-  V.Tree.set(List<&2, U32>, lists, i,
-    Some{edit(Maybe.default(&2, List<&2, U32>, V.Tree.get(List<&2, U32>, lists, i), []), id)})
-
-def Things.edit.if(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, listed: Bool,
-  lists: V.Tree<List<&2, U32>>, i: U32, id: U32) -> V.Tree<List<&2, U32>>:
+# List i of some lists with an id put first in it, or taken out of it,
+# where the mobj is listed at all.
+def Things.edit.list(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, listed: Bool,
+  +lists: V.Tree<List<&2, U32>>, +i: U32, id: U32) -> V.Tree<List<&2, U32>>:
   match listed:
     case False{}:
       lists
     case True{}:
-      Things.edit(~edit, lists, i, id)
+      V.Tree.set(List<&2, U32>, lists, i,
+        Some{edit(Maybe.default(&2, List<&2, U32>, V.Tree.get(List<&2, U32>, lists, i), []), id)})
 
 # A mobj with some flags at (x, y) in a sector, in the list of the
 # blockmap cell its centre is in and in its sector's; off the map, or
@@ -969,9 +973,9 @@ def Things.placed(~edit: @ids: List<&2, U32> -> @+id: U32 -> List<&2, U32>, ts: 
   Things{tree, count, you, cells, sectors, heard} = ts
   L.Blockmap{words, ox, oy, +cols, +rows} = bm
   +c = L.Level.cell_of(bm, x, y)
-  Things{tree, count, you, Things.edit.if(~edit, Bool.and(U32.is_zero((flags .&. 16 : U32)),
+  Things{tree, count, you, Things.edit.list(~edit, Bool.and(U32.is_zero((flags .&. 16 : U32)),
       L.Level.cell.inside(cols, rows, c)), cells, L.Level.cell.number(cols, c), id),
-    Things.edit.if(~edit, U32.is_zero((flags .&. 8 : U32)), sectors, sector, id), heard}
+    Things.edit.list(~edit, U32.is_zero((flags .&. 8 : U32)), sectors, sector, id), heard}
 
 # Doom's P_SetThingPosition: the mobj goes first in its cell's list and
 # first in its sector's.

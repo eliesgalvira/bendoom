@@ -12,3 +12,5 @@
 - [ ] A locked door without the key matches vanilla's frame with the message showing; with the key, it opens.
 - [ ] Shooting E1M2's gun-triggered line opens its door, matching vanilla.
 - [ ] A monster opening a door it may open is shown matching vanilla, or the ticket names the vanilla rule it checked and why no demo shows it.
+
+**Where it stopped (2026-10-03, 16:15):** paused when Elies cut the night to tier 1. Branch `e1-09` (worktree `../bendoom-e1-09`) has the doors committed, unreviewed: 2bb58f1 (every shareware door, keyed doors, the gun-triggered line), merged with episode-1 at 947eb00. It was bisecting DEMO2/DEMO3 and had the monster-opens-a-door case next. Resume from that worktree: finish the evidence the acceptance list asks for, merge episode-1, then review on both axes before landing.

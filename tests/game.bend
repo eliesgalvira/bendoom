@@ -25,9 +25,13 @@
 # is 64 after the wipe and 66 once the six tics and the click have
 # drawn, which is a pin.
 # First of all, the map each command line starts on, by d_main.c's
-# -warp: none, the episode and map, the map left out, -warp with nothing
-# after it, a second -warp after the first, and arguments read by their
-# first characters.
+# -warp and G_InitNew's clamps: on Freedoom, which has E4M1 and so is
+# Ultimate Doom, none, the episode and map, the map left out, -warp
+# with nothing after it, a second -warp after the first, arguments read
+# by their first characters, episode 0 played as 4, and map 0 and x
+# held to 1 and 9; on a shareware directory, without E3M1 or E4M1,
+# episodes 2, 0 and 4 and map 0 held to E1M1; on a registered one, with
+# E3M1, episode 4 held to 3 and 2 kept.
 # Then the time of a few clocks, worked out by hand in milestone 4's
 # ticket 09. The door's height is the hand computation's (4 under
 # sector 68's ceiling of -56); the positions are regression pins.
@@ -35,6 +39,7 @@ import Base
 import ../src/vec.bend as V
 import ../src/fixed.bend as F
 import ../src/angle.bend as A
+import ../src/wad.bend as W
 import ../src/level.bend as L
 import ../src/gfx.bend as G
 import ../src/keys.bend as K
@@ -88,9 +93,9 @@ def told(tag: String, +state: S.State, g: M.Game) -> IO(Maybe<M.Game>):
 
 def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
   match play:
-    case I.Playing{state, map}:
+    case I.Playing{state, map, didsecret, pointer}:
       told(tag, state, g)
-    case I.Showing{wi, after, next}:
+    case I.Showing{wi, after, trip}:
       do IO<Maybe<M.Game>>:
         IO.print(tag ++ " tally " ++ I.Inter.show(wi))
         return Some{g}
@@ -129,7 +134,7 @@ def route() -> List<&2, K.Cmd>:
 # The game handed another state, to put a second case to the same loop.
 def restaged(g: M.Game, s: S.State) -> M.Game:
   M.Game{level, gfx, tables, was, input, again, last, owed, mem, demo, music} = g
-  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}}, input, again, last, owed, mem, demo, music}
+  M.Game{level, gfx, tables, I.Playing{s, L.Name{1, 1}, False{}, False{}}, input, again, last, owed, mem, demo, music}
 
 def staged(s: S.State, m: Maybe<M.Game>) -> Maybe<M.Game>:
   match m:
@@ -151,21 +156,30 @@ def warped.at(at: L.Level.Name) -> String:
   L.Name{episode, map} = at
   " " ++ L.Level.marker(episode, map)
 
-def warped(args: List<String>) -> String:
-  warped.at(M.Game.warp(args))
+def warped(+lumps: List<&2, W.Wad.Lump>, args: List<String>) -> String:
+  warped.at(M.Game.warp(lumps, args))
+
+def warps(+lumps: List<&2, W.Wad.Lump>) -> String:
+  "warp" ++ warped(lumps, []) ++ warped(lumps, ["-warp", "1", "5"]) ++ warped(lumps, ["-WARP", "2"])
+    ++ warped(lumps, ["-warp"]) ++ warped(lumps, ["-nomonsters", "-warp", "1", "9", "-warp", "1", "2"])
+    ++ warped(lumps, ["-warp", "15", "37"]) ++ warped(lumps, ["-warp", "0"]) ++ warped(lumps, ["-warp", "1", "0"])
+    ++ warped(lumps, ["-warp", "1", "x"])
+    ++ "\nwarp shareware" ++ warped([W.Lump{0, 0, "E1M1"}], ["-warp", "2", "1"])
+    ++ warped([W.Lump{0, 0, "E1M1"}], ["-warp", "0"]) ++ warped([W.Lump{0, 0, "E1M1"}], ["-warp", "4"])
+    ++ warped([W.Lump{0, 0, "E1M1"}], ["-warp", "1", "0"])
+    ++ "\nwarp registered" ++ warped([W.Lump{0, 0, "E1M1"}, W.Lump{0, 0, "E3M1"}], ["-warp", "4"])
+    ++ warped([W.Lump{0, 0, "E1M1"}, W.Lump{0, 0, "E3M1"}], ["-warp", "2", "1"])
 
 def play(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
   (gfx, +level) = gl
   +beside = Tic.Sim.replay(route(), Tic.State.at(level, L.Start{F.Fixed.neg(F.Fixed.of_map(363)), F.Fixed.of_map(1316),
     A.Angle.of_thing(180)}))
   do IO<Unit>:
-    IO.print("warp" ++ warped([]) ++ warped(["-warp", "1", "5"]) ++ warped(["-WARP", "2"]) ++ warped(["-warp"])
-      ++ warped(["-nomonsters", "-warp", "1", "9", "-warp", "1", "2"]) ++ warped(["-warp", "15", "37"]))
     IO.print(line("start", Tic.State.start(level)))
     IO.print(line("beside", beside))
     IO.print(clicked(Tic.Sim.tic(K.Cmd.demo(0, 0, 0, 2), beside)))
     d : Maybe<M.Game> <- frame("dead space", 200n, [Key{32, True{}}], Some{M.Game{level, gfx,
-      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}},
+      P.Project.tables(level), I.Playing{killed(level), L.Name{1, 1}, False{}, False{}},
       K.Input{K.Keys.none(), 0}, False{}, 0n, 0n, mem, None{}, None{}}})
     g1 : Maybe<M.Game> <- frame("space", 400n, [Key{32, True{}}], staged(beside, d))
     g2 : Maybe<M.Game> <- frame("repeat", 600n, [Key{32, False{}}, Key{32, True{}}], g1)
@@ -178,17 +192,26 @@ def start(w: Array<U32> & G.Gfx & L.Level) -> IO(Unit):
   (mem, gl) = w
   play(mem, gl)
 
+def opened(dir: Array<U32> & List<&2, W.Wad.Lump>) -> IO(Unit):
+  (bytes, +lumps) = dir
+  do IO<Unit>:
+    IO.print(warps(lumps))
+    world : Array<U32> & G.Gfx & L.Level <- IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(1, 1, (bytes, lumps)))
+    start(world)
+
 def main() -> IO(Unit):
   do IO<Unit>:
-    world : Array<U32> & G.Gfx & L.Level <- G.Gfx.open(1, 1)
-    start(world)
-#|warp E1M1 E1M5 E2M1 E1M1 E1M9 E1M3
+    dir : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    opened(dir)
+#|warp E1M1 E1M5 E2M1 E1M1 E1M9 E1M3 E4M1 E1M1 E1M9
+#|warp shareware E1M1 E1M1 E1M1 E1M1
+#|warp registered E3M1 E2M1
 #|start tic 0 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 59
 #|beside tic 6 ended none at -363.000000 1316.000000 202.500 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 66
 #|use heard DSSWTCHN from nobody vol 64 sep 128 drew to 73
 #|dead space tic 6 ended none at -416.000000 256.000000 0.000 thinkers 9 sector 64 -128.000000 -128.000000 special 11 pressed False things 209 random 125
-#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 83
-#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 83
-#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
-#|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 83
+#|space tally count 1 cnt 29 bcnt 6 shown - - - - - anims 0 0 0 - - 0 0 - - 0 random 147
+#|repeat tally count 1 cnt 22 bcnt 13 shown - - - - - anims 0 1 0 0 0 0 1 0 0 1 random 147
+#|release tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
+#|enter tally count 1 cnt 15 bcnt 20 shown - - - - - anims 1 1 1 1 0 1 1 0 1 1 random 147
 #|esc quit

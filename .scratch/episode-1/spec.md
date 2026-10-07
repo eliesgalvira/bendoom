@@ -137,16 +137,16 @@ The work lands in tiers. Each tier is a coherent build to play, and the overnigh
 - **Freedoom keeps the flake check.** The flake check and the dev shell stay on Freedoom, because the check must not need the unfree WAD. Shareware results are ticket evidence from the oracle. Freedoom's DEMO1 (E1M6, Hurt Me Plenty) becomes a pinned test if its things are all implemented by then; it is not required.
 - **Per-map start views.** Every map E1M1 to E1M9 compares at its player start with zero differing pixels. Today 13 of 15 checked starts already do; E1M2's red key and E1M6's dropped types are the known differences.
 - **Each mechanic is checked where it acts.** Each special, monster and weapon gets a scripted demo on a shareware map that uses it, compared at a rest moment after it acts: a door fully open, a lift at the bottom, the last stair built, the player just teleported, a baron's ball mid-flight, a rocket's blast.
-- **Transitions.** A scripted run takes an exit, compares the tally with `--tally`, then compares the next map's first frame, with the carried inventory visible on the status bar.
+- **Transitions.** A scripted run takes an exit, compares the tally with `--screen tally`, then compares the next map's first frame, with the carried inventory visible on the status bar.
 - **The render test's rest positions stay at zero.** New rest positions on Freedoom maps are added where the oracle agrees.
 - **Laws.** LAWS.bend and PROOF.bend keep checking. The teleport exception and the sector-state change are the expected law edits.
 - **Performance.** The largest shareware maps (E1M6, E1M9) are measured for frame time and tic time with music synthesizing, and audio underruns are counted with the window bench's existing counter.
 - **Prior art:**
   - `tests/fight.bend`, the 1,453-tic Freedoom fight pinned by state and final frame
   - `tests/route.bend` and `tests/tally.bend`
-  - `tools/oracle.nu` with `--tally`
+  - `tools/oracle.nu` with `--screen tally`
   - `tools/listen.nu`
-  - `tests/sounds.bend` and `tests/mixer.bend`
+  - `tests/sfx.bend` and `tests/mixer.bend`
   - the frame hashes in `tests/render.bend`
 
 ## Out of Scope

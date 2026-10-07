@@ -85,14 +85,6 @@ law tic_rest:
       Fx.Closed.state(S.Player{x, y, 0, 0, 0, 0, 0, 0, 8388608, 2686976, 0, 2686976, [], I.Inventory.start(), Fx.Closed.unarmed(), S.Sim.Hurt.start()}, level, 0)))))
     == (x, y) : U32 & U32}
 
-# A level's end by the exit or by the secret exit.
-def Exit.kind(secret: Bool) -> S.Sim.Exit:
-  match secret:
-    case True{}:
-      S.Secret{}
-    case False{}:
-      S.Normal{}
-
 # LAW: a tic counts on the clock, and an ended level's tic changes
 # nothing, whatever the command and however the level ended.
 law tic_counts:
@@ -102,9 +94,9 @@ law tic_counts:
   for +clock: U32
   for +secret: Bool
   {(S.State.clock(Tic.Sim.tic(cmd, Fx.Closed.state(p, level, clock))),
-    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+    Tic.Sim.tic(cmd, S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, 0}))
     == ((clock + 1 : U32),
-      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, Exit.kind(secret), False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}})
+      S.State{p, level, Fx.Closed.none(), V.Leaf{0}, S.Thinkers{[], []}, 0, clock, S.Ended{secret}, False{}, [], S.Sim.Face.start(0), False{}, 0})
     : U32 & S.State}
 
 # LAW: standing still on the floor of Level.room, one sector with no
@@ -136,10 +128,10 @@ law use_fires_once:
   for sounds: List<&2, Sn.Sound.Event>
   for mrnd: V.Vec
   for reborn: Bool
-  for secrets: V.Vec
+  for totalsecret: U32
   for held: {True{} == K.Cmd.use(K.Cmd{forward, side, turn, buttons}) : Bool}
   {Tic.Sim.pressed(next, S.State.usedown(Tic.Sim.tic(K.Cmd{forward, side, turn, buttons},
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, secrets}))) == False{} : Bool}
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, sounds, mrnd, reborn, totalsecret}))) == False{} : Bool}
 
 # LAW: once means once: a line fired for good has no special afterwards,
 # whatever the state and the line.
@@ -159,14 +151,14 @@ def Exit.level() -> L.Level:
 def Exit.used() -> S.State:
   Tic.Sim.replay([K.Cmd.idle(), K.Cmd.idle(), K.Cmd{0, 0, 0, 2}], S.State.populated([], 128,
     S.State{Fx.Closed.player(2097152, 4194304, 0, 8388608), Exit.level(), Fx.Closed.none(), L.Level.sidetex(Exit.level()),
-      S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, V.Leaf{0}}))
+      S.Thinkers{[], []}, 0, 0, S.Unended{}, False{}, [], S.Sim.Face.start(0), False{}, 0}))
 
 # exit_ends's claim on a state, its parameter, so the checker computes
 # the state once.
 def Exit.ended(+cmd: K.Cmd, +s: S.State) -> Type:
   {(S.State.ended(s), S.State.clock(s), L.Level.special(S.State.level(s), 0), V.Vec.get(S.State.sidetex(s), 2),
     Tic.Sim.tic(cmd, s))
-    == (S.Normal{}, 3, 0, 2, s) : S.Sim.Exit & U32 & U32 & U32 & S.State}
+    == (S.Ended{False{}}, 3, 0, 2, s) : S.Sim.Exit & U32 & U32 & U32 & S.State}
 
 # LAW: the exit switch, vanilla's special 11: P_ChangeSwitchTexture, then
 # G_ExitLevel, and the tic runs on. Used on tic 3, the level has ended
@@ -425,9 +417,10 @@ law channels_priority:
   {Ch.Channel.model.size.keys(slots) == Ch.Channel.choice(priority, slots) : Nat}
 
 # LAW: a sound at 16000 or 17990 Hz, the rates of Freedoom's two sounds
-# that SDL's converter is not given, has no run, whatever it holds.
+# that SDL's converter is not given, expands to no frames, whatever it
+# holds.
 law sfx_rates_unserved:
   for count: U32
   for bytes: List<&2, U32>
-  {(X.Sfx.run(X.Sound{16000, count, bytes}), X.Sfx.run(X.Sound{17990, count, bytes}))
-    == (None{}, None{}) : Maybe<&2, X.Sfx.Run> & Maybe<&2, X.Sfx.Run>}
+  {(X.Sfx.length(X.Sound{16000, count, bytes}), X.Sfx.length(X.Sound{17990, count, bytes}))
+    == (0, 0) : U32 & U32}
