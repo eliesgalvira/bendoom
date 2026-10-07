@@ -430,4 +430,3 @@ def Song.Deck.of(names: List<&2, String>, lumps: List<&2, List<&2, U32>>) -> Son
       Song.Deck.open([], [])
     case genmidi <> songs:
       Song.Deck.open(genmidi, Song.lumps(names, songs))
-
