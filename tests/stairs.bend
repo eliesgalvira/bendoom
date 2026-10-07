@@ -7,7 +7,6 @@ import ../src/level.bend as L
 import ../src/fixed.bend as F
 import ../src/sim.bend as S
 import ../src/special.bend as Sp
-import ../src/inventory.bend as I
 import ./fixtures/closed.bend as Fx
 
 def geometry(lines: List<&2, U32>, sides: List<&2, U32>, +level: L.Level) -> L.Level:
@@ -89,9 +88,9 @@ def main() -> IO(Unit):
     active("at target", Fx.Closed.idled(96n, Sp.Sim.stairs(0, chain())))
     active("past target", Fx.Closed.idled(97n, Sp.Sim.stairs(0, chain())))
     special("empty crossing", Sp.Sim.cross.special(8, 0, changed(chain(), 0, 6, 0)))
-    special("empty use", Sp.Sim.use.special(7, 0, I.Inventory.start(), changed(chain(), 0, 6, 0)))
-    special("successful use", Sp.Sim.use.special(7, 0, I.Inventory.start(), chain()))
-    special("back use", Sp.Sim.use.line(True{}, S.State.level(chain()), 0, I.Inventory.start(), chain()))
+    special("empty use", Sp.Sim.use.special(7, 0, True{}, changed(chain(), 0, 6, 0)))
+    special("successful use", Sp.Sim.use.special(7, 0, True{}, chain()))
+    special("back use", Sp.Sim.use.line(True{}, S.State.level(chain()), 0, chain()))
     IO.print("monster crossing " ++ Bool.show(Sp.Sim.thing.cross.special(8)))
     IO.print("monster use " ++ Bool.show(Sp.Sim.thing.use.special(7)))
 
