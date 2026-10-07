@@ -72,8 +72,21 @@ def Tele.wall.report(+s: S.State) -> String:
     ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p))
     ++ " reaction " ++ U32.show(V.Vec.get(S.Player.hurt(p), S.Sim.hurt.reaction()))
 
+# P_TeleportMove clears numspechit before blocker rejection. A valid
+# destination also clears it when the accepted XY is unchanged.
+def Tele.multiple(+same: Bool, obstacle: U32) -> S.State:
+  +x = Bool.pick(U32, same, 96, 32)
+  +level = L.Level.sector.put(Tele.level(x), 1, 6, 5)
+  Sp.Sim.thing.crossed([0, 1], False{}, 7, 6291456, 4194304, 0, 0,
+    Tele.fixture(97, 3004, obstacle, L.Level.special.put(level, 1, 39)))
+
+def Tele.remaining(s: S.State) -> String:
+  U32.show(L.Level.special(S.State.level(s), 1))
+
 def main() -> IO(Unit):
   do IO<Unit>:
+    IO.print("blocked crossings remaining " ++ Tele.remaining(Tele.multiple(False{}, 3004)))
+    IO.print("same-place crossings remaining " ++ Tele.remaining(Tele.multiple(True{}, 0)))
     IO.print("wall arrival " ++ Tele.wall.report(Tele.wall()))
     IO.print("wall frozen " ++ Tele.wall.report(Tic.Sim.replay(Tele.cmds(18n, K.Cmd{25, 0, 0, 0}, []), Tele.wall())))
     IO.print("player telefrag " ++ Tele.player(Tele.cross(H.Thing.you(), 3004, 3004, 4259840)))
@@ -87,6 +100,8 @@ def main() -> IO(Unit):
       ++ " blocked repeat " ++ U32.show(Tele.once(97, 7, 3004, 4259840)))
     IO.print("back crossing " ++ Tele.thing(H.Things.get(S.State.things(Tele.cross(7, 3004, 0, 4128768)), 7)))
 
+#|blocked crossings remaining 39
+#|same-place crossings remaining 39
 #|wall arrival free False at 64.000000 64.000000 reaction 18
 #|wall frozen free False at 64.000000 64.000000 reaction 0
 #|player telefrag kills 1 target 32.000000 64.000000 angle 0 shootable False
