@@ -201,31 +201,29 @@ law tic_keeps_geometry:
   for +s: S.State
   {L.Level.geo(S.State.level(Tic.Sim.tic(cmd, s))) == L.Level.geo(S.State.level(s)) : L.Level.Geo}
 
-# A state whose player stands where the wall law allows: its box passes
-# the level's line check, no solid line crossing it, or it stands where
-# a teleport destination stands, since vanilla's P_TeleportMove puts a
-# mover there without consulting a line.
+# A starting player whose box passes the level's line check.
+def Free(+s: S.State) -> Type:
+  {True{} == S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))) : Bool}
+
+# P_TeleportMove skips lines. The player may remain at its exact
+# destination during the freeze or after a rejected move.
 def Placed(+s: S.State) -> Type:
   {True{} == Bool.or(S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))),
     S.Sim.teleport.at(L.Level.records(S.State.level(s)), S.Player.x(S.State.player(s)),
       S.Player.y(S.State.player(s)))) : Bool}
 
-# LAW: one tic from a placed state answers a placed state, for all
-# commands and states: every place a tic moves the player to passes the
-# line check, but where a teleport puts it on a teleport destination.
+# LAW: the spatial wall invariant, including retention at a destination.
 law tic_keeps_placed:
   for +cmd: K.Cmd
   for +s: S.State
   for placed: Placed(s)
   Placed(Tic.Sim.tic(cmd, s))
 
-# LAW: the wall law: replaying any script from a placed state, the start
-# included, leaves the player placed: in free space, or on a teleport
-# destination.
-law replay_keeps_placed:
+# LAW: a replay from free space ends free or at a teleport destination.
+law replay_from_free_is_placed:
   for script: List<&2, K.Cmd>
   for +s: S.State
-  for placed: Placed(s)
+  for free: Free(s)
   Placed(Tic.Sim.replay(script, s))
 
 # LAW: the freedom law, for every mobj: a place passes P_CheckPosition

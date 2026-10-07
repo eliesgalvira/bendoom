@@ -1406,12 +1406,18 @@ def Laws.tic_keeps_placed(cmd, s, placed):
         Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(player)), Tic.Sim.pressed(cmd, usedown)),
           Tic.Sim.player(S.Player.dead(player), cmd, level, clock, before)), placed)
 
-def Laws.replay_keeps_placed(script, s, placed):
+def replay_placed(script: List<&2, K.Cmd>, +s: S.State, placed: Laws.Placed(s)) ->
+  Laws.Placed(Tic.Sim.replay(script, s)):
   match script:
     case []:
       placed
     case +cmd <> rest:
-      Laws.replay_keeps_placed(rest, Tic.Sim.tic(cmd, s), Laws.tic_keeps_placed(cmd, s, placed))
+      replay_placed(rest, Tic.Sim.tic(cmd, s), Laws.tic_keeps_placed(cmd, s, placed))
+
+def Laws.replay_from_free_is_placed(script, s, free):
+  replay_placed(script, s, or_left(S.Sim.free(S.State.level(s), S.Player.x(S.State.player(s)),
+    S.Player.y(S.State.player(s))), S.Sim.teleport.at(L.Level.records(S.State.level(s)),
+    S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s))), free))
 
 # The freedom law
 # ---------------
