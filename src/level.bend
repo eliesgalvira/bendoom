@@ -697,7 +697,7 @@ def Level.read(a: Array<U32>, found: Result<&1, &1, U32 & String, List<&2, W.Wad
     case Fail{e}:
       Fail{e}
     case Done{+map}:
-      Done{Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.u16, Level.plan(map), a))}
+      Done{Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.file.u16, Level.plan(map), a))}
 
 # Map ExMy of the WAD from its bytes and directory, or Doom's error for
 # a map the WAD lacks.
