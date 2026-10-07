@@ -32,7 +32,7 @@ def main() -> IO(Unit):
   do IO<Unit>:
     path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read(path))
-    header(B.Bytes.list(bytes, 0, 12))
+    header(B.Bytes.file.list(bytes, 0, 12))
 
 #|IWAD
 #|PLAYPAL found
