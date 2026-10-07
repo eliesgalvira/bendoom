@@ -1,5 +1,5 @@
 # Doom's heads-up message line: the strings d_englsh.h gives the pickups
-# and the blue door's refusal, numbered, and the rule hu_lib.c's
+# and the locked doors' refusals, numbered, and the rule hu_lib.c's
 # HUlib_drawTextLine picks a glyph by. A message is carried
 # as its number, since the state it lives in is what the laws quantify
 # over and the tests print; the text is made where it is drawn or
@@ -86,8 +86,14 @@ def Message.gotvisor() -> U32:
 def Message.gotrockbox() -> U32:
   25
 
+def Message.pd_redk() -> U32:
+  26
+
+def Message.pd_yellowk() -> U32:
+  27
+
 # d_englsh.h's English strings for the pickups Inventory.grant names
-# and for the blue locked door. GOTMEDINEED is not among them: P_GiveBody
+# and for the locked doors. GOTMEDINEED is not among them: P_GiveBody
 # heals before p_inter.c tests the health, which is then never under 25,
 # so vanilla never shows it.
 def Message.text(n: U32) -> String:
@@ -142,6 +148,10 @@ def Message.text(n: U32) -> String:
       "Light Amplification Visor"
     case 25:
       "Picked up a box of rockets."
+    case 26:
+      "You need a red key to open this door"
+    case 27:
+      "You need a yellow key to open this door"
     case _:
       ""
 
