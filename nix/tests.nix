@@ -1,4 +1,4 @@
-{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom, sounds }:
+{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom }:
 
 let
   inherit (lib.fileset) toSource unions difference;
@@ -24,13 +24,10 @@ llvmPackages_19.stdenv.mkDerivation {
   buildInputs = optionals llvmPackages_19.stdenv.hostPlatform.isLinux (singleton alsa-lib);
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";
-  BENDOOM_SOUNDS = sounds;
 
   buildPhase = /* bash */ ''
     runHook preBuild
     export HOME=$TMPDIR
-    # The JS lane recurses deeper than bun's default stack once a test
-    # loads a second map, as tests/tally.bend loads E1M2.
     ulimit -S -s 32768
     export BUN_JSC_maxPerThreadStackUsage=16777216
     ${readFile ./compile.sh}

@@ -40,45 +40,67 @@ type Inter.Rolled is Data:
 # on the other two screens), the background's counter bcnt, the five
 # counts shown (the kills, items and secret percentages, the time and
 # the par, 4294967295 for one not shown yet) beside the five they climb
-# to, the animations, M_Random's index and whether a key that
-# accelerates was down last tic. Doom takes that press from attack or
-# from use, each with a flag of its own; here one press stands for both,
-# since both do the same thing.
+# to, the animations, M_Random's index and the player's attackdown and
+# usedown as WI_checkForAccelerate last left them, in the bits BT_ATTACK
+# and BT_USE take in a command. The pointer persists across intermissions
+# as wi_stuff.c's static snl_pointeron does.
 type Inter is Data:
   Inter{screen: Inter.Screen, cnt: U32, bcnt: U32, shown: V.Vec, target: V.Vec,
-    anims: List<&2, Inter.Anim>, mrnd: U32, down: Bool}
+    anims: List<&2, Inter.Anim>, mrnd: U32, down: U32, pointer: Bool}
 
 def Inter.screen(i: Inter) -> Inter.Screen:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   screen
 
 def Inter.cnt(i: Inter) -> U32:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   cnt
 
 def Inter.bcnt(i: Inter) -> U32:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   bcnt
 
 def Inter.shown(i: Inter) -> V.Vec:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   shown
 
 def Inter.target(i: Inter) -> V.Vec:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   target
 
 def Inter.mrnd(i: Inter) -> U32:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   mrnd
 
-# Whether a key that accelerates was down on the last tic.
-def Inter.down(i: Inter) -> Bool:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+def Inter.down(i: Inter) -> U32:
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   down
 
+def Inter.pointer(i: Inter) -> Bool:
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
+  pointer
+
+def Inter.pointed(pointer: Bool, i: Inter) -> Inter:
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, old} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer}
+
+def Inter.drawn(draws: U32, i: Inter) -> Inter:
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, ((mrnd + draws : U32) .&. 255 : U32), down, pointer}
+
+# The word WI_checkForAccelerate reads and leaves: attack in BT_ATTACK's
+# bit, 1, and use in BT_USE's, 2.
+def Inter.buttons(attack: Bool, use: Bool) -> U32:
+  (Bool.to_u32(attack) .|. (Bool.to_u32(use) << 1n) : U32)
+
+def Inter.attackdown(+wi: Inter) -> Bool:
+  Bool.not(U32.is_zero((Inter.down(wi) .&. 1 : U32)))
+
+def Inter.usedown(+wi: Inter) -> Bool:
+  Bool.not(U32.is_zero((Inter.down(wi) .&. 2 : U32)))
+
 def Inter.anims(i: Inter) -> List<&2, Inter.Anim>:
-  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = i
+  Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = i
   anims
 
 def Inter.Anim.ctr(a: Inter.Anim) -> U32:
@@ -147,23 +169,18 @@ def Inter.anims.init(n: Nat, +bcnt: U32, r: Inter.Rolled) -> Inter.Rolled:
     case 1n+m:
       Inter.anims.init(m, bcnt, Inter.anims.one(bcnt, r))
 
-def Inter.start.of(t: S.Sim.Tally, par: U32, down: Bool, r: Inter.Rolled) -> Inter:
+def Inter.start.of(t: S.Sim.Tally, par: U32, down: U32, r: Inter.Rolled) -> Inter:
   S.Tally{kills, items, secrets, maxkills, maxitems, maxsecret, time} = t
   Rolled{anims, mrnd} = r
   Inter{Count{1}, 35, 0,
     V.Vec.of_list([Inter.none(), Inter.none(), Inter.none(), Inter.none(), Inter.none()], 5),
     V.Vec.of_list([Inter.percent(kills, maxkills), Inter.percent(items, maxitems),
-      Inter.percent(secrets, maxsecret), (time / 35 : U32), par], 5), anims, mrnd, down}
+      Inter.percent(secrets, maxsecret), (time / 35 : U32), par], 5), anims, mrnd, down, False{}}
 
-# Doom's WI_Start for one player: WI_initStats, on the counts and the
-# par G_DoCompleted hands it. Every count starts unshown, the first pause
-# lasts a second, and the animations are laid out from a background
-# counter of zero, one draw of M_Random each; the index is the one the
-# level left, since the intermission draws from the same table. Use
-# counts as down when the level ended with it down, as the player's
-# usedown flag does, so the press that took the exit does not also skip
-# the first pause.
-def Inter.start(t: S.Sim.Tally, par: U32, +mrnd: U32, down: Bool) -> Inter:
+# WI_Start seeds ten animations; the first WI_Ticker precedes the tally melt.
+# G_DoCompleted's attackdown and usedown prevent the exit press from
+# also skipping the first count pause.
+def Inter.start(t: S.Sim.Tally, par: U32, +mrnd: U32, down: U32) -> Inter:
   Inter.start.of(t, par, down, Inter.anims.init(Inter.nanims(), 0, Rolled{[], mrnd}))
 
 # The tic
@@ -213,8 +230,8 @@ def Inter.climb(+shown: U32, +target: U32, step: U32) -> Inter.Climb:
   Inter.climb.if(U32.is_ge(at, target), at, target)
 
 def Inter.climbed.put(done: Bool, +i: U32, +at: U32, wi: Inter) -> Inter:
-  Inter{screen, cnt, bcnt, +shown, target, anims, mrnd, down} = wi
-  Inter{Inter.stepped(done, screen), cnt, bcnt, V.Vec.set(shown, i, at), target, anims, mrnd, down}
+  Inter{screen, cnt, bcnt, +shown, target, anims, mrnd, down, pointer} = wi
+  Inter{Inter.stepped(done, screen), cnt, bcnt, V.Vec.set(shown, i, at), target, anims, mrnd, down, pointer}
 
 def Inter.climbed.of(c: Inter.Climb, +i: U32, wi: Inter) -> Inter:
   Climb{at, done} = c
@@ -227,9 +244,9 @@ def Inter.climbed(+i: U32, step: U32, +wi: Inter) -> Inter:
 def Inter.timed.put(t: Inter.Climb, p: Inter.Climb, wi: Inter) -> Inter:
   Climb{tat, tdone} = t
   Climb{pat, pdone} = p
-  Inter{screen, cnt, bcnt, +shown, target, anims, mrnd, down} = wi
+  Inter{screen, cnt, bcnt, +shown, target, anims, mrnd, down, pointer} = wi
   Inter{Inter.stepped(Bool.and(tdone, pdone), screen), cnt, bcnt,
-    V.Vec.set(V.Vec.set(shown, Inter.time(), tat), Inter.parat(), pat), target, anims, mrnd, down}
+    V.Vec.set(V.Vec.set(shown, Inter.time(), tat), Inter.parat(), pat), target, anims, mrnd, down, pointer}
 
 # WI_updateStats' eighth state: the time and the par climb three a tic
 # together, and the screen moves on once both stand at their own.
@@ -241,11 +258,11 @@ def Inter.timed(+wi: Inter) -> Inter:
 def Inter.paused(over: Bool, wi: Inter) -> Inter:
   match over:
     case False{}:
-      Inter{screen, +cnt, bcnt, shown, target, anims, mrnd, down} = wi
-      Inter{screen, (cnt - 1 : U32), bcnt, shown, target, anims, mrnd, down}
+      Inter{screen, +cnt, bcnt, shown, target, anims, mrnd, down, pointer} = wi
+      Inter{screen, (cnt - 1 : U32), bcnt, shown, target, anims, mrnd, down, pointer}
     case True{}:
-      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = wi
-      Inter{Inter.stepped(True{}, screen), 35, bcnt, shown, target, anims, mrnd, down}
+      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = wi
+      Inter{Inter.stepped(True{}, screen), 35, bcnt, shown, target, anims, mrnd, down, pointer}
 
 # WI_updateStats' odd states: a second's pause, and then the next count.
 def Inter.pause(+wi: Inter) -> Inter:
@@ -253,8 +270,8 @@ def Inter.pause(+wi: Inter) -> Inter:
 
 def Inter.next.of(r: Inter.Rolled, wi: Inter) -> Inter:
   Rolled{anims, mrnd} = r
-  Inter{screen, cnt, bcnt, shown, target, old, was, down} = wi
-  Inter{Next{}, 140, bcnt, shown, target, anims, mrnd, down}
+  Inter{screen, cnt, bcnt, shown, target, old, was, down, pointer} = wi
+  Inter{Next{}, 140, bcnt, shown, target, anims, mrnd, down, pointer}
 
 # WI_initShowNextLoc: the screen that names the level to come, for four
 # seconds, with the animations laid out again.
@@ -266,7 +283,7 @@ def Inter.leave(press: Bool, +wi: Inter) -> Inter:
     case False{}:
       wi
     case True{}:
-      Inter.next(wi)
+      Inter.next(Inter.drawn(Bool.to_u32(Sn.Sound.Event.draws(Sn.Sound.plain(Sn.Sound.sgcock(), Sn.Nobody{}))), wi))
 
 # WI_updateStats' first test: a press before the counting is done shows
 # every count at once and leaves the screen at its last state.
@@ -275,8 +292,8 @@ def Inter.skip(jump: Bool, wi: Inter) -> Inter:
     case False{}:
       wi
     case True{}:
-      Inter{screen, cnt, bcnt, shown, +target, anims, mrnd, down} = wi
-      Inter{Count{10}, cnt, bcnt, target, target, anims, mrnd, down}
+      Inter{screen, cnt, bcnt, shown, +target, anims, mrnd, down, pointer} = wi
+      Inter{Count{10}, cnt, bcnt, target, target, anims, mrnd, down, pointer}
 
 def Inter.stats.sp(sp: U32, press: Bool, wi: Inter) -> Inter:
   match sp:
@@ -306,11 +323,11 @@ def Inter.stats(+sp: U32, +press: Bool, +wi: Inter) -> Inter:
 def Inter.shownext.put(over: Bool, +left: U32, wi: Inter) -> Inter:
   match over:
     case False{}:
-      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = wi
-      Inter{screen, left, bcnt, shown, target, anims, mrnd, down}
+      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = wi
+      Inter{screen, left, bcnt, shown, target, anims, mrnd, down, U32.is_lt((left .&. 31 : U32), 20)}
     case True{}:
-      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down} = wi
-      Inter{Last{}, 10, bcnt, shown, target, anims, mrnd, down}
+      Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = wi
+      Inter{Last{}, 10, bcnt, shown, target, anims, mrnd, down, True{}}
 
 # WI_updateShowNextLoc: four seconds, or a press, and then WI_initNoState
 # with its ten tics.
@@ -321,8 +338,8 @@ def Inter.shownext(press: Bool, +wi: Inter) -> Inter:
 # WI_updateNoState: ten tics, and at the end G_WorldDone, which the play
 # reads as the level to start.
 def Inter.nostate(wi: Inter) -> Inter:
-  Inter{screen, +cnt, bcnt, shown, target, anims, mrnd, down} = wi
-  Inter{screen, (cnt - 1 : U32), bcnt, shown, target, anims, mrnd, down}
+  Inter{screen, +cnt, bcnt, shown, target, anims, mrnd, down, pointer} = wi
+  Inter{screen, (cnt - 1 : U32), bcnt, shown, target, anims, mrnd, down, pointer}
 
 def Inter.tic.screen(screen: Inter.Screen, press: Bool, wi: Inter) -> Inter:
   match screen:
@@ -333,18 +350,15 @@ def Inter.tic.screen(screen: Inter.Screen, press: Bool, wi: Inter) -> Inter:
     case Last{}:
       Inter.nostate(wi)
 
-def Inter.tic.on(+bcnt: U32, press: Bool, down: Bool, wi: Inter) -> Inter:
-  Inter{+screen, cnt, was, shown, target, anims, mrnd, old} = wi
+def Inter.tic.on(+bcnt: U32, press: Bool, down: U32, wi: Inter) -> Inter:
+  Inter{+screen, cnt, was, shown, target, anims, mrnd, old, pointer} = wi
   Inter.tic.screen(screen, press,
-    Inter{screen, cnt, bcnt, shown, target, Inter.anims.tic(anims, bcnt), mrnd, down})
+    Inter{screen, cnt, bcnt, shown, target, Inter.anims.tic(anims, bcnt), mrnd, down, pointer})
 
-# WI_Ticker: the background's counter, then WI_checkForAccelerate, whose
-# press is the tic a key goes down and not one it is held, then the
-# screen's own update, which begins with the animations.
-def Inter.tic(+down: Bool, wi: Inter) -> Inter:
-  Inter{screen, cnt, +bcnt, shown, target, anims, mrnd, +was} = wi
-  Inter.tic.on((bcnt + 1 : U32), Bool.and(down, Bool.not(was)), down,
-    Inter{screen, cnt, bcnt, shown, target, anims, mrnd, was})
+# WI_checkForAccelerate's press: attack or use down on this tic and not
+# on the last.
+def Inter.pressed(+down: U32, +wi: Inter) -> Bool:
+  Bool.not(U32.is_zero((down .&. U32.not(Inter.down(wi)) : U32)))
 
 def Inter.sound.finished(+sp: U32, screen: Inter.Screen) -> Bool:
   match screen:
@@ -368,12 +382,36 @@ def Inter.sound.counting(+sp: U32, +press: Bool, +bcnt: U32, after: Inter) ->
         Bool.pick(List<&2, Sn.Sound.Event>, done, [Sn.Sound.plain(Sn.Sound.barexp(), Sn.Nobody{})], []))
 
 def Inter.sound(+press: Bool, before: Inter, +after: Inter) -> List<&2, Sn.Sound.Event>:
-  Inter{+screen, cnt, bcnt, shown, target, anims, mrnd, down} = before
+  Inter{+screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer} = before
   match screen:
     case Count{sp}:
       Inter.sound.counting(sp, press, Inter.bcnt(after), after)
     case _:
       []
+
+def Inter.heard(events: List<&2, Sn.Sound.Event>, wi: Inter) -> Inter:
+  match events:
+    case []:
+      wi
+    case event <> rest:
+      Inter.heard(rest, Inter.drawn(Bool.to_u32(Sn.Sound.Event.draws(event)), wi))
+
+# The sgcock pitch was drawn before Next's animation seeds in Inter.leave.
+def Inter.ticked(screen: Inter.Screen, before: Inter, +after: Inter, press: Bool) -> Inter:
+  match screen:
+    case Next{}:
+      after
+    case _:
+      Inter.heard(Inter.sound(press, before, after), after)
+
+# WI_Ticker: the background's counter, then WI_checkForAccelerate, then
+# the screen's own update, which begins with the animations. Its first
+# display consumes the tally melt after this update.
+def Inter.tic(+down: U32, +wi: Inter) -> Inter:
+  +press = Inter.pressed(down, wi)
+  +after = Inter.tic.on((Inter.bcnt(wi) + 1 : U32), press, down, wi)
+  Inter.drawn(Bool.pick(U32, U32.is_zero(Inter.bcnt(wi)), 320, 0),
+    Inter.ticked(Inter.screen(after), wi, after, press))
 
 def Inter.over.of(s: Inter.Screen, +cnt: U32) -> Bool:
   match s:
@@ -415,7 +453,7 @@ def Inter.anims.show(anims: List<&2, Inter.Anim>) -> String:
       Inter.count.show(Inter.Anim.ctr(a)) ++ Inter.anims.show(rest)
 
 def Inter.show(wi: Inter) -> String:
-  Inter{screen, +cnt, +bcnt, +shown, target, +anims, +mrnd, down} = wi
+  Inter{screen, +cnt, +bcnt, +shown, target, +anims, +mrnd, down, pointer} = wi
   Inter.Screen.show(screen) ++ " cnt " ++ U32.show(cnt) ++ " bcnt " ++ U32.show(bcnt) ++ " shown"
     ++ Inter.counts.show(5n, shown, 0) ++ " anims" ++ Inter.anims.show(anims) ++ " random "
     ++ U32.show(mrnd)
@@ -578,7 +616,7 @@ def Inter.Trip.next(t: Inter.Trip) -> L.Level.Name:
 
 # A map's name, the patch WILV00 for E1M1.
 def Inter.name(+map: U32) -> String:
-  "WILV0" ++ U32.show((map - 1 : U32))
+  G.Gfx.wi.level() ++ U32.show((map - 1 : U32))
 
 # WI_drawLF: the name of the map left at the top, and "Finished!" a name
 # and a quarter under it.
@@ -748,7 +786,7 @@ def Inter.frame.of(s: Inter.Screen, +gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, 
       Trip{L.Name{e, +last}, next, didsecret} = trip
       Inter.stats.draw(gfx, wi, Inter.name(last), mem)
     case Next{}:
-      Inter.next.draw(gfx, wi, trip, U32.is_lt((Inter.cnt(wi) .&. 31 : U32), 20), mem)
+      Inter.next.draw(gfx, wi, trip, Inter.pointer(wi), mem)
     case Last{}:
       Inter.next.draw(gfx, wi, trip, True{}, mem)
 
@@ -760,12 +798,10 @@ def Inter.frame(+gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, mem: Array<U32>) -> 
 # The play
 # --------
 
-# The game's two modes, Doom's GS_LEVEL and GS_INTERMISSION: a map's
-# level playing, with the player's didsecret, whether E1M9 is done; or
-# the tally an exit leads to, beside the level as it ended, whose player
-# crosses into the map the trip names next.
+# GS_LEVEL carries didsecret and WI_Drawer's static pointer through
+# loads and deaths. GS_INTERMISSION keeps the ended level and its trip.
 type Play is Data:
-  Playing{state: S.State, map: L.Level.Name, didsecret: Bool}
+  Playing{state: S.State, map: L.Level.Name, didsecret: Bool, pointer: Bool}
   Showing{inter: Inter, after: S.State, trip: Inter.Trip}
 
 type Play.Step is Data:
@@ -773,26 +809,14 @@ type Play.Step is Data:
 
 # A new game on a map: G_InitNew, then G_DoLoadLevel.
 def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
-  Playing{Tic.State.start(level), map, False{}}
-
-# The map G_DoCompleted returns to from map 9 of each episode.
-def Play.back(+episode: U32) -> U32:
-  match episode:
-    case 2:
-      6
-    case 3:
-      7
-    case 4:
-      3
-    case _:
-      4
+  Playing{Tic.State.start(level), map, False{}, False{}}
 
 def Play.next.kind(secret: Bool, +episode: U32, +map: U32) -> L.Level.Name:
   match secret:
     case True{}:
       L.Name{episode, 9}
     case False{}:
-      L.Name{episode, Bool.pick(U32, U32.is_eq(map, 9), Play.back(episode), (map + 1 : U32))}
+      L.Name{episode, Bool.pick(U32, U32.is_eq(map, 9), 4, (map + 1 : U32))}
 
 def Play.next.if(finale: Bool, secret: Bool, +episode: U32, +map: U32) -> Maybe<&2, L.Level.Name>:
   match finale:
@@ -803,15 +827,18 @@ def Play.next.if(finale: Bool, secret: Bool, +episode: U32, +map: U32) -> Maybe<
 
 # G_DoCompleted's next map after an exit, secret or not: none after map
 # 8, whose exit of either kind ends the episode; map 9 after a secret
-# exit; after map 9, the map its episode goes back to; else the map
-# after.
-def Play.next(secret: Bool, at: L.Level.Name) -> Maybe<&2, L.Level.Name>:
-  L.Name{+episode, +map} = at
-  Play.next.if(U32.is_eq(map, 8), secret, episode, map)
+# exit; map 4 after map 9, episode 1's return; else the map after.
+def Play.next(how: S.Sim.Exit, at: L.Level.Name) -> Maybe<&2, L.Level.Name>:
+  match how at:
+    case S.Unended{} L.Name{episode, map}:
+      None{}
+    case S.Ended{secret} L.Name{+episode, +map}:
+      Play.next.if(U32.is_eq(map, 8), secret, episode, map)
 
-def Play.shown(+last: L.Level.Name, next: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+def Play.shown(pointer: Bool, +last: L.Level.Name, next: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   L.Name{e, +map} = last
-  Showing{Inter.start(S.Sim.tally(after), Inter.par(map), S.State.mrnd(after), S.State.usedown(after)), after,
+  Showing{Inter.pointed(pointer, Inter.start(S.Sim.tally(after), Inter.par(map), S.State.mrnd(after),
+      Inter.buttons(S.Sim.Face.attackdown(S.State.face(after)), S.State.usedown(after)))), after,
     Trip{last, next, Bool.or(didsecret, U32.is_eq(map, 9))}}
 
 # G_DoCompleted on the tic a level ends: an exit to another map hands
@@ -819,28 +846,18 @@ def Play.shown(+last: L.Level.Name, next: L.Level.Name, didsecret: Bool, +after:
 # map screen the trip, leaving E1M9 marking it done. Vanilla follows
 # map 8 with the episode's finale and no tally; until the finale is
 # drawn, its level stands still where it ended.
-def Play.completed(next: Maybe<&2, L.Level.Name>, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+def Play.completed(pointer: Bool, next: Maybe<&2, L.Level.Name>, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   match next:
     case None{}:
-      Playing{after, map, didsecret}
+      Playing{after, map, didsecret, pointer}
     case Some{name}:
-      Play.shown(map, name, didsecret, after)
+      Play.shown(pointer, map, name, didsecret, after)
 
-def Play.ended(how: S.Sim.Exit, +map: L.Level.Name, didsecret: Bool, after: S.State) -> Play:
-  match how:
-    case S.Unended{}:
-      Playing{after, map, didsecret}
-    case S.Normal{}:
-      Play.completed(Play.next(False{}, map), map, didsecret, after)
-    case S.Secret{}:
-      Play.completed(Play.next(True{}, map), map, didsecret, after)
-
-def Play.after(map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
-  Play.ended(S.State.ended(after), map, didsecret, after)
+def Play.after(pointer: Bool, +map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  Play.completed(pointer, Play.next(S.State.ended(after), map), map, didsecret, after)
 
 # G_DoReborn ahead of the tic: a death that asked for the level again
-# has the map as loaded reloaded, and the player G_PlayerReborn makes
-# has not done E1M9.
+# has the map as loaded reloaded.
 def Play.reborn(reborn: Bool, +level: L.Level, state: S.State) -> S.State:
   match reborn:
     case True{}:
@@ -857,26 +874,26 @@ def Play.sounds(before: S.Sim.Exit, +after: S.State) -> List<&2, Sn.Sound.Event>
     case _:
       []
 
-# Whether the tally is accelerated this tic: WI_checkForAccelerate reads
-# attack and use from the command, and the game's window adds Space and
-# Enter.
-def Play.pressed(+held: Bool, +cmd: K.Cmd) -> Bool:
-  Bool.or(held, K.Cmd.use(cmd))
+# The attack and use WI_checkForAccelerate reads from the command, use
+# with the game's window adding Space and Enter.
+def Play.down(+held: Bool, +cmd: K.Cmd) -> U32:
+  Inter.buttons(K.Cmd.attack(cmd), Bool.or(held, K.Cmd.use(cmd)))
 
 # A tic of the play on the map as loaded: the level's tic while it
 # runs, then the tally's. Held is a key outside the command that
-# accelerates the tally, which the level pays no heed.
+# accelerates the tally, which the level pays no heed. A reload makes
+# the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, +held: Bool, play: Play) -> Play.Step:
   match play:
-    case Playing{+state, map, didsecret}:
+    case Playing{+state, map, didsecret, pointer}:
       +ended = S.State.ended(state)
       +reborn = S.State.reborn(state)
       +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
-      Step{Play.after(map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
+      Step{Play.after(pointer, map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
     case Showing{+wi, after, trip}:
-      +press = Play.pressed(held, cmd)
-      +ticked = Inter.tic(press, wi)
-      Step{Showing{ticked, after, trip}, Inter.sound(press, wi, ticked)}
+      +down = Play.down(held, cmd)
+      +ticked = Inter.tic(down, wi)
+      Step{Showing{ticked, after, trip}, Inter.sound(Inter.pressed(down, wi), wi, ticked)}
 
 def Play.Step.play(step: Play.Step) -> Play:
   Step{play, sounds} = step
@@ -886,31 +903,12 @@ def Play.Step.sounds(step: Play.Step) -> List<&2, Sn.Sound.Event>:
   Step{play, sounds} = step
   sounds
 
-def Play.wants.if(over: Bool, next: L.Level.Name) -> Maybe<&2, L.Level.Name>:
-  match over:
-    case True{}:
-      Some{next}
-    case False{}:
-      None{}
-
-# The map G_WorldDone asks for once the tally's last screen is over,
-# which loads before the next tic.
-def Play.wants(play: Play) -> Maybe<&2, L.Level.Name>:
-  match play:
-    case Playing{state, map, didsecret}:
-      None{}
-    case Showing{+wi, after, trip}:
-      Play.wants.if(Inter.over(wi), Inter.Trip.next(trip))
-
-# G_DoWorldDone on the map the tally asked for, as loaded. G_WorldDone
-# also marks E1M9 done after the secret exit, which nothing reads before
-# leaving E1M9 marks it again.
-def Play.enter(+level: L.Level, play: Play) -> Play:
-  match play:
-    case Playing{state, map, didsecret}:
-      Playing{state, map, didsecret}
-    case Showing{+wi, after, Trip{last, next, didsecret}}:
-      Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.down(wi), after), next, didsecret}
+# G_DoWorldDone on the map the tally's trip names, as loaded. G_WorldDone
+# also marks E1M9 done after the secret exit; that is left out, since
+# leaving E1M9 marks it again before anything reads it.
+def Play.enter(+level: L.Level, +wi: Inter, after: S.State, trip: Inter.Trip) -> Play:
+  Trip{last, next, didsecret} = trip
+  Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.usedown(wi), Inter.attackdown(wi), after), next, didsecret, Inter.pointer(wi)}
 
 # A play and what it is drawn from: the frame's array, the graphics, the
 # tables and the map as loaded.
@@ -926,13 +924,14 @@ def Play.World.start(map: L.Level.Name, p: Array<U32> & G.Gfx & L.Level) -> Play
   (mem, gl) = p
   Play.World.start.gl(map, mem, gl)
 
-def Play.World.of.gl(+play: Play, mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
+def Play.World.of.gl(+wi: Inter, after: S.State, trip: Inter.Trip, mem: Array<U32>, gl: G.Gfx & L.Level) ->
+  Play.World:
   (+gfx, +level) = gl
-  World{Play.enter(level, play), mem, gfx, P.Project.tables(level), level}
+  World{Play.enter(level, wi, after, trip), mem, gfx, P.Project.tables(level), level}
 
-def Play.World.of(play: Play, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+def Play.World.of(wi: Inter, after: S.State, trip: Inter.Trip, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
   (mem, gl) = p
-  Play.World.of.gl(play, mem, gl)
+  Play.World.of.gl(wi, after, trip, mem, gl)
 
 # A map, its graphics and the frame's array from the WAD BENDOOM_IWAD
 # names.
@@ -940,35 +939,45 @@ def Play.open(at: L.Level.Name) -> IO(Array<U32> & G.Gfx & L.Level):
   L.Name{+episode, +map} = at
   G.Gfx.open(episode, map)
 
-def Play.load.if(wanted: Maybe<&2, L.Level.Name>, play: Play, mem: Array<U32>, gfx: G.Gfx,
+# G_WorldDone once the tally's last screen is over: the map the trip
+# names opened and entered.
+def Play.load.if(over: Bool, wi: Inter, after: S.State, +trip: Inter.Trip, mem: Array<U32>, gfx: G.Gfx,
   tables: P.Project.Tables, level: L.Level) -> IO(Play.World):
-  match wanted:
-    case None{}:
-      IO.pure(Play.World, World{play, mem, gfx, tables, level})
-    case Some{at}:
-      IO.bind(Array<U32> & G.Gfx & L.Level, Play.World, Play.open(at),
-        opened => IO.pure(Play.World, Play.World.of(play, opened)))
+  match over:
+    case False{}:
+      IO.pure(Play.World, World{Showing{wi, after, trip}, mem, gfx, tables, level})
+    case True{}:
+      IO.bind(Array<U32> & G.Gfx & L.Level, Play.World, Play.open(Inter.Trip.next(trip)),
+        opened => IO.pure(Play.World, Play.World.of(wi, after, trip, opened)))
 
-# The world before a tic: the map the play asks for, if it asks for one,
-# opened, and the play entered on it.
+# The world before a tic: the map the tally asks for, if it asks for
+# one, which loads before the next tic.
 def Play.load(w: Play.World) -> IO(Play.World):
-  World{+play, mem, gfx, tables, level} = w
-  Play.load.if(Play.wants(play), play, mem, gfx, tables, level)
+  World{play, mem, gfx, tables, level} = w
+  match play:
+    case Showing{+wi, after, trip}:
+      Play.load.if(Inter.over(wi), wi, after, trip, mem, gfx, tables, level)
+    case playing:
+      IO.pure(Play.World, World{playing, mem, gfx, tables, level})
+
+def Play.World.stepped(mem: Array<U32>, gfx: G.Gfx, tables: P.Project.Tables, level: L.Level, step: Play.Step) ->
+  Play.World & List<&2, Sn.Sound.Event>:
+  Step{play, sounds} = step
+  (World{play, mem, gfx, tables, level}, sounds)
 
 # A tic of the play in its world.
-def Play.World.step(+cmd: K.Cmd, +held: Bool, w: Play.World) -> Play.Step & Play.World:
+def Play.World.step(cmd: K.Cmd, held: Bool, w: Play.World) -> Play.World & List<&2, Sn.Sound.Event>:
   World{play, mem, gfx, tables, +level} = w
-  +step = Play.step(level, cmd, held, play)
-  (step, World{Play.Step.play(step), mem, gfx, tables, level})
+  Play.World.stepped(mem, gfx, tables, level, Play.step(level, cmd, held, play))
 
 # A play in its world after some tics, and the sounds they started, in
 # order.
 type Play.Run is Type:
   Ran{world: Play.World, sounds: List<&2, Sn.Sound.Event>}
 
-def Play.heard(sounds: List<&2, Sn.Sound.Event>, p: Play.Step & Play.World) -> Play.Run:
-  (step, world) = p
-  Ran{world, List.append(&2, Sn.Sound.Event, sounds, Play.Step.sounds(step))}
+def Play.heard(sounds: List<&2, Sn.Sound.Event>, p: Play.World & List<&2, Sn.Sound.Event>) -> Play.Run:
+  (world, more) = p
+  Ran{world, List.append(&2, Sn.Sound.Event, sounds, more)}
 
 # A tic for each command, with a key held throughout, each after the
 # map the play asks for, if it asks for one, has loaded.
@@ -984,7 +993,7 @@ def Play.run(cmds: List<&2, K.Cmd>, +held: Bool, run: Play.Run) -> IO(Play.Run):
 # Whether the level is still running, which the demo is recorded for.
 def Play.playing(play: Play) -> Bool:
   match play:
-    case Playing{state, map, didsecret}:
+    case Playing{state, map, didsecret, pointer}:
       True{}
     case Showing{inter, after, trip}:
       False{}
@@ -994,7 +1003,7 @@ def Play.playing(play: Play) -> Bool:
 # which is D_ before the map's name, or D_INTER through the tally.
 def Play.song(play: Play) -> String:
   match play:
-    case Playing{state, L.Name{episode, map}, didsecret}:
+    case Playing{state, L.Name{episode, map}, didsecret, pointer}:
       "D_" ++ L.Level.marker(episode, map)
     case Showing{inter, after, trip}:
       "D_INTER"
@@ -1007,7 +1016,7 @@ def Play.songs() -> List<&2, String>:
 # tally, both in the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
-    case Playing{+state, map, didsecret}:
+    case Playing{+state, map, didsecret, pointer}:
       R.Render.frame(tables, gfx, state, messages, mem)
     case Showing{+wi, after, trip}:
       (Inter.frame(gfx, wi, trip, mem), 0)

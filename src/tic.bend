@@ -29,37 +29,40 @@ def State.at.spawned(+level: L.Level, place: L.Level.Start, spawn: H.Thing.Spawn
   S.Sim.psprites.start(Sp.Sim.lights(U32.to_nat(L.Level.nsectors(level)), 0,
     S.State.populated(things, L.Level.nthings(level),
       S.State{S.Player.at(level, place, inv), level, H.Things.none(0, you, 0, 0), L.Level.sidetex(level), S.Thinkers{[], []},
-        rnd, 0, S.Unended{}, usedown, [], face, False{}, S.Sim.secrets(level)})))
+        rnd, 0, S.Unended{}, usedown, [], face, False{}, S.Sim.totalsecret(level)})))
 
 # A new game at a place: G_InitNew clears the random indices, and
 # G_PlayerReborn hands out the pistol start with use down, so a key held
-# since before the level does nothing. M_Random's index stands at 64,
-# since the melt that wipes the level in draws once a screen column, 320.
+# since before the level does nothing. The first two commands precede
+# the startup melt and its 320 M_Random draws.
 def State.at(+level: L.Level, place: L.Level.Start) -> S.State:
-  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(), S.Sim.Face.start(64), True{})
+  State.at.spawned(level, place, H.Thing.spawn(level, 0), I.Inventory.start(),
+    S.Sim.Face.melt.wait(2, S.Sim.Face.start(0)), True{})
 
 def State.start(+level: L.Level) -> S.State:
   State.at(level, L.Level.start_of(level))
 
 # G_DoLoadLevel after a level that came before, which neither random
-# index restarts from: the map from its start with the player and use
-# as the caller hands them, and ST_Start's bar, whose melt draws M_Random
-# 320 times more.
-def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, +mrnd: U32, face: V.Vec) -> S.State:
+# index restarts from: the map from its start with the player, use and
+# attack as the caller hands them, and ST_Start's bar. Its melt waits
+# until the first ST_Ticker has chosen the face.
+def State.restarted(+level: L.Level, +rnd: U32, +inv: I.Inventory, +usedown: Bool, attackdown: Bool, +mrnd: U32,
+  face: V.Vec) -> S.State:
   State.at.spawned(level, L.Level.start_of(level), H.Thing.spawn(level, rnd), inv,
-    S.Sim.Face.restart(I.Inventory.weapons(inv), usedown, ((mrnd + 64 : U32) .&. 255 : U32), face), usedown)
+    S.Sim.Face.melt.wait(1, S.Sim.Face.restart(I.Inventory.weapons(inv), attackdown, mrnd, face)), usedown)
 
 # G_DoReborn's reload: the dead player's map again from a pistol start,
 # as G_PlayerReborn leaves the player.
 def State.reloaded(+level: L.Level, +dead: S.State) -> S.State:
-  State.restarted(level, S.State.rnd(dead), I.Inventory.start(), True{}, S.State.mrnd(dead), S.State.face(dead))
+  State.restarted(level, S.State.rnd(dead), I.Inventory.start(), True{}, True{}, S.State.mrnd(dead),
+    S.State.face(dead))
 
 # G_DoWorldDone's load: the next map, entered with the inventory
 # G_PlayerFinishLevel leaves, M_Random's index where the tally left it,
 # and use and attack down as WI_checkForAccelerate last saw them.
-def State.carried(+level: L.Level, +mrnd: U32, +down: Bool, +after: S.State) -> S.State:
-  State.restarted(level, S.State.rnd(after), I.Inventory.finished(S.Player.inv(S.State.player(after))), down, mrnd,
-    S.State.face(after))
+def State.carried(+level: L.Level, +mrnd: U32, +usedown: Bool, +attackdown: Bool, +after: S.State) -> S.State:
+  State.restarted(level, S.State.rnd(after), I.Inventory.finished(S.Player.inv(S.State.player(after))), usedown,
+    attackdown, mrnd, S.State.face(after))
 
 # Chasing
 # -------
@@ -112,10 +115,10 @@ def Sim.chase.landed(th: H.Thing, +level: L.Level, +x: U32, +y: U32, +floor: U32
 # P_UnsetThingPosition and P_SetThingPosition about a thing's move.
 def Sim.chase.placed(+th: H.Thing, +level: L.Level, +x: U32, +y: U32, +floor: U32, +ceil: U32, s: S.State) ->
   S.State:
-  S.State{player, lv, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, lv, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{player, lv, H.Things.moved(things, L.Level.blockmap_of(level), th,
     Sim.chase.landed(th, level, x, y, floor, ceil)), sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    mrnd, reborn, secrets}
+    mrnd, reborn, totalsecret}
 
 def Sim.chase.step.fin(taken: Bool, th: H.Thing, +id: U32, +level: L.Level, +ox: U32, +oy: U32, +x: U32,
   +y: U32, +r: U32, +floor: U32, +ceil: U32, s: S.State) -> S.Sim.Walk:
@@ -217,10 +220,10 @@ def Sim.chase.walked(w: S.Sim.Walk) -> S.Sim.Walk:
   match w:
     case S.Walk{False{}, id, s}:
       S.Walk{False{}, id, s}
-    case S.Walk{True{}, +id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}}:
+    case S.Walk{True{}, +id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}:
       +drawn = M.Random.next(rnd)
       S.Walk{True{}, id, S.Sim.thing.counted(id, H.Thing.hurt.movecount(), (M.Random.at(drawn) .&. 15 : U32),
-        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets})}
+        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})}
 
 def Sim.chase.walk(w: S.Sim.Walk, +level: L.Level) -> S.Sim.Walk:
   Sim.chase.walked(Sim.chase.move(w, level))
@@ -272,11 +275,11 @@ def Sim.chase.order(w: S.Sim.Walk, +d1: U32, +d2: U32, +back: U32, +far: Bool) -
   match w:
     case S.Walk{True{}, id, s}:
       Chase{S.Walk{True{}, id, s}, H.Thing.nodir(), H.Thing.nodir()}
-    case S.Walk{False{}, id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}}:
+    case S.Walk{False{}, id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}:
       +drawn = M.Random.next(rnd)
       Sim.chase.swapped(Bool.or(U32.is_lt(200, M.Random.at(drawn)), far),
         S.Walk{False{}, id,
-          S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets}},
+          S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}},
         d1, d2, back)
 
 def Sim.chase.axes(c: Sim.Chase, +level: L.Level) -> S.Sim.Walk:
@@ -305,10 +308,10 @@ def Sim.chase.search(w: S.Sim.Walk, +back: U32, +level: L.Level) -> S.Sim.Walk:
   match w:
     case S.Walk{True{}, id, s}:
       S.Walk{True{}, id, s}
-    case S.Walk{False{}, id, S.State{player, lv, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}}:
+    case S.Walk{False{}, id, S.State{player, lv, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}:
       +drawn = M.Random.next(rnd)
       Sim.chase.scan(8n, S.Walk{False{}, id,
-          S.State{player, lv, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets}},
+          S.State{player, lv, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}},
         Bool.pick(U32, U32.is_zero((M.Random.at(drawn) .&. 1 : U32)), 7, 0),
         U32.is_zero((M.Random.at(drawn) .&. 1 : U32)), back, level)
 
@@ -348,9 +351,7 @@ def Sim.chase.newdir(w: S.Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level)
   Sim.chase.newdir.at(S.Walk{ok, id, s}, deltax, deltay,
     S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.movedir()), level)
 
-# Doom's A_FaceTarget: the thing turns to face its target. Vanilla's
-# shadow branch, which spreads the turn at a target flagged MF_SHADOW, a
-# spectre or an invisible player, is not here yet.
+# Doom's A_FaceTarget: the thing turns to face its target.
 def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
   H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, +ai} = th
   H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),
@@ -444,10 +445,10 @@ def Sim.chase.gone(+id: U32, +s: S.State) -> S.Sim.Acted:
 # always fires.
 def Sim.chase.range.draw(+dist: U32, w: S.Sim.Walk) -> S.Sim.Walk:
   match w:
-    case S.Walk{ok, id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}}:
+    case S.Walk{ok, id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}:
       +drawn = M.Random.next(rnd)
       S.Walk{F.Fixed.ge(M.Random.at(drawn), dist), id,
-        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets}}
+        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}
 
 # P_CheckMissileRange's distance: the whole units between the two, 64
 # off for the range and 128 more where the type has no melee attack, and
@@ -497,11 +498,11 @@ def Sim.chase.stepped(spent: Bool, +deltax: U32, +deltay: U32, +level: L.Level, 
 # under 3 comes of it.
 def Sim.chase.sounded(+kind: U32, w: S.Sim.Walk) -> S.Sim.Acted:
   match w:
-    case S.Walk{ok, +id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}}:
+    case S.Walk{ok, +id, S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}}:
       +drawn = M.Random.next(rnd)
       S.Acted{None{}, S.Sim.sound(Bool.pick(U32, U32.is_lt(M.Random.at(drawn), 3), H.Thing.activesound(kind), 0),
         Sn.Thing{id},
-        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, secrets})}
+        S.State{player, level, things, sidetex, thinkers, drawn, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})}
 
 def Sim.chase.walks(+kind: U32, +id: U32, +deltax: U32, +deltay: U32, +movecount: U32, +level: L.Level,
   s: S.State) -> S.Sim.Acted:
@@ -638,13 +639,13 @@ def Sim.bullet.at(+x: U32, +y: U32, +shootz: U32, +id: U32, +angle: U32, +slope:
     slope, damage, s)
 
 def Sim.bullet(+x: U32, +y: U32, +shootz: U32, +id: U32, +bangle: U32, +slope: U32, s: S.State) -> S.State:
-  S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +a = M.Random.next(rnd)
   +b = M.Random.next(a)
   +c = M.Random.next(b)
   Sim.bullet.at(x, y, shootz, id, (bangle + ((M.Random.at(a) - M.Random.at(b) : U32) << 20n) : U32), slope,
     (3 * ((M.Random.at(c) % 5 : U32) + 1 : U32) : U32),
-    S.State{player, level, things, sidetex, thinkers, c, clock, ended, usedown, sounds, mrnd, reborn, secrets})
+    S.State{player, level, things, sidetex, thinkers, c, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 def Sim.posattack.body(m: S.Sim.Body, +id: U32, +angle: U32, +s: S.State) -> S.State:
   S.Body{i, +x, +y, +z, radius, +height, flags} = m
@@ -930,14 +931,14 @@ def Sim.think(t: S.Thinker, s: S.State) -> S.State:
   match t:
     case S.Mobj{id}:
       Sim.thing(id, s)
-    case S.Mover{sector, ceiling, speed, [], plan, noise}:
-      s
     case S.Mover{+sector, ceiling, speed, S.Hold{+tics} <> +rest, plan, +noise}:
       Sp.Sim.mover.kept(sector, ceiling, speed, Bool.pick(List<&2, S.Sim.Step>, U32.is_eq(tics, 1), rest,
         S.Hold{(tics - 1 : U32)} <> rest), plan, noise,
         S.Sim.sound(Bool.pick(U32, U32.is_eq(tics, 1), Sp.Sim.Noise.wake(noise), 0), Sn.Sector{sector}, s))
     case S.Mover{sector, ceiling, speed, S.Travel{down, dest} <> rest, plan, noise}:
       Sp.Sim.mover.move(sector, ceiling, speed, down, dest, rest, plan, noise, s)
+    case S.Mover{sector, ceiling, speed, steps, plan, noise}:
+      Sp.Sim.mover.kept(sector, ceiling, speed, steps, plan, noise, s)
     case S.Button{side, slot, texture, +tics}:
       Sp.Sim.button(U32.is_eq(tics, 1), side, slot, texture, tics, s)
     case S.Blink{sector, +count, dark, bright, darktime, brighttime, random}:
@@ -965,9 +966,9 @@ def Player.held(+x: U32, +y: U32, after: S.Player) -> S.Player:
 # would hold two states at once, and the budget of docs/bend.md's width
 # cap has no room for that.
 def State.held(geo: L.Level.Geo, +x: U32, +y: U32, after: S.State) -> S.State:
-  S.State{player, L.Level{g, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = after
+  S.State{player, L.Level{g, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = after
   S.State{Player.held(x, y, player), L.Level{geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, clock, ended,
-    usedown, sounds, mrnd, reborn, secrets}
+    usedown, sounds, mrnd, reborn, totalsecret}
 
 # P_PlayerThink's counters, the damage count's fade among them.
 def Sim.counters(p: S.Player) -> S.Player:
@@ -1030,11 +1031,11 @@ def Sim.thinkers.go(fuel: List<&2, S.Thinker>, +cmd: K.Cmd, +geo: L.Level.Geo, s
   match fuel s:
     case [] s:
       s
-    case f <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}:
-      S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
-    case f <> rest S.State{player, level, +things, sidetex, S.Thinkers{ran, +t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}:
+    case f <> rest S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
+      S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
+    case f <> rest S.State{player, level, +things, sidetex, S.Thinkers{ran, +t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
       Sim.thinkers.go(rest, cmd, geo, Sim.turn(Sim.mine(t, H.Things.you(things)), t, cmd, geo,
-        S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}))
+        S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))
 
 # Runs until none is due: the thinkers a run started run in the next, the
 # same tic, as those added to the tail of Doom's list do. The fuel is
@@ -1043,17 +1044,17 @@ def Sim.thinkers.all(fuel: Nat, +cmd: K.Cmd, +geo: L.Level.Geo, s: S.State) -> S
   match fuel s:
     case 0n s:
       s
-    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}:
-      S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
-    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, +t <> +due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}:
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
+      S.State{player, level, things, sidetex, S.Thinkers{ran, []}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
+    case 1n+f S.State{player, level, things, sidetex, S.Thinkers{ran, +t <> +due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}:
       Sim.thinkers.all(f, cmd, geo, Sim.thinkers.go(t <> due, cmd, geo,
-        S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}))
+        S.State{player, level, things, sidetex, S.Thinkers{ran, t <> due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))
 
 # The thinkers all due again, in the order they were started.
 def State.rested(s: S.State) -> S.State:
-  S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{player, level, things, sidetex, S.Thinkers{ran, due}, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{player, level, things, sidetex, S.Thinkers{[], List.append(&2, S.Thinker, List.reverse(&2, S.Thinker, ran), due)},
-    rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}
+    rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
 # Doom's P_RunThinkers.
 def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: S.State) -> S.State:
@@ -1064,7 +1065,7 @@ def Sim.thinkers(+cmd: K.Cmd, +geo: L.Level.Geo, s: S.State) -> S.State:
 def Sim.tic.kept(geo: L.Level.Geo, clock: U32, use: Bool, +after: S.State) -> S.State:
   S.State{S.State.player(after), L.Level{geo, L.Level.sectors(S.State.level(after)), L.Level.specials(S.State.level(after)), L.Level.alerted(S.State.level(after))},
     S.State.things(after), S.State.sidetex(after), S.State.thinkers.of(after), S.State.rnd(after), (clock + 1 : U32),
-    S.State.ended(after), use, S.State.sounds(after), S.State.face(after), S.State.reborn(after), S.State.secrets(after)}
+    S.State.ended(after), use, S.State.sounds(after), S.State.face(after), S.State.reborn(after), S.State.totalsecret(after)}
 
 # P_PlayerThink's counters, once the sprites have moved.
 def Sim.player.counted(+s: S.State) -> S.State:
@@ -1093,9 +1094,9 @@ def Sim.weapon.select(+cmd: K.Cmd, +s: S.State) -> S.State:
 # times, and a state the checker cannot compute, as a level no law
 # fixes leaves it, is compared once per read (docs/bend.md).
 def Sim.player.thinks(+cmd: K.Cmd, hurt: S.State) -> S.State:
-  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = hurt
+  S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = hurt
   Sim.player.counted(S.Sim.psprites.with(~Sim.damage.enter.acted, ~Sp.Sim.shoot, cmd, Sim.weapon.select(cmd, Sp.Sim.sector.secret(
-    S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets}))))
+    S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))))
 
 # Doom's P_PlayerThink for a living player, in its order: the move, the
 # eye, what the sector's special deals, then the player sprites and the
@@ -1141,9 +1142,9 @@ def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, 
 # back at. A_WeaponReady's attackdown stays set while an attack sequence
 # keeps that action from seeing a released command.
 def Sim.st.ticker(s: S.State) -> S.State:
-  S.State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  S.State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd)), reborn, secrets}
+    S.Sim.Face.melt.tic(S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd))), reborn, totalsecret}
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: S.State) -> S.State:
@@ -1154,10 +1155,10 @@ def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +
 
 def Sim.tic(+cmd: K.Cmd, s: S.State) -> S.State:
   match s:
-    case S.State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, S.Unended{}, +usedown, sounds, mrnd, reborn, secrets}:
+    case S.State{+player, L.Level{+geo, sectors, specials, heard}, things, sidetex, thinkers, rnd, +clock, S.Unended{}, +usedown, sounds, mrnd, reborn, totalsecret}:
       +level = {L.Level{geo, sectors, specials, heard} : L.Level}
       Sim.tic.live(cmd, level, geo, clock, usedown, S.Player.dead(player),
-        {S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, [], mrnd, reborn, secrets} : S.State})
+        {S.State{player, level, things, sidetex, thinkers, rnd, clock, S.Unended{}, usedown, [], mrnd, reborn, totalsecret} : S.State})
     case ended:
       ended
 

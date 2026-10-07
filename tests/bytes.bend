@@ -1,14 +1,8 @@
-# Bytes.read over files the test writes as ASCII text, and Bytes.hex.
-# Each line is a file's slots, its first five, and the sum of them all.
-# The expected values are worked out by hand: the slots are the
-# smallest power of two that holds the file, one for an empty file; 'a'
-# is 97, so "abc" sums to 97 + 98 + 99, 4096 of 'a' to 97 * 4096, which
-# fill their array, and a 'b' after them doubles it. Hex takes each
-# cell's low byte, so 427, 0x1ab, reads ab.
-# Then words: the bytes 78 56 34 12 assemble little-endian as
-# 0x12345678; a WAD's kind is 1 for "IWAD" and 2 for "PWAD", each read
-# as a little-endian word, and 0 for anything else; and a tree built
-# from 5 6 7 reads them back by position.
+# File capacity is a power of two bytes, at least four. ASCII a is 97,
+# abc sums to 294, and 4096 a bytes sum to 397312.
+# Binary bytes 00 ff 80 01 78 56 34 12 give little-endian words
+# 0180ff00, 34567801 and 12345678 at offsets 0, 3 and 4.
+# Hex uses the low byte. WAD kinds are the IWAD/PWAD little-endian words.
 import Base
 import ../src/bytes.bend as B
 import ../src/wad.bend as W
@@ -30,7 +24,7 @@ def summed(p: Array<U32> & List<&2, U32>) -> String:
 
 def sized(p: Array<U32> & U32) -> String:
   (a, +size) = p
-  U32.show(size) ++ " slots |" ++ summed(B.Bytes.list(a, 0, size))
+  U32.show((size * 4 : U32)) ++ " bytes |" ++ summed(B.Bytes.file.list(a, 0, (size * 4 : U32)))
 
 def wrote(p: File & Result<&1, &1, U32 & String, Unit>) -> IO(Unit):
   (file, done) = p
@@ -43,8 +37,21 @@ def show(tag: String, text: String) -> IO(Unit):
     bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read("bytes.scratch"))
     IO.print(tag ++ ": " ++ sized(Array.size(U32, bytes)))
 
+def words(p: Array<U32> & List<&2, U32>) -> IO(Unit):
+  (a, values) = p
+  IO.print("packed words" ++ ints(values))
+
+def binary() -> IO(Unit):
+  do IO<Unit>:
+    file : File <- IO.try(File, File.open("bytes.scratch", "w"))
+    IO.bind(File & Result<&1, &1, U32 & String, Unit>, Unit,
+      File.write_bytes(file, [0, 255, 128, 1, 120, 86, 52, 18]), wrote)
+    bytes : Array<U32> <- IO.try(Array<U32>, B.Bytes.read("bytes.scratch"))
+    words(B.Bytes.each(~U32, ~B.Bytes.file.u32, [0, 3, 4], bytes))
+
 def main() -> IO(Unit):
   do IO<Unit>:
+    binary()
     show("empty", "")
     show("a", "a")
     show("ab", "ab")
@@ -60,13 +67,14 @@ def main() -> IO(Unit):
     IO.print("vec" ++ ints([V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 0), V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 1),
       V.Vec.get(V.Vec.of_list([5, 6, 7], 3), 2)]))
 
-#|empty: 1 slots | 0 | sum 0
-#|a: 1 slots | 97 | sum 97
-#|ab: 2 slots | 97 98 | sum 195
-#|abc: 4 slots | 97 98 99 0 | sum 294
-#|abcde: 8 slots | 97 98 99 100 101 | sum 495
-#|4096 a: 4096 slots | 97 97 97 97 97 | sum 397312
-#|4096 a, b: 8192 slots | 97 97 97 97 97 | sum 397410
+#|packed words 25231104 878082049 305419896
+#|empty: 4 bytes | 0 0 0 0 | sum 0
+#|a: 4 bytes | 97 0 0 0 | sum 97
+#|ab: 4 bytes | 97 98 0 0 | sum 195
+#|abc: 4 bytes | 97 98 99 0 | sum 294
+#|abcde: 8 bytes | 97 98 99 100 101 | sum 495
+#|4096 a: 4096 bytes | 97 97 97 97 97 | sum 397312
+#|4096 a, b: 8192 bytes | 97 97 97 97 97 | sum 397410
 #|missing: opened False
 #|hex 00090a0f1080ffab
 #|le32 305419896
