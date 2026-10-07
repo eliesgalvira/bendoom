@@ -70,7 +70,7 @@ def Keys.numbers(ns: List<&2, Bool>, place: Nat, down: Bool) -> List<&2, Bool>:
           held <> Keys.numbers(rest, p, down)
 
 # The runtime's key codes: arrows 63232 up, 63233 down, 63234 left,
-# 63235 right; letters lower case; Shift 65592 and 65596; Space 32;
+# 63235 right; letters lower case; Shift 65592 and 65596; Space 32 and Enter 13;
 # Ctrl 65595 and 65598; the digits their characters, 1 at 49.
 def Keys.press(+code: U32, +down: Bool, keys: Keys) -> Keys:
   Keys{up, dn, left, right, sleft, sright, run, use, fire, numbers} = keys
@@ -81,7 +81,7 @@ def Keys.press(+code: U32, +down: Bool, keys: Keys) -> Keys:
     Keys.set(U32.is_eq(code, 97), down, sleft),
     Keys.set(U32.is_eq(code, 100), down, sright),
     Keys.set(U32.is_eq(code, 65592) || U32.is_eq(code, 65596), down, run),
-    Keys.set(U32.is_eq(code, 32), down, use),
+    Keys.set(U32.is_eq(code, 32) || U32.is_eq(code, 13), down, use),
     Keys.set(U32.is_eq(code, 65595) || U32.is_eq(code, 65598), down, fire),
     Keys.numbers(numbers, Keys.number(code), down)}
 
@@ -119,7 +119,7 @@ def Keys.change(ns: List<&2, Bool>, +change: U32) -> U32:
 # The command for held keys, with the tics the turn keys have been
 # held, this one included: the first five turn slowly. Opposite keys
 # cancel out, in U32's wrapping arithmetic. Ctrl is BT_ATTACK, Space
-# BT_USE.
+# and Enter BT_USE.
 def Keys.cmd(keys: Keys, +turnheld: U32) -> Cmd:
   Keys{up, down, left, right, sleft, sright, +run, use, fire, numbers} = keys
   +slow = U32.is_lt(turnheld, 6)
