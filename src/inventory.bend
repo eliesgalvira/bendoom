@@ -7,7 +7,8 @@ import ./sound.bend as Sn
 import ./message.bend as Msg
 
 # Health and armour; key bits; ammo and caps; backpack and weapon bits;
-# power timers; item, kill and secret counts; and pickup flash. The line
+# power timers and the fixed-colormap snapshot in slot 6; item, kill
+# and secret counts; and pickup flash. The line
 # packs message tics, message id, readyweapon and pendingweapon into
 # four bytes. Pending 255 means wp_nochange. Packing keeps the native
 # lane within its record-width budget (docs/bend.md).
@@ -16,7 +17,7 @@ type Inventory is Data:
     weapons: U32, powers: V.Vec, items: U32, bonus: U32, line: U32, kills: U32, secrets: U32}
 
 def Inventory.unpowered() -> V.Vec:
-  V.Vec.of_list([0, 0, 0, 0, 0, 0], 6)
+  V.Vec.of_list([0, 0, 0, 0, 0, 0, 0], 7)
 
 # The line with no message up, a weapon ready and none pending.
 def Inventory.readied(+ready: U32) -> U32:
@@ -217,11 +218,18 @@ def Inventory.infratics() -> U32:
 def Inventory.irontics() -> U32:
   2100
 
+def Inventory.blink(+tics: U32) -> Bool:
+  Bool.or(U32.is_gt(tics, 128), Bool.not(U32.is_zero((tics .&. 8 : U32))))
+
 # A power's counter: the tics a timed power has left, the computer map's
 # 1 once it is had, and the berserk power's count up from 1 while on.
 def Inventory.power.of(+power: U32, inv: Inventory) -> U32:
   Inventory{health, armour, armourtype, cards, ammo, caps, backpack, weapons, powers, items, bonus, line, kills, secrets} = inv
   V.Vec.get(powers, power)
+
+# Renderer selection saved by P_PlayerThink before thinker pickups.
+def Inventory.fixedcolormap(inv: Inventory) -> U32:
+  Inventory.power.of(6, inv)
 
 def Inventory.strength(+inv: Inventory) -> U32:
   Inventory.power.of(Inventory.pw_strength(), inv)
@@ -530,7 +538,8 @@ def Inventory.powers.tic(+powers: V.Vec) -> V.Vec:
   +strong = Inventory.power.tic(powers, Inventory.pw_strength(), 1)
   +unseen = Inventory.power.tic(strong, Inventory.pw_invisibility(), Inventory.down())
   +lit = Inventory.power.tic(unseen, Inventory.pw_infrared(), Inventory.down())
-  Inventory.power.tic(lit, Inventory.pw_ironfeet(), Inventory.down())
+  V.Vec.set(Inventory.power.tic(lit, Inventory.pw_ironfeet(), Inventory.down()), 6,
+    Bool.pick(U32, Inventory.blink(V.Vec.get(lit, Inventory.pw_infrared())), 1, 0))
 
 # P_PlayerThink's counters, with HU_Ticker's: the powers', the flash's,
 # which fades by one a tic, and the heads-up line's, which does too and

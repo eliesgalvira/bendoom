@@ -146,16 +146,16 @@ def main() -> IO(Unit):
         S.Sim.face.pain(60), S.Sim.face.pain(59), S.Sim.face.pain(40), S.Sim.face.pain(39),
         S.Sim.face.pain(20), S.Sim.face.pain(19), S.Sim.face.pain(0)]))
     IO.print("palette count 0 1 8 9 64 100:"
-      ++ Fx.words([Y.Bar.palette(0, 0, 0), Y.Bar.palette(1, 0, 0), Y.Bar.palette(8, 0, 0),
-        Y.Bar.palette(9, 0, 0), Y.Bar.palette(64, 0, 0), Y.Bar.palette(100, 0, 0)]))
+      ++ Fx.words([Y.Bar.palette(0, 0, 0, 0), Y.Bar.palette(1, 0, 0, 0), Y.Bar.palette(8, 0, 0, 0),
+        Y.Bar.palette(9, 0, 0, 0), Y.Bar.palette(64, 0, 0, 0), Y.Bar.palette(100, 0, 0, 0)]))
     IO.print("palette flash 1 6 8 9 25:"
-      ++ Fx.words([Y.Bar.palette(0, 0, 1), Y.Bar.palette(0, 0, 6), Y.Bar.palette(0, 0, 8),
-        Y.Bar.palette(0, 0, 9), Y.Bar.palette(0, 0, 25)]))
+      ++ Fx.words([Y.Bar.palette(0, 0, 1, 0), Y.Bar.palette(0, 0, 6, 0), Y.Bar.palette(0, 0, 8, 0),
+        Y.Bar.palette(0, 0, 9, 0), Y.Bar.palette(0, 0, 25, 0)]))
     IO.print("palette berserk 1 256 768 4096:"
-      ++ Fx.words([Y.Bar.palette(0, 1, 0), Y.Bar.palette(0, 256, 0), Y.Bar.palette(0, 768, 0),
-        Y.Bar.palette(0, 4096, 0)]))
+      ++ Fx.words([Y.Bar.palette(0, 1, 0, 0), Y.Bar.palette(0, 256, 0, 0), Y.Bar.palette(0, 768, 0, 0),
+        Y.Bar.palette(0, 4096, 0, 0)]))
     IO.print("palette count 100 berserk 1, berserk 768 flash 6:"
-      ++ Fx.words([Y.Bar.palette(100, 1, 0), Y.Bar.palette(0, 768, 6)]))
+      ++ Fx.words([Y.Bar.palette(100, 1, 0, 0), Y.Bar.palette(0, 768, 6, 0)]))
     IO.print("meets:" ++ meets(Fx.Closed.met(Fx.Closed.barrel())))
     IO.print("use reaches " ++ reach(Fx.Closed.reach(Fx.Closed.barrel())))
     IO.print("random at 0 1 2 3 255:" ++ Fx.words([M.Random.at(0), M.Random.at(1), M.Random.at(2), M.Random.at(3), M.Random.at(255)]))
