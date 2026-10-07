@@ -898,6 +898,14 @@ def Gfx.sprite.def.rows(d: H.Thing.Def, +n: Nat, marks: V.Vec) -> V.Vec:
   H.Def{kind, +state, radius, height, flags} = d
   Gfx.sprite.chase(n, False{}, state, state, marks)
 
+def Gfx.sprite.spawned(kinds: List<&2, U32>, +n: Nat, marks: V.Vec) -> V.Vec:
+  match kinds:
+    case []:
+      marks
+    case +kind <> rest:
+      Gfx.sprite.spawned(rest, n, Gfx.sprite.woken(kind, n,
+        Gfx.sprite.def.rows(H.Thing.info(kind), n, marks)))
+
 # The state rows the level and runtime drops can spawn, the weapons,
 # the chaingun's second flash, which A_FireCGun sets and no row leads
 # to, and every row those entry points lead to, each once, in order.
@@ -908,13 +916,8 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +marks = Gfx.sprite.weapons(H.Thing.weapons(), n, marks)
   +second = (H.Thing.Weapon.flash(H.Thing.chaingun()) + 1 : U32)
   +marks = Gfx.sprite.chase(n, False{}, second, second, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(2007), n, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(2001), n, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.puff()), n, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.blood()), n, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.fireball()), n, marks)
-  +marks = Gfx.sprite.def.rows(H.Thing.info(H.Thing.tfog()), n, marks)
-  +marks = Gfx.sprite.hurt(H.Thing.fireball(), n, marks)
+  +marks = Gfx.sprite.spawned([2007, 2001, H.Thing.puff(), H.Thing.blood(), H.Thing.fireball(),
+    H.Thing.tfog(), H.Thing.baronball()], n, marks)
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, marks))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:

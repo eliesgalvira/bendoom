@@ -4,11 +4,11 @@
 
 **What to build:** Typed monster missiles and vanilla baron attacks, pain, death and sounds. The shared missile path must run death-entry actions before randomizing explosion duration, including vertical impacts. E1M8 boss-death floor behavior belongs to ticket 19.
 
-**Blocked by:** Explicit approval of ticket 12's reviewed law changes before either branch lands. Longer ticket 15 acceptance waits for root's next release.
+**Remaining:** Native checks, proof and gameplay/audio acceptance. Ticket 12's law and landing were approved on October 7.
 
 **Status:** ready-for-agent
 
-Typed spawn/impact metadata and baron rows 292–299 use projectile kind 4294967291. Runtime BAL7 sprite loading is mandatory unfinished source work: the sprite loader currently marks the imp ball and teleport fog explicitly, so the new definition alone does not load the baron ball. Add its flight and death graphs through the existing traversal before any rendering acceptance.
+Typed spawn/impact metadata and baron rows 292–299 use projectile kind 4294967291. Runtime BAL7 loading now follows the existing spawn and hurt graph traversals alongside the other runtime effects. The shared missile callback runs the entered row's action before randomizing its duration; plain death rows preserve plain state entry.
 
 - [ ] On E1M8, visible baron ball mid-flight and impact compare with Chocolate Doom with zero differing pixels.
 - [ ] The imp's existing tests and frame pins pass unchanged on native and JavaScript.
@@ -18,4 +18,4 @@ Typed spawn/impact metadata and baron rows 292–299 use projectile kind 4294967
 
 Expected values come from installed Chocolate Doom source and WAD data. Rest-frame oracles remain zero; no masks or frame repins may hide mismatches.
 
-Validation is unverified. The first sim JavaScript comparison failed only because the new internal projectile kind was absent from the type-inventory expectation. Its zero count was confirmed directly from Freedoom E1M1 THINGS and the expectation was corrected. The retry did not run and proof/native/captures remain pending.
+The sim and source-derived focused baron JavaScript checks pass. Proof reached the known Enter-key binding mismatch from ticket 14; the reviewed one-expression correction is merged for retry. The earlier type-inventory expectation was corrected from a direct Freedoom E1M1 THINGS query; no behavior or frame pins changed. The queued native/proof batch was cancelled before acquisition for review scheduling. The loader fold still needs compilation through a graphics consumer. Proof, native checks/products/width, visual oracles and exact audio acceptance remain pending.
