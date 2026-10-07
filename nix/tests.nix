@@ -1,4 +1,4 @@
-{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom, sounds }:
+{ lib, llvmPackages_19, bend, bun, alsa-lib, freedoom }:
 
 let
   inherit (lib.fileset) toSource unions difference;
@@ -24,7 +24,6 @@ llvmPackages_19.stdenv.mkDerivation {
   buildInputs = optionals llvmPackages_19.stdenv.hostPlatform.isLinux (singleton alsa-lib);
 
   BENDOOM_IWAD = "${freedoom}/share/games/doom/freedoom1.wad";
-  BENDOOM_SOUNDS = sounds;
 
   buildPhase = /* bash */ ''
     runHook preBuild
