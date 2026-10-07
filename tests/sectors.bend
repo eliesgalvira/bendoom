@@ -16,6 +16,7 @@ import ../src/level.bend as L
 import ../src/sim.bend as S
 import ../src/special.bend as Sp
 import ../src/sound.bend as Sn
+import ../src/inventory.bend as I
 import ./fixtures/closed.bend as Fx
 
 def line(~seen: S.State -> String, tag: String, +s: S.State) -> String:
@@ -111,6 +112,12 @@ def m_random(s: S.State) -> String:
 
 def p_random(s: S.State) -> String:
   " p_random " ++ U32.show(S.State.rnd(s))
+
+def spawned(s: S.State) -> String:
+  S.State{player, +level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, secrets} = s
+  " light " ++ U32.show(L.Level.sector.light(level, 1)) ++ " p_random " ++ U32.show(rnd) ++
+    " sector_special " ++ U32.show(L.Level.sector.special(level, 1))
+
 
 # The player's place, facing, momentum, heights and eye, and whether the
 # rest of it is as it began: no line crossed, G_PlayerReborn's inventory,
@@ -315,6 +322,29 @@ def lights() -> IO(Unit):
     watch(~light, "strobe beside 96", [1n, 34n, 1n, 4n, 1n], Fx.Closed.lit(12, 96))
     watch(~light, "strobe beside 160", [35n, 5n], Fx.Closed.idled(1n, Fx.Closed.lit(12, 160)))
     watch(~light, "glow", [6n, 1n, 1n, 5n, 1n, 1n], Fx.Closed.idled(1n, Fx.Closed.lit(8, 96)))
+    watch(~spawned, "fast strobe", [6n, 15n, 5n], Fx.Closed.lit(2, 96))
+    watch(~spawned, "slow strobe", [6n, 35n, 5n], Fx.Closed.lit(3, 96))
+    watch(~spawned, "sync fast strobe", [1n, 15n, 5n], Fx.Closed.lit(13, 96))
+
+
+def damage.seen(+s: S.State) -> String:
+  " health " ++ U32.show(I.Inventory.health(S.Player.inv(S.State.player(s)))) ++
+    " flash " ++ U32.show(S.Sim.Hurt.damage(S.Player.hurt(S.State.player(s)))) ++ p_random(s)
+
+def damage.start(suit: U32, rnd: U32) -> S.State:
+  S.State.rnd.put(rnd, S.State.player.put(Fx.Closed.west(),
+    S.Player.holding(Fx.Closed.player(2097152, 4194304, 0, 8388608),
+      I.Inventory.power(I.Inventory.pw_ironfeet(), suit, I.Inventory.start()))))
+
+# P_PlayerInSpecialSector gates damage on clock&31; suit leakage rolls even between hits.
+def damage() -> IO(Unit):
+  do IO<Unit>:
+    IO.print("20 percent" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 0, damage.start(0, 0))))
+    IO.print("between hits" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 1, damage.start(0, 0))))
+    IO.print("airborne" ++ damage.seen(Sp.Sim.sector.grounded(False{}, 16, 0, damage.start(0, 0))))
+    IO.print("suit blocks nukage" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 7, 0, damage.start(1, 0))))
+    IO.print("suit leak between hits" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 1, damage.start(1, 255))))
+    IO.print("suit leaks" ++ damage.seen(Sp.Sim.sector.grounded(True{}, 16, 0, damage.start(1, 255))))
 
 def main() -> IO(Unit):
   do IO<Unit>:
@@ -328,6 +358,7 @@ def main() -> IO(Unit):
     crushed.lift()
     places()
     lights()
+    damage()
 
 #|door tic 1 ceiling 2.000000
 #|door tic 33 ceiling 66.000000
@@ -416,3 +447,25 @@ def main() -> IO(Unit):
 #|glow tic 14 light 152
 #|glow tic 15 light 152
 #|glow tic 16 light 144
+
+# P_SpawnStrobeFlash consumes entry2=109: (109&7)+1=6; synced count1 consumes none.
+#|fast strobe tic 0 light 160 p_random 2 sector_special 0
+#|fast strobe tic 6 light 96 p_random 2 sector_special 0
+#|fast strobe tic 21 light 160 p_random 2 sector_special 0
+#|fast strobe tic 26 light 96 p_random 2 sector_special 0
+#|slow strobe tic 0 light 160 p_random 2 sector_special 0
+#|slow strobe tic 6 light 96 p_random 2 sector_special 0
+#|slow strobe tic 41 light 160 p_random 2 sector_special 0
+#|slow strobe tic 46 light 96 p_random 2 sector_special 0
+#|sync fast strobe tic 0 light 160 p_random 1 sector_special 0
+#|sync fast strobe tic 1 light 96 p_random 1 sector_special 0
+#|sync fast strobe tic 16 light 160 p_random 1 sector_special 0
+#|sync fast strobe tic 21 light 96 p_random 1 sector_special 0
+
+# Source m_random.c entries0=0 and1=8; a surviving damage hit takes a pain roll.
+#|20 percent health 80 flash 20 p_random 1
+#|between hits health 100 flash 0 p_random 0
+#|airborne health 100 flash 0 p_random 0
+#|suit blocks nukage health 100 flash 0 p_random 0
+#|suit leak between hits health 100 flash 0 p_random 0
+#|suit leaks health 80 flash 20 p_random 1
