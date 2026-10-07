@@ -105,13 +105,13 @@ def tics(gaps: List<&2, U32>, +level: L.Level, +at: U32, play: W.Play) -> IO(W.P
           run(U32.to_nat(gap), level, play))
         tics(rest, level, (at + gap : U32), shown)
 
-# Where the player stands, the special of the sector under it, whether
-# that sector's secret is still to count, and how many it has counted.
+# The player's place and original sector special, live secret eligibility
+# and discoveries.
 def secret.line(tag: String, +level: L.Level, +s: S.State, +p: S.Player, +sector: U32) -> String:
   tag ++ " tic " ++ U32.show(S.State.clock(s)) ++ " at " ++ F.Fixed.show(S.Player.x(p)) ++ " "
     ++ F.Fixed.show(S.Player.y(p)) ++ " sector " ++ U32.show(sector) ++ " special "
     ++ U32.show(L.Level.sector.special(level, sector)) ++ " left "
-    ++ U32.show(V.Vec.get(S.State.secrets(s), sector)) ++ " counted "
+    ++ U32.show(Bool.to_u32(U32.is_eq(L.Level.sector.special(S.State.level(s), sector), 9))) ++ " counted "
     ++ U32.show(I.Inventory.secrets(S.Player.inv(p)))
 
 def secret.at(tag: String, +level: L.Level, +s: S.State, +p: S.Player) -> String:
@@ -291,14 +291,61 @@ def soundcheck(+level: L.Level) -> IO(Unit):
       ++ sounds(held(1n, 0, 0, 0, True{}), level, p1, ""))
     return Unit{}
 
+def secret.original(level: L.Level) -> S.State:
+  Tic.State.at(level, L.Start{F.Fixed.of_map(400), F.Fixed.of_map(2040), A.Angle.of_thing(270)})
+
 def secrets(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
-    s0 : S.State <- secret("in the secret", level, Tic.State.at(level, L.Start{F.Fixed.of_map(400),
-      F.Fixed.of_map(2040), A.Angle.of_thing(270)}))
+    s0 : S.State <- secret("in the secret", level, secret.original(level))
     s1 : S.State <- secret("stood a tic", level, Tic.Sim.tic(K.Cmd.idle(), s0))
     s2 : S.State <- secret("out south", level, Tic.Sim.replay(out(), s1))
     s3 : S.State <- secret("back north", level, Tic.Sim.replay(back(), s2))
     return Unit{}
+
+# p_spec.c counts initial special 9 in P_SpawnSpecials, then discovers
+# only live special 9 at floor height and clears it. p_floor.c's special
+# copies and p_plats.c's clears never change that initial total.
+def secret.changed(+special: U32, +s: S.State) -> S.State:
+  +level = S.State.level(s)
+  +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
+  Sp.Sim.floor.change(sector, L.Level.floorpic(level, sector), special, s)
+
+def secret.tally.of(t: S.Sim.Tally) -> String:
+  S.Tally{kills, items, secrets, maxkills, maxitems, maxsecret, time} = t
+  U32.show(secrets) ++ "/" ++ U32.show(maxsecret)
+
+def secret.tally(tag: String, +s: S.State) -> String:
+  tag ++ " secrets " ++ secret.tally.of(S.Sim.tally(s)) ++ " special "
+    ++ U32.show(L.Level.sector.special(S.State.level(s),
+      L.Level.sector_at(S.State.level(s), S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))))
+
+def secret.copied(level: L.Level) -> S.State:
+  Sp.Sim.sector.secret(secret.changed(9,
+    Tic.State.at(level, L.Start{F.Fixed.of_map(400), F.Fixed.of_map(1936), A.Angle.of_thing(270)})))
+
+def secret.recopied(n: Nat, s: S.State) -> S.State:
+  match n:
+    case 0n:
+      s
+    case 1n+m:
+      secret.recopied(m, Sp.Sim.sector.secret(secret.changed(9, s)))
+
+def secret.airborne(+s: S.State) -> S.State:
+  +level = S.State.level(s)
+  +p = S.State.player(s)
+  +sector = L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))
+  Sp.Sim.sector.secret(S.State.player.put(s, S.Player.at.fin(S.Player.x(p), S.Player.y(p), S.Player.angle(p),
+    (L.Level.floor(level, sector) + F.Fixed.unit() : U32), L.Level.ceil(level, sector), S.Player.inv(p))))
+
+def secret.totals(+level: L.Level) -> IO(Unit):
+  do IO<Unit>:
+    IO.print(secret.tally("cleared", Sp.Sim.sector.secret(secret.changed(0, secret.original(level)))))
+    IO.print(secret.tally("found", Sp.Sim.sector.secret(secret.original(level))))
+    IO.print(secret.tally("found again", Sp.Sim.sector.secret(Sp.Sim.sector.secret(secret.original(level)))))
+    IO.print(secret.tally("copied", secret.copied(level)))
+    IO.print(secret.tally("copied again", Sp.Sim.sector.secret(secret.changed(9, secret.copied(level)))))
+    IO.print(secret.tally("copies exceed total", secret.recopied(4n, secret.copied(level))))
+    IO.print(secret.tally("airborne", secret.airborne(secret.original(level))))
 
 # WI_checkForAccelerate permits a new attack while use stays held,
 # then a new use while attack stays held; neither held button repeats.
@@ -363,6 +410,7 @@ def play(+level: L.Level) -> IO(Unit):
     didsecret(level)
     soundcheck(level)
     secrets(level)
+    secret.totals(level)
     IO.print(buttons())
     IO.print(pointers(level))
     IO.print(random.draws())
@@ -428,6 +476,13 @@ def main() -> IO(Unit):
 #|stood a tic tic 1 at 400.000000 2040.000000 sector 86 special 9 left 0 counted 1
 #|out south tic 24 at 400.037475 1935.800521 sector 87 special 0 left 0 counted 1
 #|back north tic 48 at 400.011810 1994.541183 sector 86 special 9 left 0 counted 1
+#|cleared secrets 0/4 special 0
+#|found secrets 1/4 special 0
+#|found again secrets 1/4 special 0
+#|copied secrets 1/4 special 0
+#|copied again secrets 2/4 special 0
+#|copies exceed total secrets 5/4 special 0
+#|airborne secrets 0/4 special 9
 
 #|buttons True False False True down True False
 

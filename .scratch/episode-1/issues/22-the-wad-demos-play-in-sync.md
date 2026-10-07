@@ -4,7 +4,7 @@
 
 **What to build:** DEMO1 (E1M5, 5,026 tics), DEMO2 (E1M3, 3,836 tics) and DEMO3 (E1M7, 2,134 tics) of DOOM1.WAD replay in Bendoom to their last tic without drifting from Chocolate Doom. Find and fix each desync at its cause; a fix that belongs to another ticket's mechanic is fixed here, with the cause named in the report.
 
-**Blocked by:** 09, 10, 11, 12, 13, 15, 16, 17, 18, 20
+**Blocked by:** 09, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21
 
 **Status:** ready-for-agent
 
@@ -12,6 +12,10 @@
 - [ ] Before reporting a desync, rule out the oracle (see `docs/agents/orchestrator.md`).
 - [ ] If Freedoom's DEMO1 (E1M6, Hurt Me Plenty) also replays in sync, pin it as a flake-check test; if not, report its first diverging tic and the missing mechanic.
 - [ ] The README's project status describes the episode.
+- [ ] All nine map start views match Chocolate Doom with zero differing pixels on the final episode build, as spec 54 requires.
+- [ ] Each map song has a zero-sample-difference comparison through `tools/listen.nu`, as spec 56 requires. Keep valid earlier evidence where the relevant path is unchanged; one map's song does not establish the others.
+- [ ] The final browser build passes the episode parity checks required by spec 51, with music and sound effects from the opened WAD.
+- [ ] E1M6 and E1M9 hold 35 tics/s with music synthesizing and no audio underruns, using the window bench's counter as specified in spec 57.
 
 ## Baseline (ticket 02, 2026-10-02)
 
