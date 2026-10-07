@@ -146,7 +146,7 @@ The work lands in tiers. Each tier is a coherent build to play, and the overnigh
   - `tests/route.bend` and `tests/tally.bend`
   - `tools/oracle.nu` with `--screen tally`
   - `tools/listen.nu`
-  - `tests/sounds.bend` and `tests/mixer.bend`
+  - `tests/sfx.bend` and `tests/mixer.bend`
   - the frame hashes in `tests/render.bend`
 
 ## Out of Scope
