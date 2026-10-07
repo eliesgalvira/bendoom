@@ -672,8 +672,16 @@ def carry(tag: String, n: Nat, cmd: K.Cmd, sectors: List<&2, U32>, +id: U32, s: 
     IO.print(Run.log(r) ++ watch(tag, sectors, q) ++ bounded(H.Things.get(S.State.things(q), id)))
     return q
 
+def patch.byte.put(+at: U32, b: U32, p: Array<U32> & U32) -> Array<U32>:
+  (a, +word) = p
+  +shift = U32.to_nat(((at .&. 3 : U32) * 8 : U32))
+  Array.set(U32, a, (at >> 2n : U32), ((word - (word .&. (255 << shift))) .|. (b << shift) : U32))
+
+def patch.byte(a: Array<U32>, +at: U32, b: U32) -> Array<U32>:
+  patch.byte.put(at, b, a[(at >> 2n : U32)])
+
 def patch.word(a: Array<U32>, +at: U32, +w: U32) -> Array<U32>:
-  Array.set(U32, Array.set(U32, a, at, (w .&. 255 : U32)), (at + 1 : U32), (w >> 8n : U32))
+  patch.byte(patch.byte(a, at, (w .&. 255 : U32)), (at + 1 : U32), (w >> 8n : U32))
 
 # THINGS record i made a thing of a type at (x, y) in map units, on
 # every skill, in the WAD's bytes, whose E1M1 THINGS lump starts at pos.
