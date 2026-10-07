@@ -75,20 +75,16 @@ def Test.step(+sounds: List<&2, C.Channel.Sound>, +tag: String, e: Sn.Sound.Even
   IO(List<&2, Maybe<&2, C.Channel>>):
   Test.told(tag, C.Channel.hear(sounds, [e], chans))
 
-# The bank, deck and channels after the frames mixed so far, in order.
-type Test.Mix is Type:
-  Mix{bank: C.Channel.Bank, deck: S.Song.Deck, chans: List<&2, Maybe<&2, C.Channel>>, words: List<&2, U32>}
-
-def Test.took(acc: List<&2, U32>, w: A.Stream.Window) -> Test.Mix:
+def Test.took(acc: List<&2, U32>, w: A.Stream.Window) -> A.Stream.Window:
   A.Window{bank, deck, chans, words} = w
-  Mix{bank, deck, chans, List.append(&2, U32, acc, words)}
+  A.Window{bank, deck, chans, List.append(&2, U32, acc, words)}
 
-def Test.take(+n: U32, m: Test.Mix) -> Test.Mix:
-  Mix{bank, deck, +chans, acc} = m
+def Test.take(+n: U32, m: A.Stream.Window) -> A.Stream.Window:
+  A.Window{bank, deck, +chans, acc} = m
   Test.took(acc, A.Stream.window(n, deck, chans, bank))
 
 # A window of each of the frame counts.
-def Test.run(sizes: List<&2, U32>, m: Test.Mix) -> Test.Mix:
+def Test.run(sizes: List<&2, U32>, m: A.Stream.Window) -> A.Stream.Window:
   match sizes:
     case []:
       m
@@ -114,25 +110,25 @@ def Test.sizes() -> List<&2, U32>:
   [1, 7, 100, 2048, 33, 999, 3072, 5, 3072, 3072, 3072, 3072]
 
 # The grunt alone, over a deck that plays no song.
-def Test.alone(m: Test.Mix) -> IO(C.Channel.Bank):
-  Mix{bank, deck, +chans, +words} = m
+def Test.alone(m: A.Stream.Window) -> IO(C.Channel.Bank):
+  A.Window{bank, deck, +chans, +words} = m
   do IO<C.Channel.Bank>:
     IO.print("grunt " ++ U32.show(H.Fnv.words(List.take(&2, U32, words, 16996n))) ++ " "
       ++ String.join(Test.frames(words, [0, 1, 3, 2714, 16995, 16996]), " "))
     IO.print("after " ++ String.join(Test.table(chans), " "))
     return bank
 
-def Test.song.done(m: Test.Mix) -> IO(Unit):
-  Mix{bank, deck, +chans, +words} = m
+def Test.song.done(m: A.Stream.Window) -> IO(Unit):
+  A.Window{bank, deck, +chans, +words} = m
   do IO<Unit>:
     IO.print("song " ++ U32.show(H.Fnv.words(words)) ++ " "
       ++ String.join(Test.frames(words, [0, 1, 2155, 2156, 2157, 15480]), " "))
     IO.print("playing " ++ String.join(Test.table(chans), " "))
 
-def Test.song.on(+sounds: List<&2, C.Channel.Sound>, m: Test.Mix) -> Test.Mix:
-  Mix{bank, deck, chans, acc} = m
+def Test.song.on(+sounds: List<&2, C.Channel.Sound>, m: A.Stream.Window) -> A.Stream.Window:
+  A.Window{bank, deck, chans, acc} = m
   Test.run([33, 999, 3072, 5, 3072, 3072, 3072],
-    Mix{bank, deck, C.Channel.hear(sounds, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], chans), acc})
+    A.Window{bank, deck, C.Channel.hear(sounds, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], chans), acc})
 
 def Test.started(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
   (deck, idle) = p
@@ -140,9 +136,9 @@ def Test.started(p: S.Song.Deck & List<&2, U32>) -> S.Song.Deck:
 
 # The song from its first frame, after the chip's first buffer, with a
 # door from that frame and the grunt from 2156.
-def Test.song(+sounds: List<&2, C.Channel.Sound>, deck: S.Song.Deck, bank: C.Channel.Bank) -> Test.Mix:
+def Test.song(+sounds: List<&2, C.Channel.Sound>, deck: S.Song.Deck, bank: C.Channel.Bank) -> A.Stream.Window:
   Test.song.on(sounds, Test.run([1, 7, 100, 2048],
-    Mix{bank, Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))),
+    A.Window{bank, Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))),
       C.Channel.hear(sounds, [Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}], C.Channel.none()), []}))
 
 def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
@@ -188,7 +184,7 @@ def Test.all.go(+deck: S.Song.Deck, bank: C.Channel.Bank) -> IO(Unit):
   C.Bank{frames, +sounds} = bank
   do IO<Unit>:
     Test.script(sounds)
-    rest : C.Channel.Bank <- Test.alone(Test.run(Test.sizes(), Mix{C.Bank{frames, sounds}, deck,
+    rest : C.Channel.Bank <- Test.alone(Test.run(Test.sizes(), A.Window{C.Bank{frames, sounds}, deck,
       C.Channel.hear(sounds, [Sn.Start{Sn.Sound.noway(), Sn.Nobody{}, 64, 128}], C.Channel.none()), []}))
     Test.song.done(Test.song(sounds, deck, rest))
     IO.print("postmix " ++ Test.frame(A.Stream.post([(35536 << 16n : U32)],
