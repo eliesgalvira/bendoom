@@ -198,18 +198,32 @@ def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx
     case Some{Stream{audio, deck, chans, bank, dry}}:
       Some{Stream{audio, deck, C.Channel.update(~Ctx, ~params, ctx, chans), bank, dry}}
 
-def Stream.loaded(+songs: List<&2, String>, +rows: List<&2, Sn.Sound.Sfx>, +lumps: List<&2, List<&2, U32>>) ->
-  S.Song.Deck & C.Channel.Bank:
-  (S.Song.Deck.of(songs, List.drop(&2, List<&2, U32>, lumps, List.length(&2, Sn.Sound.Sfx, rows))),
-    C.Channel.bank(rows, lumps))
+def Stream.read.songs(songs: List<&2, String>, bank: C.Channel.Bank,
+  p: Array<U32> & List<&2, List<&2, U32>>) -> Array<U32> & S.Song.Deck & C.Channel.Bank:
+  (a, lumps) = p
+  (a, S.Song.Deck.of(songs, lumps), bank)
 
-# The named songs, with GENMIDI, and the sounds of the table's rows given,
-# expanded, all read from the WAD BENDOOM_IWAD names in one pass.
-def Stream.load(+songs: List<&2, String>, +rows: List<&2, Sn.Sound.Sfx>) -> IO(S.Song.Deck & C.Channel.Bank):
+def Stream.read.bank(+songs: List<&2, String>, dir: List<&2, W.Wad.Lump>, p: Array<U32> & C.Channel.Bank) ->
+  Array<U32> & S.Song.Deck & C.Channel.Bank:
+  (a, bank) = p
+  Stream.read.songs(songs, bank, W.Wad.lumps("GENMIDI" <> songs, dir, a))
+
+# Songs and sounds expanded from the same opened WAD the graphics reads.
+# Only one sound's raw bytes are held while its samples enter the bank.
+def Stream.read(songs: List<&2, String>, rows: List<&2, Sn.Sound.Sfx>, p: Array<U32> & List<&2, W.Wad.Lump>) ->
+  Array<U32> & S.Song.Deck & C.Channel.Bank:
+  (a, +dir) = p
+  Stream.read.bank(songs, dir, C.Channel.load(rows, (a, dir)))
+
+def Stream.load.done(p: Array<U32> & S.Song.Deck & C.Channel.Bank) -> S.Song.Deck & C.Channel.Bank:
+  (a, deck, bank) = p
+  (deck, bank)
+
+# The standalone mixer bench and tests read the same runtime bank.
+def Stream.load(songs: List<&2, String>, rows: List<&2, Sn.Sound.Sfx>) -> IO(S.Song.Deck & C.Channel.Bank):
   do IO<S.Song.Deck & C.Channel.Bank>:
-    path : String <- IO.try(String, IO.get_env("BENDOOM_IWAD"))
-    lumps : List<&2, List<&2, U32>> <- W.Wad.read(path, List.append(&2, String, C.Channel.lumps(rows), "GENMIDI" <> songs))
-    return Stream.loaded(songs, rows, lumps)
+    wad : Array<U32> & List<&2, W.Wad.Lump> <- W.Wad.open()
+    return Stream.load.done(Stream.read(songs, rows, wad))
 
 # A game with no sound device says so once and plays on in silence.
 def Stream.silent() -> IO(Maybe<Stream>):
