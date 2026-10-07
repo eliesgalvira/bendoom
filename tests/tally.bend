@@ -54,7 +54,7 @@ def replayed(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play) -> W.Play:
     case []:
       play
     case cmd <> rest:
-      replayed(rest, level, W.Play.Step.play(W.Play.step(level, cmd, False{}, play)))
+      replayed(rest, level, W.Play.Step.play(W.Play.step(level, cmd, play)))
 
 # The play after so many idle tics.
 def run(n: Nat, +level: L.Level, play: W.Play) -> W.Play:
@@ -83,7 +83,7 @@ def sounds(script: List<&2, K.Cmd>, +level: L.Level, play: W.Play, log: String) 
     case []:
       log
     case +cmd <> rest:
-      +step = W.Play.step(level, cmd, False{}, play)
+      +step = W.Play.step(level, cmd, play)
       sounds(rest, level, W.Play.Step.play(step), log ++ sound.line(W.Play.Step.sounds(step), W.Play.Step.play(step)))
 
 # A tic of use, which the tally reads as a press, after a tic of none.
@@ -203,7 +203,7 @@ def carries(tag: String, play: W.Play) -> String:
 def entered(+level: L.Level, play: W.Play) -> W.Play:
   match play:
     case W.Showing{wi, after, trip}:
-      W.Play.Step.play(W.Play.step(level, K.Cmd.idle(), False{}, W.Play.enter(level, wi, after, trip)))
+      W.Play.Step.play(W.Play.step(level, K.Cmd.idle(), W.Play.enter(level, wi, after, trip)))
     case playing:
       playing
 

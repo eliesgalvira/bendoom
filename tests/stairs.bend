@@ -87,7 +87,7 @@ def main() -> IO(Unit):
     floors("96 calls", Fx.Closed.idled(96n, Sp.Sim.stairs(0, chain())))
     active("at target", Fx.Closed.idled(96n, Sp.Sim.stairs(0, chain())))
     active("past target", Fx.Closed.idled(97n, Sp.Sim.stairs(0, chain())))
-    special("empty crossing", Sp.Sim.cross.special(8, 0, changed(chain(), 0, 6, 0)))
+    special("empty crossing", Sp.Sim.cross.special(8, 0, 0, S.Cross{0, 0, 0, 0, 0}, changed(chain(), 0, 6, 0)))
     special("empty use", Sp.Sim.use.special(7, 0, True{}, changed(chain(), 0, 6, 0)))
     special("successful use", Sp.Sim.use.special(7, 0, True{}, chain()))
     special("back use", Sp.Sim.use.line(True{}, S.State.level(chain()), 0, chain()))

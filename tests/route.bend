@@ -34,7 +34,7 @@ def idled(n: Nat, +level: L.Level, play: N.Play) -> N.Play:
     case 0n:
       play
     case 1n+m:
-      idled(m, level, N.Play.Step.play(N.Play.step(level, K.Cmd.idle(), False{}, play)))
+      idled(m, level, N.Play.Step.play(N.Play.step(level, K.Cmd.idle(), play)))
 
 def report(+s: S.State) -> IO(Unit):
   do IO<Unit>:
