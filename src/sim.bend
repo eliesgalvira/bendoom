@@ -2188,19 +2188,19 @@ type Sim.Noise is Data:
 # Doom's thinkers. A mobj is P_MobjThinker for the mobj an id names, a
 # thing's or the player's. A mover is T_VerticalDoor, T_PlatRaise and
 # T_MoveFloor in one: a sector's ceiling or floor, a speed, the steps
-# left, the whole plan, which a crushed mover starts again, and its
-# sounds. A button is a pressed switch waiting to pop back: the side,
-# which of its three textures, the texture it showed, and the tics left.
-# A blink is
-# T_LightFlash and T_StrobeFlash in one: the tics left at the sector's
-# light, its dark and bright levels, the time at each, and whether a time
-# is the count or the mask of a random one. A glow is T_Glow: the two
-# levels and the way it is going.
+# left, the whole plan, which a crushed or turned mover goes back to,
+# and its sounds. A button is a pressed switch waiting to pop back: the
+# side, which of its three textures, the texture it showed, and the tics
+# left and its fixed Doom button index. A blink is T_LightFlash and
+# T_StrobeFlash in one: the tics left
+# at the sector's light, its dark and bright levels, the time at each,
+# and whether a time is the count or the mask of a random one. A glow is
+# T_Glow: the two levels and the way it is going.
 type Thinker is Data:
   Mobj{id: U32}
   Mover{sector: U32, ceiling: Bool, speed: U32, steps: List<&2, Sim.Step>, plan: List<&2, Sim.Step>,
     noise: Sim.Noise}
-  Button{side: U32, slot: U32, texture: U32, tics: U32}
+  Button{side: U32, slot: U32, texture: U32, tics: U32, index: U32}
   Blink{sector: U32, count: U32, dark: U32, bright: U32, darktime: U32, brighttime: U32, random: Bool}
   Glow{sector: U32, dark: U32, bright: U32, down: Bool}
 
@@ -3261,11 +3261,12 @@ type Sim.Hit is Data:
 
 # What Doom's PTR_ShootTraverse keeps in globals, with what the bullet
 # met: the population and the player to read a mobj with, the shooter,
-# the height and range of the shot, the slope it flies at, and the
-# damage it deals whatever it hits.
+# the height and range of the shot, the slope it flies at, the damage it
+# deals whatever it hits, where it stopped, and the lines it met, the
+# last first.
 type Sim.Shot is Data:
   Shot{things: H.Things, player: Player, shooter: U32, shootz: U32, range: U32, slope: U32, damage: U32,
-    hit: Sim.Hit}
+    hit: Sim.Hit, lines: List<&2, U32>}
 
 # The wall was reached: the bullet leaves nothing where it flew over a
 # sky ceiling, or where the sector behind the line shows the sky too,
@@ -3273,11 +3274,11 @@ type Sim.Shot is Data:
 def Sim.shot.sky(sky: Bool, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   match sky:
     case True{}:
-      Shot{things, player, shooter, shootz, range, slope, damage, was} = sh
-      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Vanished{}}}
+      Shot{things, player, shooter, shootz, range, slope, damage, was, lines} = sh
+      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Vanished{}, lines}}
     case False{}:
-      Shot{things, player, shooter, shootz, range, slope, damage, was} = sh
-      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Struck{frac}}}
+      Shot{things, player, shooter, shootz, range, slope, damage, was, lines} = sh
+      Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage, Struck{frac}, lines}}
 
 def Sim.shot.behind(exists: Bool, +level: L.Level, +back: U32) -> Bool:
   match exists:
@@ -3290,12 +3291,12 @@ def Sim.shot.behind(exists: Bool, +level: L.Level, +back: U32) -> Bool:
 # along the ray, which is where the sky is tested too.
 def Sim.shot.wall(+level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
-  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit, lines} = sh
   +back4 = (frac - F.Fixed.div(262144, range) : U32)
   +z = (shootz + F.Fixed.mul(slope, F.Fixed.mul(back4, range)) : U32)
   Sim.shot.sky(Bool.and(L.Level.sky(level, front), Bool.or(F.Fixed.gt(z, L.Level.ceil(level, front)),
       Sim.shot.behind(Bool.not(U32.is_eq(back, L.Level.none())), level, back))), back4,
-    Shot{things, player, shooter, shootz, range, slope, damage, hit})
+    Shot{things, player, shooter, shootz, range, slope, damage, hit, lines})
 
 def Sim.shot.open(blocked: Bool, +level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) ->
   Sim.Answer<&2, Sim.Shot>:
@@ -3310,14 +3311,14 @@ def Sim.shot.open(blocked: Bool, +level: L.Level, +line: L.Level.Line, +frac: U3
 # differs from the one behind it is in the way.
 def Sim.shot.crosses(+level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   L.Line{x1, y1, x2, y2, flags, +front, +back} = line
-  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+  Shot{things, player, shooter, +shootz, +range, +slope, damage, hit, lines} = sh
   +dist = F.Fixed.mul(range, frac)
   Sim.shot.open(Bool.or(
       Bool.and(Bool.not(U32.is_eq(L.Level.floor(level, front), L.Level.floor(level, back))),
         F.Fixed.gt(F.Fixed.div((Sim.open_bottom(level, line) - shootz : U32), dist), slope)),
       Bool.and(Bool.not(U32.is_eq(L.Level.ceil(level, front), L.Level.ceil(level, back))),
         F.Fixed.lt(F.Fixed.div((Sim.open_top(level, line) - shootz : U32), dist), slope))),
-    level, line, frac, Shot{things, player, shooter, shootz, range, slope, damage, hit})
+    level, line, frac, Shot{things, player, shooter, shootz, range, slope, damage, hit, lines})
 
 def Sim.shot.solid(open: Bool, +level: L.Level, +line: L.Level.Line, +frac: U32, sh: Sim.Shot) ->
   Sim.Answer<&2, Sim.Shot>:
@@ -3337,9 +3338,9 @@ def Sim.shot.body(missed: Bool, +id: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answe
     case True{}:
       Answer{False{}, sh}
     case False{}:
-      Shot{things, player, shooter, shootz, +range, slope, damage, was} = sh
+      Shot{things, player, shooter, shootz, +range, slope, damage, was, lines} = sh
       Answer{True{}, Shot{things, player, shooter, shootz, range, slope, damage,
-        Pierced{id, (frac - F.Fixed.div(655360, range) : U32)}}}
+        Pierced{id, (frac - F.Fixed.div(655360, range) : U32)}, lines}}
 
 # PTR_ShootTraverse over a mobj: one whose box the slope passes over or
 # under is shot past.
@@ -3349,11 +3350,11 @@ def Sim.shot.shootable(shootable: Bool, +id: U32, +z: U32, +height: U32, +frac: 
     case False{}:
       Answer{False{}, sh}
     case True{}:
-      Shot{things, player, shooter, +shootz, +range, +slope, damage, hit} = sh
+      Shot{things, player, shooter, +shootz, +range, +slope, damage, hit, lines} = sh
       +dist = F.Fixed.mul(range, frac)
       Sim.shot.body(Bool.or(F.Fixed.lt(F.Fixed.div((z + height - shootz : U32), dist), slope),
           F.Fixed.gt(F.Fixed.div((z - shootz : U32), dist), slope)), id, frac,
-        Shot{things, player, shooter, shootz, range, slope, damage, hit})
+        Shot{things, player, shooter, shootz, range, slope, damage, hit, lines})
 
 def Sim.shot.self(own: Bool, m: Maybe<&2, Sim.Body>, +id: U32, +frac: U32, sh: Sim.Shot) ->
   Sim.Answer<&2, Sim.Shot>:
@@ -3366,18 +3367,24 @@ def Sim.shot.self(own: Bool, m: Maybe<&2, Sim.Body>, +id: U32, +frac: U32, sh: S
       Sim.shot.shootable(Bool.not(U32.is_zero((flags .&. 4 : U32))), id, z, height, frac, sh)
 
 def Sim.shot.thing(+id: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
-  Shot{+things, +player, +shooter, shootz, range, slope, damage, hit} = sh
+  Shot{+things, +player, +shooter, shootz, range, slope, damage, hit, lines} = sh
   Sim.shot.self(U32.is_eq(id, shooter), Sim.body(things, player, id), id, frac,
-    Shot{things, player, shooter, shootz, range, slope, damage, hit})
+    Shot{things, player, shooter, shootz, range, slope, damage, hit, lines})
+
+def Sim.shot.meets(+i: U32, sh: Sim.Shot) -> Sim.Shot:
+  Shot{things, player, shooter, shootz, range, slope, damage, hit, lines} = sh
+  Shot{things, player, shooter, shootz, range, slope, damage, hit, i <> lines}
 
 def Sim.shot.met(isline: Bool, +level: L.Level, +what: U32, +frac: U32, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   match isline:
     case True{}:
-      Sim.shot.line(level, what, frac, sh)
+      Sim.shot.line(level, what, frac, Sim.shot.meets(what, sh))
     case False{}:
       Sim.shot.thing(what, frac, sh)
 
-# Doom's PTR_ShootTraverse, without P_ShootSpecialLine.
+# Doom's PTR_ShootTraverse. It calls P_ShootSpecialLine on each line it
+# meets, which only starts thinkers and swaps textures, nothing the walk
+# reads, so the shot calls it once the walk is over.
 def Sim.shot.visit(+level: L.Level, m: Sim.Meet, sh: Sim.Shot) -> Sim.Answer<&2, Sim.Shot>:
   Meet{frac, isline, what} = m
   Sim.shot.met(isline, level, what, frac, sh)
@@ -3493,58 +3500,68 @@ def Sim.shot.left(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: S
       s
     case Struck{+frac}:
       Trace{tx, ty, tdx, tdy} = tr
-      Shot{things, player, shooter, shootz, +range, slope, damage, was} = sh
+      Shot{things, player, shooter, shootz, +range, slope, damage, was, lines} = sh
       Sim.puff((tx + F.Fixed.mul(tdx, frac) : U32), (ty + F.Fixed.mul(tdy, frac) : U32),
         (shootz + F.Fixed.mul(slope, F.Fixed.mul(frac, range)) : U32), s)
     case Pierced{id, +frac}:
       Trace{tx, ty, tdx, tdy} = tr
-      Shot{+things, +player, +shooter, shootz, +range, slope, +damage, was} = sh
+      Shot{+things, +player, +shooter, shootz, +range, slope, +damage, was, lines} = sh
       Sim.shot.bled(~enter, Sim.body(things, player, id), (tx + F.Fixed.mul(tdx, frac) : U32),
         (ty + F.Fixed.mul(tdy, frac) : U32), (shootz + F.Fixed.mul(slope, F.Fixed.mul(frac, range)) : U32), damage,
         shooter, s)
 
+def Sim.shot.lines(~shoot: @+line: U32 -> @+s: State -> State, lines: List<&2, U32>, s: State) -> State:
+  match lines:
+    case []:
+      s
+    case i <> rest:
+      Sim.shot.lines(~shoot, rest, shoot(i, s))
+
+# The lines the bullet met, in the order it met them, each shot by the
+# special above, and then what it leaves where it stopped.
 def Sim.shot.done(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
-  tr: Sim.Trace, sh: Sim.Shot, s: State) -> State:
-  Shot{things, player, shooter, shootz, range, slope, damage, +hit} = sh
-  Sim.shot.left(~enter, hit, tr, Shot{things, player, shooter, shootz, range, slope, damage, hit}, s)
+  ~shoot: @+line: U32 -> @+s: State -> State, tr: Sim.Trace, sh: Sim.Shot, s: State) -> State:
+  Shot{things, player, shooter, shootz, range, slope, damage, +hit, lines} = sh
+  Sim.shot.left(~enter, hit, tr, Shot{things, player, shooter, shootz, range, slope, damage, hit, []},
+    Sim.shot.lines(~shoot, List.reverse(&2, U32, lines), s))
 
 # Doom's P_LineAttack: the bullet's ray, and what it leaves where it
 # stops.
-def Sim.attack.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
+def Sim.attack.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State,
   +level: L.Level, +ts: H.Things, +p: Player, +x: U32, +y: U32, +shootz: U32, +shooter: U32,
   +angle: U32, +range: U32, +slope: U32, +damage: U32, s: State) -> State:
   +sine = L.Level.sine(level)
   +f = A.Angle.fine(angle)
   +x2 = (x + (range >> 16n) * A.Angle.cos(sine, f) : U32)
   +y2 = (y + (range >> 16n) * A.Angle.sin(sine, f) : U32)
-  Sim.shot.done(~enter, Sim.trace.of(L.Level.blockmap_of(level), x, y, x2, y2),
+  Sim.shot.done(~enter, ~shoot, Sim.trace.of(L.Level.blockmap_of(level), x, y, x2, y2),
     Sim.path(~Sim.Shot, ~Sim.shot.visit, level, ts, p, True{}, True{}, x, y, x2, y2,
-      Shot{ts, p, shooter, shootz, range, slope, damage, Vanished{}}), s)
+      Shot{ts, p, shooter, shootz, range, slope, damage, Vanished{}, []}), s)
 
-def Sim.gunshot.fired.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +angle: U32, +damage: U32, +slope: U32, +s: State) -> State:
+def Sim.gunshot.fired.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +angle: U32, +damage: U32, +slope: U32, +s: State) -> State:
   +p = State.player(s)
   +ts = State.things(s)
-  Sim.attack.with(~enter, State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
+  Sim.attack.with(~enter, ~shoot, State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
     H.Things.you(ts), angle, Sim.missilerange(), slope, damage, s)
 
 # A held shot is spread by a draw to either side, where the first of a
 # press goes straight where the weapon points.
-def Sim.gunshot.spread.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, accurate: Bool, +angle: U32, +damage: U32, +slope: U32, s: State) -> State:
+def Sim.gunshot.spread.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, accurate: Bool, +angle: U32, +damage: U32, +slope: U32, s: State) -> State:
   match accurate:
     case True{}:
-      Sim.gunshot.fired.with(~enter, angle, damage, slope, s)
+      Sim.gunshot.fired.with(~enter, ~shoot, angle, damage, slope, s)
     case False{}:
       State{player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
       +a = M.Random.next(rnd)
       +b = M.Random.next(a)
-      Sim.gunshot.fired.with(~enter, (angle + ((M.Random.at(a) - M.Random.at(b) : U32) << 18n) : U32), damage, slope,
+      Sim.gunshot.fired.with(~enter, ~shoot, (angle + ((M.Random.at(a) - M.Random.at(b) : U32) << 18n) : U32), damage, slope,
         State{player, level, things, sidetex, thinkers, b, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # Doom's P_GunShot: the damage is drawn first, whoever takes it.
-def Sim.gunshot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, accurate: Bool, +slope: U32, s: State) -> State:
+def Sim.gunshot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, accurate: Bool, +slope: U32, s: State) -> State:
   State{+player, level, things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +drew = M.Random.next(rnd)
-  Sim.gunshot.spread.with(~enter, accurate, Player.angle(player), (5 * ((M.Random.at(drew) % 3 : U32) + 1 : U32) : U32), slope,
+  Sim.gunshot.spread.with(~enter, ~shoot, accurate, Player.angle(player), (5 * ((M.Random.at(drew) % 3 : U32) + 1 : U32) : U32), slope,
     State{player, level, things, sidetex, thinkers, drew, clock, ended, usedown, sounds, mrnd, reborn, totalsecret})
 
 # The player sprites
@@ -3593,27 +3610,27 @@ def Sim.spent(+ammo: U32, s: State) -> State:
   State{Player.holding(player, I.Inventory.spend(ammo, 1, Player.inv(player))), level, things,
     sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}
 
-def Sim.fire.shot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +s: State) -> State:
+def Sim.fire.shot.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +s: State) -> State:
   +p = State.player(s)
   +ts = State.things(s)
-  Sim.gunshot.with(~enter, U32.is_zero(Player.refire(p)), Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p),
+  Sim.gunshot.with(~enter, ~shoot, U32.is_zero(Player.refire(p)), Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p),
     Sim.shootz(Player.z(p), Sim.height()), H.Things.you(ts), Player.angle(p)), s)
 
 # A bullet fired once its shot is heard: a round is spent, the muzzle
 # flash is set, and the bullet flies where the autoaim points, straight
 # on the first shot of a press and spread on the rest.
-def Sim.fire.bullet.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
-  Entering{None{}, Some{flash}, psp, Sim.fire.shot.with(~enter, Sim.spent(ammo, s))}
+def Sim.fire.bullet.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
+  Entering{None{}, Some{flash}, psp, Sim.fire.shot.with(~enter, ~shoot, Sim.spent(ammo, s))}
 
 # Doom's A_FirePistol: the shot is heard, then the bullet fired.
-def Sim.fire.pistol.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+def Sim.fire.pistol.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-  Sim.fire.bullet.with(~enter, flash, psp, ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s))
+  Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s))
 
-def Sim.fire.cgun.loaded.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, loaded: Bool, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
+def Sim.fire.cgun.loaded.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, loaded: Bool, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
   match loaded:
     case True{}:
-      Sim.fire.bullet.with(~enter, flash, psp, ammo, s)
+      Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, s)
     case False{}:
       Entering{None{}, None{}, psp, s}
 
@@ -3626,25 +3643,25 @@ def Sim.fire.cgun.flash(+psp: Psprite, +weapon: H.Thing.Weapon) -> U32:
 
 # Doom's A_FireCGun: the pistol's shot, heard even with no bullet left,
 # where it stops.
-def Sim.fire.cgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +psp: Psprite, +weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
+def Sim.fire.cgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +psp: Psprite, +weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   +heard = Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)
-  Sim.fire.cgun.loaded.with(~enter, Sim.ammo.enough(weapon, heard),
+  Sim.fire.cgun.loaded.with(~enter, ~shoot, Sim.ammo.enough(weapon, heard),
     Sim.fire.cgun.flash(psp, weapon), psp, H.Thing.Weapon.ammo(weapon), heard)
 
-def Sim.fire.pellets.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, fuel: Nat, +slope: U32, s: State) -> State:
+def Sim.fire.pellets.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, fuel: Nat, +slope: U32, s: State) -> State:
   match fuel:
     case 0n:
       s
     case 1n+n:
-      Sim.fire.pellets.with(~enter, n, slope, Sim.gunshot.with(~enter, False{}, slope, s))
+      Sim.fire.pellets.with(~enter, ~shoot, n, slope, Sim.gunshot.with(~enter, ~shoot, False{}, slope, s))
 
-def Sim.fire.shotgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
+def Sim.fire.shotgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, +s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
   +p = State.player(s)
   +ts = State.things(s)
   +slope = Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
     H.Things.you(ts), Player.angle(p))
-  Entering{None{}, Some{flash}, psp, Sim.fire.pellets.with(~enter, 7n, slope,
+  Entering{None{}, Some{flash}, psp, Sim.fire.pellets.with(~enter, ~shoot, 7n, slope,
     Sim.spent(ammo, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s)))}
 
 def Sim.melee.range() -> U32:
@@ -3685,7 +3702,7 @@ def Sim.melee.sound(+saw: Bool, +hit: Bool, +s: State) -> State:
   Bool.pick(State, saw, Sim.sound(Bool.pick(U32, hit, Sn.Sound.sawhit(), Sn.Sound.sawful()), Sn.Thing{H.Thing.you()}, s),
     Bool.pick(State, hit, Sim.sound(Sn.Sound.punch(), Sn.Thing{H.Thing.you()}, s), s))
 
-def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
+def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State,
   +saw: Bool, +psp: Psprite, +s: State) -> Sim.Entering:
   State{+player, level, +things, sidetex, thinkers, +rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   +damage = M.Random.next(rnd)
@@ -3696,7 +3713,7 @@ def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> 
   +aim = Sim.aim(level, things, player, Player.x(player), Player.y(player),
     Sim.shootz(Player.z(player), Sim.height()), H.Things.you(things), angle, range)
   +target = Sim.melee.target(Sim.Aim.target(aim), things, player, L.Level.tanto(level))
-  +hurt = Sim.attack.with(~enter, level, things, player, Player.x(player), Player.y(player), Sim.shootz(Player.z(player), Sim.height()),
+  +hurt = Sim.attack.with(~enter, ~shoot, level, things, player, Player.x(player), Player.y(player), Sim.shootz(Player.z(player), Sim.height()),
     H.Things.you(things), angle, range, Sim.Aim.slope(aim),
     (2 * ((M.Random.at(damage) % 10 : U32) + 1 : U32) * Bool.pick(U32, saw, 1,
       Bool.pick(U32, U32.is_zero(I.Inventory.strength(Player.inv(player))), 1, 10)) : U32),
@@ -3814,7 +3831,7 @@ def Sim.lower(psp: Psprite, +s: State) -> Sim.Entering:
   Sim.lower.done(Player.dead(State.player(s)), done,
     Psprite{state, tics, sx, F.Fixed.min(sunk, Sim.weaponbottom())}, s)
 
-def Sim.psprite.act.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, action: H.Thing.Action, +psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
+def Sim.psprite.act.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, action: H.Thing.Action, +psp: Psprite, cmd: K.Cmd, weapon: H.Thing.Weapon, +s: State) ->
   Sim.Entering:
   match action:
     case H.Null{}:
@@ -3826,15 +3843,15 @@ def Sim.psprite.act.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
         weapon, L.Level.sine(State.level(s)), State.clock(s),
         Sim.bob(Player.momx(State.player(s)), Player.momy(State.player(s))), Sim.ready.sound(psp, s))
     case H.FirePistol{}:
-      Sim.fire.pistol.with(~enter, psp, weapon, s)
+      Sim.fire.pistol.with(~enter, ~shoot, psp, weapon, s)
     case H.FireShotgun{}:
-      Sim.fire.shotgun.with(~enter, psp, weapon, s)
+      Sim.fire.shotgun.with(~enter, ~shoot, psp, weapon, s)
     case H.FireCGun{}:
-      Sim.fire.cgun.with(~enter, psp, weapon, s)
+      Sim.fire.cgun.with(~enter, ~shoot, psp, weapon, s)
     case H.Punch{}:
-      Sim.melee.hit.with(~enter, False{}, psp, s)
+      Sim.melee.hit.with(~enter, ~shoot, False{}, psp, s)
     case H.Saw{}:
-      Sim.melee.hit.with(~enter, True{}, psp, s)
+      Sim.melee.hit.with(~enter, ~shoot, True{}, psp, s)
     case H.ReFire{}:
       Sim.refire(psp, cmd, weapon, s)
     case H.Lower{}:
@@ -3868,22 +3885,22 @@ def Sim.psprite.entered(e: Sim.Entering, +row: H.Thing.Row, had: Maybe<&2, U32>)
 
 # One turn of P_SetPsprite: the sprite takes the state's row and tics,
 # and the row's action runs.
-def Sim.psprite.enter.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd, +weapon: H.Thing.Weapon,
+def Sim.psprite.enter.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd, +weapon: H.Thing.Weapon,
   +s: State) -> Sim.Entering:
   Psprite{was, tics, sx, sy} = psp
   +row = H.Thing.row(state)
-  Sim.psprite.entered(Sim.psprite.act.with(~enter, H.Thing.Row.action(row),
+  Sim.psprite.entered(Sim.psprite.act.with(~enter, ~shoot, H.Thing.Row.action(row),
     Psprite{Some{state}, H.Thing.Row.tics(row), sx, sy}, cmd, Player.ready(State.player(s)), s), row, had)
 
 # Entering S_NULL stops the sprite showing, as a state number of 0 does
 # in vanilla.
-def Sim.psprite.gone.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, null: Bool, state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd,
+def Sim.psprite.gone.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, null: Bool, state: U32, had: Maybe<&2, U32>, psp: Psprite, cmd: K.Cmd,
   +weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   match null psp:
     case True{} Psprite{was, tics, sx, sy}:
       Entering{None{}, had, Psprite{None{}, tics, sx, sy}, s}
     case False{} kept:
-      Sim.psprite.enter.with(~enter, state, had, kept, cmd, weapon, s)
+      Sim.psprite.enter.with(~enter, ~shoot, state, had, kept, cmd, weapon, s)
 
 # Doom's P_SetPsprite: states are entered in turn while an action sets
 # one or the state entered lasts no tics. No chain of vanilla's is
@@ -3896,11 +3913,11 @@ def Sim.psprite.alert(fired: Bool, e: Sim.Entering) -> Sim.Entering:
       Entering{next, sets, psp, s} = e
       Entering{next, sets, psp, Sim.alert(s)}
 
-def Sim.psprite.set.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, fuel: Nat, st: Sim.Entering, +cmd: K.Cmd, +weapon: H.Thing.Weapon) -> Sim.Entering:
+def Sim.psprite.set.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, fuel: Nat, st: Sim.Entering, +cmd: K.Cmd, +weapon: H.Thing.Weapon) -> Sim.Entering:
   match fuel st:
     case 1n+f Entering{Some{+state}, sets, psp, s}:
       Sim.psprite.alert(U32.is_eq(state, H.Thing.Weapon.atk(weapon)),
-        Sim.psprite.set.with(~enter, f, Sim.psprite.gone.with(~enter, U32.is_eq(state, H.Thing.null()), state, sets, psp, cmd, weapon, s),
+        Sim.psprite.set.with(~enter, ~shoot, f, Sim.psprite.gone.with(~enter, ~shoot, U32.is_eq(state, H.Thing.null()), state, sets, psp, cmd, weapon, s),
           cmd, weapon))
     case _ Entering{next, sets, psp, s}:
       Entering{next, sets, psp, s}
@@ -3908,13 +3925,13 @@ def Sim.psprite.set.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
 # Doom's P_MovePsprites for one sprite: one that shows counts its tics
 # down, and the tic they run out enters its next state. No weapon state
 # lasts.
-def Sim.psprite.tic.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, psp: Psprite, sets: Maybe<&2, U32>, cmd: K.Cmd, weapon: H.Thing.Weapon, s: State) ->
+def Sim.psprite.tic.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, psp: Psprite, sets: Maybe<&2, U32>, cmd: K.Cmd, weapon: H.Thing.Weapon, s: State) ->
   Sim.Entering:
   match psp:
     case Psprite{None{}, tics, sx, sy}:
       Entering{None{}, sets, Psprite{None{}, tics, sx, sy}, s}
     case Psprite{Some{+state}, +tics, sx, sy}:
-      Sim.psprite.set.with(~enter, 8n, Entering{Bool.pick(Maybe<&2, U32>, U32.is_eq(tics, 1),
+      Sim.psprite.set.with(~enter, ~shoot, 8n, Entering{Bool.pick(Maybe<&2, U32>, U32.is_eq(tics, 1),
         Some{H.Thing.Row.next(H.Thing.row(state))}, None{}), sets, Psprite{Some{state}, (tics - 1 : U32), sx, sy},
         s}, cmd, weapon)
 
@@ -3928,29 +3945,34 @@ def Sim.psprites.done(weapon: Psprite, e: Sim.Entering) -> State:
   Entering{next, sets, psp, s} = e
   State.showing(Sim.psprites.follow(weapon, psp), s)
 
-def Sim.psprites.after.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, weapon: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
+def Sim.psprites.after.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, weapon: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
   Entering{next, sets, psp, s} = e
-  Sim.psprites.done(weapon, Sim.psprite.tic.with(~enter, psp, None{}, cmd, winfo, s))
+  Sim.psprites.done(weapon, Sim.psprite.tic.with(~enter, ~shoot, psp, None{}, cmd, winfo, s))
 
 # The flash after the weapon's step: a state the weapon's action set is
 # entered first, and only then does P_MovePsprites count the flash's
 # tics down, since it reaches the flash after the weapon.
-def Sim.psprites.flash.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, flash: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
+def Sim.psprites.flash.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, flash: Psprite, e: Sim.Entering, +cmd: K.Cmd, +winfo: H.Thing.Weapon) -> State:
   Entering{next, sets, psp, s} = e
-  Sim.psprites.after.with(~enter, psp, Sim.psprite.set.with(~enter, 8n, Entering{sets, None{}, flash, s}, cmd, winfo), cmd, winfo)
+  Sim.psprites.after.with(~enter, ~shoot, psp, Sim.psprite.set.with(~enter, ~shoot, 8n, Entering{sets, None{}, flash, s}, cmd, winfo), cmd, winfo)
 
-def Sim.psprites.both.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ps: Psprites, +cmd: K.Cmd, +winfo: H.Thing.Weapon, s: State) -> State:
+def Sim.psprites.both.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, ps: Psprites, +cmd: K.Cmd, +winfo: H.Thing.Weapon, s: State) -> State:
   Psprites{+weapon, flash} = ps
-  Sim.psprites.flash.with(~enter, flash, Sim.psprite.tic.with(~enter, weapon, None{}, cmd, winfo, s), cmd, winfo)
+  Sim.psprites.flash.with(~enter, ~shoot, flash, Sim.psprite.tic.with(~enter, ~shoot, weapon, None{}, cmd, winfo, s), cmd, winfo)
 
 # Doom's P_MovePsprites: the weapon's sprite steps first, and its action
 # may set the flash's state; then the flash's steps, on the state the
 # weapon left it in.
-def Sim.psprites.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +cmd: K.Cmd, +s: State) -> State:
-  Sim.psprites.both.with(~enter, Player.psprites(State.player(s)), cmd, Player.ready(State.player(s)), s)
+def Sim.psprites.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, +cmd: K.Cmd, +s: State) -> State:
+  Sim.psprites.both.with(~enter, ~shoot, Player.psprites(State.player(s)), cmd, Player.ready(State.player(s)), s)
+
+# No line answers a shot, for the weapon steps that fire none: the raise
+# and the dead player's idle one.
+def Sim.unshot(+line: U32, +s: State) -> State:
+  s
 
 def Sim.psprites.idle(+s: State) -> State:
-  Sim.psprites.with(~Sim.damage.enter, K.Cmd.idle(), s)
+  Sim.psprites.with(~Sim.damage.enter, ~Sim.unshot, K.Cmd.idle(), s)
 
 def Sim.psprites.raised(e: Sim.Entering) -> State:
   Entering{next, sets, psp, s} = e
@@ -3962,7 +3984,7 @@ def Sim.psprites.raised(e: Sim.Entering) -> State:
 # level's start this runs cannot be seen.
 def Sim.psprites.up(+weapon: H.Thing.Weapon, s: State) -> State:
   H.Weapon{+up, ready, down, ammo, atk, flash} = weapon
-  Sim.psprites.raised(Sim.psprite.set.with(~Sim.damage.enter, 8n, Entering{Some{up}, None{}, Psprite{None{}, 0, 0, Sim.weaponbottom()}, s},
+  Sim.psprites.raised(Sim.psprite.set.with(~Sim.damage.enter, ~Sim.unshot, 8n, Entering{Some{up}, None{}, Psprite{None{}, 0, 0, Sim.weaponbottom()}, s},
     K.Cmd.idle(), weapon))
 
 def Sim.psprites.start(+s: State) -> State:
