@@ -682,6 +682,35 @@ def Sim.stairs(+line: U32, +s: S.State) -> S.State:
 def Sim.floor.low(+level: L.Level, +sector: U32, s: S.State) -> S.State:
   Sim.floor.to(sector, True{}, Sim.floor.lowest(level, sector), s)
 
+def Sim.boss.living(things: List<&2, H.Thing>, +id: U32, +kind: U32) -> Bool:
+  match things:
+    case []:
+      False{}
+    case +th <> rest:
+      Bool.or(Bool.and(Bool.not(U32.is_eq(H.Thing.id(th), id)),
+        Bool.and(U32.is_eq(H.Thing.kind(th), kind), F.Fixed.gt(H.Thing.health(th), 0))),
+        Sim.boss.living(rest, id, kind))
+
+def Sim.boss.lower(ready: Bool, +s: S.State) -> S.State:
+  match ready:
+    case False{}:
+      s
+    case True{}:
+      Sim.start(~Sim.floor.low, Sim.tagged.go(U32.to_nat(L.Level.nsectors(S.State.level(s))), True{},
+        S.State.level(s), S.State.thinkers(s), 666, 0), s)
+
+def Sim.boss.at(name: L.Level.Name, th: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
+  match name th:
+    case L.Name{1, 8} Some{+boss}:
+      Sim.boss.lower(Bool.and(U32.is_eq(H.Thing.kind(boss), 3003),
+        Bool.and(Bool.not(S.Player.dead(S.State.player(s))),
+          Bool.not(Sim.boss.living(H.Things.list(S.State.things(s)), id, H.Thing.kind(boss))))), s)
+    case _ _:
+      s
+
+def Sim.boss(+id: U32, +s: S.State) -> S.State:
+  Sim.boss.at(L.Level.name(S.State.level(s)), S.State.thing(id, s), id, s)
+
 # Doom's raiseFloor: 1 a tic up to the lowest ceiling around, or to its
 # own when that is lower.
 def Sim.floor.raise(+level: L.Level, +sector: U32, s: S.State) -> S.State:
@@ -1364,9 +1393,26 @@ def Sim.sector.damage(nukage: Bool, hellslime: Bool, +clock: U32, +s: S.State) -
     case False{} False{}:
       s
 
+def Sim.sector.finish(done: Bool, s: S.State) -> S.State:
+  match done:
+    case False{}:
+      s
+    case True{}:
+      State.end(False{}, s)
+
+def Sim.sector.final(+s: S.State) -> S.State:
+  Sim.sector.finish(U32.is_le(I.Inventory.health(S.Player.inv(S.State.player(s))), 10), s)
+
+def Sim.sector.dispatch(final: Bool, +grounded: Bool, +special: U32, +clock: U32, s: S.State) -> S.State:
+  match final:
+    case True{}:
+      Sim.sector.final(Sim.sector.hurt(U32.is_zero((clock .&. 31 : U32)), 20, s))
+    case False{}:
+      Sim.sector.damage(Bool.and(grounded, U32.is_eq(special, 7)),
+        Bool.and(grounded, U32.is_eq(special, 16)), clock, s)
+
 def Sim.sector.grounded(+grounded: Bool, +special: U32, clock: U32, s: S.State) -> S.State:
-  Sim.sector.damage(Bool.and(grounded, U32.is_eq(special, 7)),
-    Bool.and(grounded, U32.is_eq(special, 16)), clock, s)
+  Sim.sector.dispatch(Bool.and(grounded, U32.is_eq(special, 11)), grounded, special, clock, s)
 
 def Sim.sector(+level: L.Level, clock: U32, +s: S.State) -> S.State:
   +sector = L.Level.sector_at(level, S.Player.x(S.State.player(s)), S.Player.y(S.State.player(s)))
