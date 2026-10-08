@@ -55,9 +55,9 @@ def Tele.once(+special: U32, +who: U32, obstacle: U32, +x: U32) -> U32:
 
 def Tele.wall.level(level: L.Level) -> L.Level:
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
-    boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = level
+    boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = level
   L.Level{L.Geo{V.Vec.set(lines, 2, 5), sides, verts, segs, subs, nodes, root, blockmap, things, texnames,
-    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard}
+    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard}
 
 # A destination on an explicitly blocking line fails P_CheckPosition, but
 # P_TeleportMove accepts it. Frozen tics retain that nonfree position.

@@ -979,14 +979,17 @@ def free(+s: S.State) -> IO(S.State):
 # A run, then the tic, the player's place, the inventory, how many
 # things are left and the names of those taken since the case's first
 # state.
-def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S.State):
-  +r = ran(n, cmd, s)
-  +q = Run.state(r)
+def picked.run(tag: String, first: List<&2, H.Thing>, r: Run) -> IO(S.State):
+  Run{log, +q} = r
   do IO<S.State>:
-    IO.print(Run.log(r) ++ line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
+    IO.print(log ++ line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
     IO.print("  " ++ I.Inventory.show(S.Player.inv(S.State.player(q)))
-      ++ H.Things.tally(H.Things.list(S.State.things(first)), S.State.things(q)) ++ said(q))
+      ++ H.Things.tally(first, S.State.things(q)) ++ said(q))
     return q
+
+def picked(tag: String, n: Nat, cmd: K.Cmd, first: S.State, s: S.State) -> IO(S.State):
+  +before = H.Things.list(S.State.things(first))
+  picked.run(tag, before, ran(n, cmd, s))
 
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
@@ -1561,7 +1564,7 @@ def attack.missile.ticks(n: Nat, +id: U32, s: S.State) -> S.State:
 
 def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U32, +s: S.State) -> S.State:
   S.Body{i, sx, sy, z, radius, height, flags} = source
-  +spawned = S.Sim.missile.spawn(S.Body{i, sx, sy, z, radius, height, flags},
+  +spawned = S.Sim.missile.spawn(H.Thing.fireball(), S.Body{i, sx, sy, z, radius, height, flags},
     S.Body{4294967294, F.Fixed.of_map(tx), F.Fixed.of_map(ty), z, radius, height, flags}, you, s)
   +id = H.Things.count(S.State.things(s))
   attack.missile.ticks(n, id,
@@ -1569,7 +1572,7 @@ def attack.missile.from(+source: S.Sim.Body, +tx: U32, +ty: U32, n: Nat, +you: U
 
 def attack.missile.up.from(+source: S.Sim.Body, n: Nat, +you: U32, +s: S.State) -> S.State:
   S.Body{i, x, y, z, radius, height, flags} = source
-  +spawned = S.Sim.missile.spawn(S.Body{i, x, y, z, radius, height, flags},
+  +spawned = S.Sim.missile.spawn(H.Thing.fireball(), S.Body{i, x, y, z, radius, height, flags},
     S.Body{4294967294, x, y, (z + F.Fixed.of_map(64) : U32), radius, height, flags}, you, s)
   +id = H.Things.count(S.State.things(s))
   attack.missile.ticks(n, id,
@@ -2008,7 +2011,7 @@ def main() -> IO(Unit):
 #|free at start True
 #|inventory health 100 armour 0 type 0 cards 0 ammo 50 0 0 0 caps 200 50 300 50 backpack False weapons 3 powers 0 0 0 0 0 0 items 0 flash 0
 #|things at start 209 random 59
-#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0 4294967294:0 4294967293:0 6:0 13:0 14:0 34:0 46:0 58:0 2024:0 2025:0 2026:0 2045:0 3003:0 4294967292:0
+#|by type 5:1 8:0 10:3 12:3 15:4 17:0 18:5 19:1 20:1 21:2 24:2 26:1 35:0 43:12 47:18 48:4 54:15 60:2 2001:0 2002:0 2003:0 2004:0 2005:1 2007:2 2008:14 2010:1 2011:2 2012:4 2013:0 2014:30 2015:18 2018:1 2019:0 2023:1 2028:7 2035:22 2046:0 2047:1 2048:1 2049:1 3004:4 9:10 3001:10 3002:5 4294967295:0 4294967294:0 4294967293:0 6:0 13:0 14:0 34:0 46:0 58:0 2024:0 2025:0 2026:0 2045:0 3003:0 4294967292:0 4294967291:0
 #|first 2 3 6 8 9 10 11 12 13 14 15 16
 #|links 209 of 209 things, solid 108 of 108, wrong 0, unlinked 0
 #|thing 2 type 2005 at 3104.000000 2160.000000 z 194.000000 angle 315.000 sector 139 state 45 tics 4294967295 radius 20 height 16 flags 1 ambush True

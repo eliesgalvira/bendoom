@@ -111,7 +111,7 @@ def Closed.level(ox: U32, records: V.Vec, count: U32) -> L.Level:
     L.Blockmap{V.Vec.of_list([0, 0, 1, 1, 5, 0, 0, 1, 65535], 9), ox, 0, 1, 1},
     L.Things{records, count}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 2, 3,
-    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
+    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, L.Name{1, 1}},
     V.Vec.of_list([0, 8388608, 0, 0, 160, 0, 0, 0, 0, 0, 0, 160, 0, 0, 0, 4718592, 0, 0, 160, 0, 0], 21), V.Vec.of_list([1, 0, 117, 0], 4), V.Vec.of_list([], 3)})
 
 def Closed.doors() -> L.Level:
@@ -194,11 +194,11 @@ def Closed.seen(+s: S.State) -> U32 & U32:
 
 # What a listener d units south of a source hears, facing an angle.
 def Closed.heard(d: U32, facing: U32) -> U32 & U32:
-  Sn.Sound.adjust(True{}, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
+  Sn.Sound.adjust(True{}, 1, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)), 0,
     F.Fixed.neg(F.Fixed.of_map(d)), facing, 0, 0)
 
 def Closed.coincident(starting: Bool) -> U32 & U32:
-  Sn.Sound.adjust(starting, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
+  Sn.Sound.adjust(starting, 1, L.Level.sine(L.Level.room(0, 128)), L.Level.tanto(L.Level.room(0, 128)),
     0, 0, 1073741824, 0, 0)
 
 # The lights' tests stand on the literal level with the west room

@@ -44,7 +44,7 @@ def Film.pcm(words: List<&2, U32>) -> List<&2, U32>:
 
 def Film.channels(play: I.Play, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
   match play:
-    case I.Playing{+state, map, didsecret, pointer}:
+    case I.Playing{+state, didsecret, pointer}:
       C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
     case _:
       chans
@@ -78,12 +78,17 @@ def Film.outro.pending(how: S.Sim.Exit) -> List<&2, K.Cmd>:
     case S.Ended{secret}:
       List.replicate(K.Cmd, Fi.Finale.outro(Fi.Finale.start()), K.Cmd.idle())
 
+def Film.outro.state(name: L.Level.Name, state: S.State) -> List<&2, K.Cmd>:
+  match name:
+    case L.Name{episode, 8}:
+      Film.outro.pending(S.State.ended(state))
+    case _:
+      []
+
 def Film.outro(play: I.Play) -> List<&2, K.Cmd>:
   match play:
-    case I.Playing{state, L.Name{episode, 8}, didsecret, pointer}:
-      Film.outro.pending(S.State.ended(state))
-    case I.Playing{state, map, didsecret, pointer}:
-      []
+    case I.Playing{+state, didsecret, pointer}:
+      Film.outro.state(L.Level.name(S.State.level(state)), state)
     case I.Showing{wi, after, trip}:
       Film.outro.of(wi)
     case I.Ending{f}:
@@ -122,7 +127,7 @@ def Film.world(+map: L.Level.Name, demo: List<&2, U32>, audio: File, dir: Array<
   L.Name{+episode, +number} = map
   IO.bind(Array<U32> & G.Gfx & L.Level, Unit,
     IO.pass(Array<U32> & G.Gfx & L.Level, G.Gfx.load(episode, number, dir)),
-    world => Film.start(demo, audio, I.Play.World.start(map, world), loaded))
+    world => Film.start(demo, audio, I.Play.World.start(world), loaded))
 
 def Film.ready(+demo: List<&2, U32>, audio: File, dir: List<&2, W.Wad.Lump>,
   p: Array<U32> & Sg.Song.Deck & C.Channel.Bank) -> IO(Unit):

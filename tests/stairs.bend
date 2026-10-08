@@ -11,9 +11,9 @@ import ./fixtures/closed.bend as Fx
 
 def geometry(lines: List<&2, U32>, sides: List<&2, U32>, +level: L.Level) -> L.Level:
   L.Level{L.Geo{ls, ss, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
-    boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = level
+    boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = level
   L.Level{L.Geo{V.Vec.of_list(lines, 10), V.Vec.of_list(sides, 9), verts, segs, subs, nodes, root, blockmap,
-    things, texnames, ["STEP", "CEIL", "STEP", "CEIL", "STEP", "CEIL"], sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+    things, texnames, ["STEP", "CEIL", "STEP", "CEIL", "STEP", "CEIL"], sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, V.Vec.of_list([8, 7, 0, 0], 4), heard}
 
 def level(lines: List<&2, U32>, sides: List<&2, U32>) -> L.Level:
