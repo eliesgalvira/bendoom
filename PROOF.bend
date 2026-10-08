@@ -384,38 +384,47 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
       S.Sim.move(L.Level{geo, sectors, specials, heard}, K.Cmd.idle(), rest_player(x, y))))
 
 # Floor damage and secret discovery preserve the player's place.
-def rest_counted(+nukage: Bool, +hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
+def rest_damage(final: Bool, nukage: Bool, hellslime: Bool, s: S.State) -> S.State:
+  match final:
+    case True{}:
+      Sp.Sim.sector.final(Sp.Sim.sector.hurt(True{}, 20, s))
+    case False{}:
+      Sp.Sim.sector.damage(nukage, hellslime, 0, s)
+
+def rest_counted(+final: Bool, +nukage: Bool, +hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
   +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
     Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.damage.enter.acted, ~Sp.Sim.shoot, K.Cmd.idle(),
       Tic.Sim.weapon.select(K.Cmd.idle(), Sp.Sim.sector.secret.count(counts, sector,
-        Sp.Sim.sector.damage(nukage, hellslime, 0, rest_walked(geo, sectors, specials, heard, x, y)))))))
+        rest_damage(final, nukage, hellslime, rest_walked(geo, sectors, specials, heard, x, y)))))))
 
-def rest_think(+nukage: Bool, +hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
-  +heard: V.Vec, +x: U32, +y: U32) -> S.State:
+def rest_think(s: S.State, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
-    Tic.Sim.player.thinks(K.Cmd.idle(), Sp.Sim.sector.damage(nukage, hellslime, 0,
-      rest_walked(geo, sectors, specials, heard, x, y))))
+    Tic.Sim.player.thinks(K.Cmd.idle(), s))
 
-def rest_due(nukage: Bool, hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
+def rest_due(final: Bool, nukage: Bool, hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
   +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_counted(nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))),
+      rest_counted(final, nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))),
     S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_counted(nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))))
+      rest_counted(final, nukage, hellslime, counts, sector, geo, sectors, specials, heard, x, y)))))
     == (x, y) : U32 & U32}:
-  match nukage hellslime counts:
-    case True{} _ False{}:
+  match final nukage hellslime counts:
+    case True{} _ _ False{}:
       {==}
-    case True{} _ True{}:
+    case True{} _ _ True{}:
       {==}
-    case False{} True{} False{}:
+    case False{} True{} _ False{}:
       {==}
-    case False{} True{} True{}:
+    case False{} True{} _ True{}:
       {==}
-    case False{} False{} False{}:
+    case False{} False{} True{} False{}:
       {==}
-    case False{} False{} True{}:
+    case False{} False{} True{} True{}:
+      {==}
+    case False{} False{} False{} False{}:
+      {==}
+    case False{} False{} False{} True{}:
       {==}
 
 def rest_sector(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> U32:
@@ -430,37 +439,46 @@ def rest_counts(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
       L.Level.floor(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y))))
 
 # Damage cases expose the state before the symbolic secret test.
-def rest_secret(nukage: Bool, hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+def rest_secret(final: Bool, nukage: Bool, hellslime: Bool, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
   +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))),
+      rest_think(rest_damage(final, nukage, hellslime, rest_walked(geo, sectors, specials, heard, x, y)), x, y)))),
     S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(nukage, hellslime, geo, sectors, specials, heard, x, y)))))
+      rest_think(rest_damage(final, nukage, hellslime, rest_walked(geo, sectors, specials, heard, x, y)), x, y)))))
     == (x, y) : U32 & U32}:
-  match nukage hellslime:
-    case True{} _:
-      rest_due(True{}, hellslime, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
-    case False{} True{}:
-      rest_due(False{}, True{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
-    case False{} False{}:
-      rest_due(False{}, False{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+  match final nukage hellslime:
+    case True{} _ _:
+      rest_due(True{}, nukage, hellslime, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+    case False{} True{} _:
+      rest_due(False{}, True{}, hellslime, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+    case False{} False{} True{}:
+      rest_due(False{}, False{}, True{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
+    case False{} False{} False{}:
+      rest_due(False{}, False{}, False{}, rest_counts(geo, sectors, specials, heard, x, y), rest_sector(geo, sectors, specials, heard, x, y), geo, sectors, specials, heard, x, y)
 
-def rest_at(+grounded: Bool, +special: U32, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
+def rest_at(final: Bool, +grounded: Bool, +special: U32, +geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec,
   +heard: V.Vec, +x: U32, +y: U32) ->
   {(S.Player.x(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
-        geo, sectors, specials, heard, x, y)))),
+      rest_think(Sp.Sim.sector.dispatch(final, grounded, special, 0,
+        rest_walked(geo, sectors, specials, heard, x, y)), x, y)))),
     S.Player.y(S.State.player(Tic.Sim.tic.done(K.Cmd.idle(), geo, 0, x, y,
-      rest_think(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
-        geo, sectors, specials, heard, x, y)))))
+      rest_think(Sp.Sim.sector.dispatch(final, grounded, special, 0,
+        rest_walked(geo, sectors, specials, heard, x, y)), x, y)))))
     == (x, y) : U32 & U32}:
-  rest_secret(Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
-    geo, sectors, specials, heard, x, y)
+  match final:
+    case True{}:
+      rest_secret(True{}, False{}, False{}, geo, sectors, specials, heard, x, y)
+    case False{}:
+      rest_secret(False{}, Bool.and(grounded, U32.is_eq(special, 7)), Bool.and(grounded, U32.is_eq(special, 16)),
+        geo, sectors, specials, heard, x, y)
 
 def Laws.tic_rest(level, x, y):
   match level:
     case L.Level{geo, sectors, specials, heard}:
-      rest_at(U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+      rest_at(Bool.and(U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
+          L.Level.floor(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y))),
+          U32.is_eq(L.Level.sector.special(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y)), 11)),
+        U32.is_eq(S.Player.z(S.State.player(rest_walked(geo, sectors, specials, heard, x, y))),
           L.Level.floor(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y))),
         L.Level.sector.special(L.Level{geo, sectors, specials, heard}, rest_sector(geo, sectors, specials, heard, x, y)),
         geo, sectors, specials, heard, x, y)
