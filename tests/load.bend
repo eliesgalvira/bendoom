@@ -1,6 +1,6 @@
 # E1M1's level record and graphics from the WAD named by BENDOOM_IWAD,
 # loaded by the game's loaders: samples of what the renderer reads. Each
-# expected value was read from Freedoom's bytes independently, in
+# WAD value was read from Freedoom's bytes independently, in
 # nushell, before the loader answered it; the multi-patch texels were
 # composed there by vanilla's rule, patches pasted in order; the lines'
 # specials were counted there, and the two sectors' block boxes worked
@@ -14,8 +14,9 @@
 # flat 122, of 3; sector 23's floor), FWATER1 (flat 141, of 4; sector
 # 36's ceiling), SFALL1 (texture 502, of 4; side 203's middle) and
 # WFALL1 (texture 494, of 4; side 932's middle). Their frames are
-# numbered first, flats from 0 and textures from 1, and what each shows
-# at a clock is worked out by P_UpdateSpecials' rule; the flats' texels
+# numbered after the finale's FLOOR4_8 at flat 0, textures from 1. The
+# atlas indices are regression pins; their phases and texels follow
+# P_UpdateSpecials' rule and the WAD's bytes. The flats' texels
 # 0 and 2077 are NUKAGE1's and FWATER1's at clock 0, NUKAGE3's and
 # FWATER2's at clock 1. THINGS has 292 records, kept as the lump stores
 # them: player 1's start, the dead former sergeant (type 19) spawned on
@@ -344,7 +345,7 @@ def main() -> IO(Unit):
 #|texture SW2BRN1 64x128.000000 patches 5 mask 63
 #|texture SW2GRAY 64x128.000000 patches 3 mask 63
 #|switches 105 121 105 0
-#|animations 0 3 1 5, 2 4 3 7, 2 4 3 7, 0 5 4 8, 1 5 4 8
+#|animations 1 4 1 5, 3 5 3 7, 3 5 3 7, 1 6 4 8, 2 6 4 8
 #|palette colormap flats texels 16777215 16711680 10972011 4 97 0 0 149 148 6 15 98 97 98 104 108 108 108 7 110 110 108 87 87 92 0 16 122 20 7 78 86 4 106 123 125 206 207 125 125 243 207 16 1 64 255 1 17 8
 #|bar patches 13 16 13 16 4 6 13 16 7 5 7 7 4 6 38 32 320 32
 #|PLAY A PLAYA1 0 PLAYA2A8 0 PLAYA3A7 0 PLAYA4A6 0 PLAYA5 0 PLAYA4A6 1 PLAYA3A7 1 PLAYA2A8 1

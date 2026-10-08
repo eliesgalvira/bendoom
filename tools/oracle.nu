@@ -202,10 +202,13 @@ def captured [iwad: binary, name: string, script: binary, count: int, binary: pa
     let frames = $trace | lines | parse 'CAPTURE tic {tic} gamestate {gamestate} wi {wi}'
     if ($frames | is-empty) { error make {msg: $"Chocolate did not capture command ($count): ($trace | lines | last)"} }
     let scene = $frames | first
+    let finale = $trace | lines | parse 'FINALE tic {tic} stage {stage} count {count}'
     let right = match $screen {
       level => ($scene.gamestate == "0")
       tally => ($scene.gamestate == "1" and $scene.wi == "0")
       entering => ($scene.gamestate == "1" and $scene.wi in ["1" "-1"])
+      finale-text => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "0")
+      finale-art => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "1")
     }
     if not $right { error make {msg: $"captured frame is not ($screen): ($scene)"} }
     let raw = open --raw $target
@@ -226,6 +229,9 @@ def compare [
   run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool, messages: bool>
 ]: nothing -> record {
   if $run.unmasked and $run.capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
+  if ($run.screen | str starts-with "finale-") and (not $run.unmasked or $run.capture == "") {
+    error make {msg: "finale frames require --capture and --unmasked"}
+  }
   let capture = if $run.capture == "" { "" } else { $run.capture | path expand }
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
@@ -234,7 +240,8 @@ def compare [
     tally => (finished $iwad $m)
     entering => (entering $iwad $m)
     level => (patch-pixels $iwad M_PAUSE 126 4)
-    _ => (error make {msg: $"--screen ($run.screen) is none of level, tally or entering"})
+    finale-text | finale-art => []
+    _ => (error make {msg: $"--screen ($run.screen) is none of level, tally, entering, finale-text or finale-art"})
   }
   let inter = $run.screen != level
   let scratch = pwd | path join research oracle
@@ -276,7 +283,7 @@ def main [
   --map: string = "E1M1"                   # the map, by its marker
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
-  --screen: string = "level"              # level, or tally or entering after the exit the script takes
+  --screen: string = "level"              # level, tally, entering, finale-text or finale-art
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
   --messages                               # show messages in both engines
@@ -295,7 +302,7 @@ def "main demo" [
   --wad: path                              # the IWAD (default $env.BENDOOM_IWAD)
   --things: string = ""                    # records to rewrite, each "record,type,x,y", facing 0
   --frame: path = ./frame                  # the frame dump, built from tools/frame.bend
-  --screen: string = "level"              # level, or tally or entering after the exit the tics take
+  --screen: string = "level"              # level, tally, entering, finale-text or finale-art
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
   --messages                               # show messages in both engines
