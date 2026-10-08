@@ -497,7 +497,7 @@ def Closed.chasing(a: H.Thing.Action) -> Bool:
 
 def Closed.wakes(d: H.Thing.Def) -> Bool:
   H.Def{+kind, +state, radius, height, flags} = d
-  Bool.or(U32.is_zero(H.Thing.seesound(kind)),
+  Bool.or(U32.is_zero((flags .&. 4194304 : U32)),
     Bool.and(Closed.looking(H.Thing.Row.action(H.Thing.row(state))),
       Bool.and(Closed.row(H.Thing.see(kind)),
         Closed.chasing(H.Thing.Row.action(H.Thing.row(H.Thing.see(kind)))))))
