@@ -11,6 +11,7 @@
 - [ ] Each demo compares with Chocolate Doom with zero differing pixels at no fewer than five tics spread through it and at its last tic.
 - [ ] Before reporting a desync, rule out the oracle (see `docs/agents/orchestrator.md`).
 - [ ] Resolve the inherited lethal-melee death-state discrepancy below, preserving fuzz phase through the actual draw history.
+- [ ] Resolve the inherited E1M8 status-face disagreement below at its first incorrect random draw or oracle event.
 - [ ] If Freedoom's DEMO1 (E1M6, Hurt Me Plenty) also replays in sync, pin it as a flake-check test; if not, report its first diverging tic and the missing mechanic.
 - [ ] The README's project status describes the episode.
 - [ ] All nine map start views match Chocolate Doom with zero differing pixels on the final episode build, as spec 54 requires.
@@ -40,3 +41,11 @@ The resulting death view differs by33920 pixels. Its different draw history also
 Chocolate Doom's `P_FireWeapon` enters `S_PLAY_ATK1` before the weapon attack state. `A_FirePistol`, `A_FireShotgun` and a loaded `A_FireCGun` enter `S_PLAY_ATK2` before firing. These transitions replace any pending player pain action. The corresponding existing Bendoom fire helpers omit that player-state transition. This is a source finding, not yet an observed waveform mismatch; compare a shared demo where firing overlaps the pending `A_Pain` action before claiming or fixing an audible difference.
 
 Ticket18 handles its new `A_GunFlash` transition using the existing standing row. In the current first-person player model, the attack chain has no actions, random draws, rendered sprite or movement predicate, so collapsing it to standing preserves its observable behavior. Literal attack rows are not required merely to match internal state numbers. Any correction to the older fire paths should preserve the common transition timing and remove the cause of a surviving pain action.
+
+## Inherited E1M8 status-face disagreement
+
+Ticket19's placed-player E1M8 route retains all stock things and changes only the player start to `-160 864 0`. Fixture SHA256 is `f65d1ebb68f31c629c02bd6fd70f15df298885cc852ee1d2c2435eb366934fc1`; complete demo SHA256 is `e86bc8240dfd2e29740b9b12934c41f67dad4a367baebce1ca701980c597ab8e`. The saved command stream is `research/route19-ending.commands` in `../bendoom-e1-19`; `research/production19/face-handoff.md` records the reproduction and external trace.
+
+Full-frame comparisons differ at tics2176/2519/2520/2694/2830 by538/497/497/538/503 pixels, all within the status face. At2176, the green16 binary and ticket19 have byte-identical entire status bars, including the same538 differing pixels. This establishes an inherited failure, not a passing cropped comparison. The six other predefined mechanic and ending views pass all64000 pixels and the active palette.
+
+The bounded trace at clocks2100..2175 puts Bendoom's M_Random index two draws ahead of Chocolate Doom throughout:0 versus254 at2100,34 versus32 at2131,79 versus77 at2175. The last BossDeath acts at2176, after this discrepancy. Locate the first differing draw and rule out the oracle before changing code; do not fit an offset, change capture tics or mask the face.
