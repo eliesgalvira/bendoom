@@ -826,6 +826,8 @@ def Sim.thing.act(action: H.Thing.Action, +id: U32, +s: S.State) -> S.Sim.Acted:
       S.Acted{None{}, Sim.monster.attack(H.Thing.baronball(), 10, id, s)}
     case H.SargAttack{}:
       S.Acted{None{}, Sim.sargattack(id, s)}
+    case H.BossDeath{}:
+      S.Acted{None{}, Sp.Sim.boss(id, s)}
     case H.Explode{}:
       S.Acted{None{}, Sim.explode.acted(S.State.thing(id, s), s)}
     case other:
