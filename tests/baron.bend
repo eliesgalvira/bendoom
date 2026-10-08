@@ -6,6 +6,7 @@ import ../src/tic.bend as Tic
 import ../src/inventory.bend as I
 import ../src/fixed.bend as F
 import ../src/vec.bend as V
+import ../src/sound.bend as Sn
 import ./fixtures/closed.bend as Fx
 
 def Baron.melee() -> S.State:
@@ -46,6 +47,12 @@ def main() -> IO(Unit):
     IO.print("baron melee/missile " ++ U32.show(H.Thing.melee(3003)) ++ " " ++ U32.show(H.Thing.missile(3003)))
     IO.print("balls speed/damage " ++ U32.show(H.Thing.speed(H.Thing.fireball())) ++ "/" ++ U32.show(H.Thing.damage(H.Thing.fireball()))
       ++ " " ++ U32.show(H.Thing.speed(H.Thing.baronball())) ++ "/" ++ U32.show(H.Thing.damage(H.Thing.baronball())))
+    IO.print("map1/map8 volumes " ++ U32.show(Sn.Sound.volume.at(1, F.Fixed.of_map(384))) ++ "/"
+      ++ U32.show(Sn.Sound.volume.at(8, F.Fixed.of_map(384))) ++ " "
+      ++ U32.show(Sn.Sound.volume.at(1, F.Fixed.of_map(1200))) ++ "/"
+      ++ U32.show(Sn.Sound.volume.at(8, F.Fixed.of_map(1200))) ++ " "
+      ++ U32.show(Sn.Sound.volume.at(1, F.Fixed.of_map(1400))) ++ "/"
+      ++ U32.show(Sn.Sound.volume.at(8, F.Fixed.of_map(1400))))
     Baron.report("claw", 7, Baron.melee())
     Baron.report("burst", 8, S.Sim.missile.burst.with(~Tic.Sim.missile.enter.acted, 8, Baron.fixture(False{})))
     Baron.report("vertical burst", 8, Tic.Sim.missile.z.hit(False{}, 8, Baron.fixture(False{})))
@@ -53,6 +60,7 @@ def main() -> IO(Unit):
 
 #|baron melee/missile 292 292
 #|balls speed/damage 655360/3 983040/8
+#|map1/map8 volumes 52/54 0/15 0/15
 #|claw random 2 health 90 state 294/8 reaction 8 angle 1073741824 missile False momentum 0.000000 0.000000
 #|burst random 1 health 100 state 297/6 reaction 8 angle 0 missile False momentum 0.000000 0.000000
 #|vertical burst random 1 health 100 state 297/6 reaction 8 angle 0 missile False momentum 0.000000 0.000000

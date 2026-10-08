@@ -23,7 +23,7 @@ def finished(+s: S.State) -> String:
 
 def shown(play: N.Play) -> String:
   match play:
-    case N.Playing{state, map, didsecret, pointer}:
+    case N.Playing{state, didsecret, pointer}:
       "still playing"
     case N.Showing{N.Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer}, after, trip}:
       "intermission " ++ N.Inter.Screen.show(screen) ++ " shown" ++ N.Inter.counts.show(5n, shown, 0)
@@ -43,7 +43,7 @@ def report(+s: S.State) -> IO(Unit):
     IO.print(finished(s))
     IO.print(position(S.State.player(s)))
     IO.print(S.Sim.Tally.show(S.Sim.tally(s)))
-    IO.print(shown(idled(600n, S.State.level(s), N.Play.after(False{}, L.Name{1, 1}, False{}, s))))
+    IO.print(shown(idled(600n, S.State.level(s), N.Play.after(False{}, False{}, s))))
 
 def loaded(world: Array<U32> & L.Level, cmds: List<&2, K.Cmd>) -> IO(Unit):
   (mem, level) = world

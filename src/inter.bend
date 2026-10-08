@@ -798,7 +798,7 @@ def Inter.frame(+gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, mem: Array<U32>) -> 
 # GS_LEVEL carries didsecret and WI_Drawer's static pointer through
 # loads and deaths. GS_INTERMISSION keeps the ended level and its trip.
 type Play is Data:
-  Playing{state: S.State, map: L.Level.Name, didsecret: Bool, pointer: Bool}
+  Playing{state: S.State, didsecret: Bool, pointer: Bool}
   Showing{inter: Inter, after: S.State, trip: Inter.Trip}
   Ending{finale: Fi.Finale}
 
@@ -806,8 +806,8 @@ type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
 
 # A new game on a map: G_InitNew, then G_DoLoadLevel.
-def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
-  Playing{Tic.State.start(level), map, False{}, False{}}
+def Play.start(level: L.Level) -> Play:
+  Playing{Tic.State.start(level), False{}, False{}}
 
 def Play.destination(secret: Bool, +episode: U32, +map: U32) -> L.Level.Name:
   match secret:
@@ -825,12 +825,12 @@ def Play.shown(pointer: Bool, +last: L.Level.Name, next: L.Level.Name, didsecret
 def Play.after.ended(how: S.Sim.Exit, pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   match how map:
     case S.Unended{} name:
-      Playing{after, name, didsecret, pointer}
+      Playing{after, didsecret, pointer}
     case S.Ended{secret} L.Name{+episode, +map}:
       Play.shown(pointer, L.Name{episode, map}, Play.destination(secret, episode, map), didsecret, after)
 
-def Play.after(pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
-  Play.after.ended(S.State.ended(after), pointer, map, didsecret, after)
+def Play.after(pointer: Bool, didsecret: Bool, +after: S.State) -> Play:
+  Play.after.ended(S.State.ended(after), pointer, L.Level.name(S.State.level(after)), didsecret, after)
 
 # G_DoReborn ahead of the tic: a death that asked for the level again
 # has the map as loaded reloaded.
@@ -853,21 +853,21 @@ def Play.sounds(before: S.Sim.Exit, +after: S.State) -> List<&2, Sn.Sound.Event>
 def Play.ticked(before: S.Sim.Exit, pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   match before map:
     case S.Unended{} L.Name{episode, 8}:
-      Playing{after, L.Name{episode, 8}, didsecret, pointer}
+      Playing{after, didsecret, pointer}
     case S.Ended{secret} L.Name{episode, 8}:
       Ending{Fi.Finale.tic(Fi.Finale.start())}
     case _ name:
-      Play.after(pointer, name, didsecret, after)
+      Play.after(pointer, didsecret, after)
 
 # A tic of the current scene: the level, tally or finale. A reload makes
 # the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, play: Play) -> Play.Step:
   match play:
-    case Playing{+state, map, didsecret, pointer}:
+    case Playing{+state, didsecret, pointer}:
       +ended = S.State.ended(state)
       +reborn = S.State.reborn(state)
       +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
-      Step{Play.ticked(ended, pointer, map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
+      Step{Play.ticked(ended, pointer, L.Level.name(S.State.level(after)), Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
     case Showing{+wi, after, trip}:
       +down = Inter.buttons(K.Cmd.attack(cmd), K.Cmd.use(cmd))
       +ticked = Inter.tic(down, wi)
@@ -888,21 +888,21 @@ def Play.Step.sounds(step: Play.Step) -> List<&2, Sn.Sound.Event>:
 # leaving E1M9 marks it again before anything reads it.
 def Play.enter(+level: L.Level, +wi: Inter, after: S.State, trip: Inter.Trip) -> Play:
   Trip{last, next, didsecret} = trip
-  Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.usedown(wi), Inter.attackdown(wi), after), next, didsecret, Inter.pointer(wi)}
+  Playing{Tic.State.carried(level, Inter.mrnd(wi), Inter.usedown(wi), Inter.attackdown(wi), after), didsecret, Inter.pointer(wi)}
 
 # A play and what it is drawn from: the frame's array, the graphics, the
 # tables and the map as loaded.
 type Play.World is Type:
   World{play: Play, mem: Array<U32>, gfx: G.Gfx, tables: P.Project.Tables, level: L.Level}
 
-def Play.World.start.gl(map: L.Level.Name, mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
+def Play.World.start.gl(mem: Array<U32>, gl: G.Gfx & L.Level) -> Play.World:
   (+gfx, +level) = gl
-  World{Play.start(level, map), mem, gfx, P.Project.tables(level), level}
+  World{Play.start(level), mem, gfx, P.Project.tables(level), level}
 
 # A new game on a map, in the world opened for it.
-def Play.World.start(map: L.Level.Name, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+def Play.World.start(p: Array<U32> & G.Gfx & L.Level) -> Play.World:
   (mem, gl) = p
-  Play.World.start.gl(map, mem, gl)
+  Play.World.start.gl(mem, gl)
 
 def Play.World.of.gl(+wi: Inter, after: S.State, trip: Inter.Trip, mem: Array<U32>, gl: G.Gfx & L.Level) ->
   Play.World:
@@ -976,8 +976,8 @@ def Play.run(cmds: List<&2, K.Cmd>, run: Play.Run) -> IO(Play.Run):
 # D_VICTOR through the finale.
 def Play.song(play: Play) -> String:
   match play:
-    case Playing{state, L.Name{episode, map}, didsecret, pointer}:
-      "D_" ++ L.Level.marker(episode, map)
+    case Playing{state, didsecret, pointer}:
+      "D_" ++ L.Level.Name.marker(L.Level.name(S.State.level(state)))
     case Showing{inter, after, trip}:
       "D_INTER"
     case Ending{f}:
@@ -990,7 +990,7 @@ def Play.songs() -> List<&2, String>:
 # Each scene draws into the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
-    case Playing{+state, map, didsecret, pointer}:
+    case Playing{+state, didsecret, pointer}:
       R.Render.frame(tables, gfx, state, messages, mem)
     case Showing{+wi, after, trip}:
       (Inter.frame(gfx, wi, trip, mem), 0)
