@@ -851,7 +851,8 @@ def Sim.near(+level: L.Level, things: H.Things, +x: U32, +y: U32, +r: U32) -> Li
 
 # The player's mobj, MT_PLAYER.
 def Player.body(+p: Player, id: U32) -> Sim.Body:
-  Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), Sim.flags()}
+  Body{id, Player.x(p), Player.y(p), Player.z(p), Sim.radius(), Sim.height(), (Sim.flags() .|. Bool.pick(U32,
+    U32.is_zero(I.Inventory.power.of(I.Inventory.pw_invisibility(), Player.inv(p))), 0, 262144) : U32)}
 
 # A thing's live body, including the dimensions a crushed corpse loses.
 def Sim.body.of(th: H.Thing) -> Sim.Body:
@@ -2663,19 +2664,34 @@ def Sim.missile.put(m: Maybe<&2, H.Thing>, +id: U32, +angle: U32, +momx: U32, +m
     case Some{th}:
       State.thing.put(id, Sim.missile.thing(th, angle, momx, momy, momz, source), s)
 
-def Sim.missile.spawn(+kind: U32, m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> State:
-  Body{mi, +x, +y, +z, mr, mh, mf} = m
-  Body{ti, +tx, +ty, +tz, tr, th, tf} = t
-  +angle = A.Angle.of(L.Level.tanto(State.level(s)), (tx - x : U32), (ty - y : U32))
+def Sim.shadow.turn(shadow: Bool, angle: U32, shift: Nat, +s: State) -> U32 & State:
+  match shadow:
+    case False{}:
+      (angle, s)
+    case True{}:
+      +first = M.Random.next(State.rnd(s))
+      +second = M.Random.next(first)
+      ((angle + ((M.Random.at(first) - M.Random.at(second) : U32) << shift) : U32), State.rnd.put(second, s))
+
+def Sim.missile.aimed(+kind: U32, +x: U32, +y: U32, +z: U32, +tx: U32, +ty: U32, +tz: U32,
+  +source: U32, +id: U32, p: U32 & State) -> State:
+  (+angle, +s) = p
   +fine = A.Angle.fine(angle)
   +speed = H.Thing.speed(kind)
   +dist = U32.max((F.Fixed.approx((tx - x : U32), (ty - y : U32)) / speed : U32), 1)
+  Sim.missile.put(H.Things.get(State.things(s), id), id, angle,
+    F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(s)), fine)),
+    F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(s)), fine)),
+    F.Fixed.quot((tz - z : U32), dist), source, s)
+
+def Sim.missile.spawn(+kind: U32, m: Sim.Body, t: Sim.Body, +source: U32, +s: State) -> State:
+  Body{mi, +x, +y, +z, mr, mh, mf} = m
+  Body{ti, +tx, +ty, tz, tr, th, tf} = t
+  +angle = A.Angle.of(L.Level.tanto(State.level(s)), (tx - x : U32), (ty - y : U32))
   +id = H.Things.count(State.things(s))
-  +spawned = Sim.spawn(H.Thing.info(kind), x, y, (z + 2097152 : U32), s)
-  Sim.sound(H.Thing.seesound(kind), Sn.Thing{id}, Sim.missile.put(H.Things.get(State.things(spawned), id), id, angle,
-    F.Fixed.mul(speed, A.Angle.cos(L.Level.sine(State.level(spawned)), fine)),
-    F.Fixed.mul(speed, A.Angle.sin(L.Level.sine(State.level(spawned)), fine)),
-    F.Fixed.quot((tz - z : U32), dist), source, spawned))
+  Sim.missile.aimed(kind, x, y, z, tx, ty, tz, source, id,
+    Sim.shadow.turn(Bool.not(U32.is_zero((tf .&. 262144 : U32))), angle, 20n,
+      Sim.sound(H.Thing.seesound(kind), Sn.Thing{id}, Sim.spawn(H.Thing.info(kind), x, y, (z + 2097152 : U32), s))))
 
 def Sim.remove.thing(m: Maybe<&2, H.Thing>, s: State) -> State:
   match m:

@@ -16,6 +16,8 @@ import ./script.bend as T
 import ../src/bytes.bend as B
 import ../src/level.bend as L
 import ../src/gfx.bend as G
+import ../src/project.bend as P
+import ../src/sound.bend as Sn
 import ../src/keys.bend as K
 import ../src/inter.bend as I
 import ../src/demo.bend as D
@@ -44,17 +46,52 @@ def Frame.palette(p: Array<U32> & U32) -> Array<U32> & String:
   (mem, palette) = p
   (mem, B.Bytes.hex([palette]))
 
-def Frame.draw(messages: Bool, ran: I.Play.Run) -> IO(Unit):
-  I.Ran{I.World{play, mem, gfx, tables, level}, sounds} = ran
+def Frame.printed(palette: U32, mem: Array<U32>) -> IO(Unit):
   do IO<Unit>:
-    rest : Array<U32> <- Frame.print(Frame.palette(I.Play.frame(tables, gfx, play, messages, mem)))
+    rest : Array<U32> <- Frame.print(Frame.palette((mem, palette)))
     Frame.rows(200n, 0, rest)
 
-def Frame.load(messages: Bool, script: List<&2, K.Cmd>, +map: L.Level.Name) -> IO(Unit):
-  do IO<Unit>:
-    w : Array<U32> & G.Gfx & L.Level <- I.Play.open(map)
-    ran : I.Play.Run <- I.Play.run(script, I.Ran{I.Play.World.start(w), []})
-    Frame.draw(messages, ran)
+type Frame.Run is Type:
+  Run{world: I.Play.World, palette: U32}
+
+def Frame.drawn(play: I.Play, gfx: G.Gfx, tables: P.Project.Tables, level: L.Level,
+  p: Array<U32> & U32) -> Frame.Run:
+  (mem, palette) = p
+  Run{I.World{play, mem, gfx, tables, level}, palette}
+
+def Frame.draw(messages: Bool, w: I.Play.World) -> Frame.Run:
+  I.World{+play, mem, +gfx, +tables, level} = w
+  Frame.drawn(play, gfx, tables, level, I.Play.frame(tables, gfx, play, messages, mem))
+
+def Frame.stepped(messages: Bool, p: I.Play.World & List<&2, Sn.Sound.Event>) -> Frame.Run:
+  (world, sounds) = p
+  Frame.draw(messages, world)
+
+# Timedemo consumes its startup command before the first D_Display.
+def Frame.go(cmds: List<&2, K.Cmd>, +messages: Bool, run: Frame.Run) -> IO(Unit):
+  match cmds run:
+    case [] Run{I.World{play, mem, gfx, tables, level}, palette}:
+      Frame.printed(palette, mem)
+    case +cmd <> rest Run{world, palette}:
+      IO.bind(I.Play.World, Unit, I.Play.load(world),
+        loaded => Frame.go(rest, messages, Frame.stepped(messages, I.Play.World.step(cmd, loaded))))
+
+def Frame.started(p: I.Play.World & List<&2, Sn.Sound.Event>) -> Frame.Run:
+  (world, sounds) = p
+  Run{world, 0}
+
+def Frame.start(script: List<&2, K.Cmd>, +messages: Bool, w: I.Play.World) -> IO(Unit):
+  match script:
+    case []:
+      Frame.go([], messages, Frame.draw(messages, w))
+    case +cmd <> []:
+      Frame.go([], messages, Frame.stepped(messages, I.Play.World.step(cmd, w)))
+    case +cmd <> rest:
+      Frame.go(rest, messages, Frame.started(I.Play.World.step(cmd, w)))
+
+def Frame.load(messages: Bool, script: List<&2, K.Cmd>, map: L.Level.Name) -> IO(Unit):
+  IO.bind(Array<U32> & G.Gfx & L.Level, Unit, I.Play.open(map),
+    opened => Frame.start(script, messages, I.Play.World.start(opened)))
 
 def Frame.demo(messages: Bool, +demo: List<&2, U32>) -> IO(Unit):
   Frame.load(messages, D.Demo.play(demo), D.Demo.map(demo))

@@ -909,15 +909,21 @@ def Play.World.of.gl(+wi: Inter, after: S.State, trip: Inter.Trip, mem: Array<U3
   (+gfx, +level) = gl
   World{Play.enter(level, wi, after, trip), mem, gfx, P.Project.tables(level), level}
 
-def Play.World.of(wi: Inter, after: S.State, trip: Inter.Trip, p: Array<U32> & G.Gfx & L.Level) -> Play.World:
-  (mem, gl) = p
-  Play.World.of.gl(wi, after, trip, mem, gl)
-
 # A map, its graphics and the frame's array from the WAD BENDOOM_IWAD
 # names.
 def Play.open(at: L.Level.Name) -> IO(Array<U32> & G.Gfx & L.Level):
   L.Name{+episode, +map} = at
   G.Gfx.open(episode, map)
+
+def Play.loaded(phase: U32, wi: Inter, after: S.State, trip: Inter.Trip,
+  p: Array<U32> & G.Gfx & L.Level) -> Play.World:
+  (mem, gl) = p
+  Play.World.of.gl(wi, after, trip, Array.set(U32, mem, G.Gfx.fuzzpos(), phase), gl)
+
+def Play.load.next(wi: Inter, after: S.State, +trip: Inter.Trip, p: Array<U32> & U32) -> IO(Play.World):
+  (mem, phase) = p
+  IO.bind(Array<U32> & G.Gfx & L.Level, Play.World, Play.open(Inter.Trip.next(trip)),
+    opened => IO.pure(Play.World, Play.loaded(phase, wi, after, trip, opened)))
 
 # G_WorldDone once the tally's last screen is over: the map the trip
 # names opened and entered.
@@ -927,8 +933,7 @@ def Play.load.if(over: Bool, wi: Inter, after: S.State, +trip: Inter.Trip, mem: 
     case False{}:
       IO.pure(Play.World, World{Showing{wi, after, trip}, mem, gfx, tables, level})
     case True{}:
-      IO.bind(Array<U32> & G.Gfx & L.Level, Play.World, Play.open(Inter.Trip.next(trip)),
-        opened => IO.pure(Play.World, Play.World.of(wi, after, trip, opened)))
+      Play.load.next(wi, after, trip, B.Bytes.at(mem, G.Gfx.fuzzpos()))
 
 # The world before a tic: the map the tally asks for, if it asks for
 # one, which loads before the next tic.

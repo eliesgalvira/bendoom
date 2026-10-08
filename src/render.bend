@@ -37,22 +37,23 @@ def Render.light(+level: L.Level, +p: S.Player, +extralight: U32) -> U32:
   P.Project.lightnum(L.Level.sector.light(level, L.Level.sector_at(level, S.Player.x(p), S.Player.y(p))),
     extralight)
 
-def Render.psprite(psp: S.Psprite, gfx: G.Gfx, lightnum: U32, fixedcolormap: U32, mem: Array<U32>) -> Array<U32>:
+def Render.psprite(psp: S.Psprite, gfx: G.Gfx, lightnum: U32, fixedcolormap: U32, shadow: Bool, mem: Array<U32>) -> Array<U32>:
   match psp:
     case S.Psprite{None{}, tics, sx, sy}:
       mem
     case S.Psprite{Some{state}, tics, sx, sy}:
-      T.Sprites.psprite(gfx, state, sx, sy, lightnum, fixedcolormap, mem)
+      T.Sprites.psprite(gfx, state, sx, sy, lightnum, fixedcolormap, shadow, mem)
 
 # Doom's R_DrawPlayerSprites: the weapon, then its flash, those that
 # show, over the view.
-def Render.psprites(ps: S.Psprites, +gfx: G.Gfx, +lightnum: U32, +fixedcolormap: U32, mem: Array<U32>) -> Array<U32>:
+def Render.psprites(ps: S.Psprites, +gfx: G.Gfx, +lightnum: U32, +fixedcolormap: U32, +shadow: Bool, mem: Array<U32>) -> Array<U32>:
   S.Psprites{weapon, flash} = ps
-  Render.psprite(flash, gfx, lightnum, fixedcolormap, Render.psprite(weapon, gfx, lightnum, fixedcolormap, mem))
+  Render.psprite(flash, gfx, lightnum, fixedcolormap, shadow, Render.psprite(weapon, gfx, lightnum, fixedcolormap, shadow, mem))
 
 def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.Thing>, +p: S.Player,
   mem: Array<U32>) -> Array<U32>:
   Render.psprites(S.Player.psprites(p), gfx, Render.light(level, p, P.View.extralight(view)), P.View.fixedcolormap(view),
+    I.Inventory.blink(I.Inventory.power.of(I.Inventory.pw_invisibility(), S.Player.inv(p))),
     Render.rest(view, level, gfx, things, B.Bsp.walk(view, level, gfx, D.Draw.clear(mem))))
 
 # The heads-up line
