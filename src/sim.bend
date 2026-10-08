@@ -2848,8 +2848,8 @@ def Sim.damage.taken(hurt: I.Inventory & U32, +source: U32, +s: State) -> State:
 # is Hurt Me Plenty. Sector 11 clamps lethal damage before armour.
 def Sim.damage.final(+level: L.Level, +player: Player, +damage: U32) -> U32:
   +health = I.Inventory.health(Player.inv(player))
-  Bool.pick(U32, Bool.and(U32.is_eq(L.Level.sector.special(level,
-    L.Level.sector_at(level, Player.x(player), Player.y(player))), 11), U32.is_ge(damage, health)),
+  Bool.pick(U32, Bool.and(U32.is_ge(damage, health), U32.is_eq(L.Level.sector.special(level,
+    L.Level.sector_at(level, Player.x(player), Player.y(player))), 11)),
     (health - 1 : U32), damage)
 
 def Sim.damage.player(+damage: U32, +source: U32, +s: State) -> State:
