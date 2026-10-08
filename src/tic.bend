@@ -734,33 +734,13 @@ def Sim.melee.damage(+target: U32, +factor: U32, +sides: U32, +id: U32, s: S.Sta
   +after = S.Sim.drawn(s)
   Sim.damage(target, (((M.Random.at(S.State.rnd(after)) % sides : U32) + 1 : U32) * factor : U32), id, id, after)
 
-def Sim.missile.ready(th: H.Thing, +cut: U32) -> H.Thing:
-  H.Thing{tid, kind, x, y, +z, floorz, ceilz, angle, sector, state, +tics, +momz, hurt} = th
-  H.Thing{tid, kind, x, y, (z + F.Fixed.sar(momz) : U32), floorz, ceilz, angle, sector, state,
-    F.Fixed.max((tics - cut : U32), 1), momz, hurt}
-
-def Sim.missile.first.ready(+ready: H.Thing, +id: U32, +s: S.State) -> S.State:
-  H.Thing{tid, kind, +x, +y, z, floorz, ceilz, angle, sector, state, tics, momz, +hurt} = ready
-  S.Sim.thing.fit.with(~Sim.missile.enter.acted, id, H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt},
-    (x + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momx())) : U32),
-    (y + F.Fixed.sar(V.Vec.get(hurt, H.Thing.hurt.momy())) : U32), s)
-
-def Sim.missile.first(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
-  match m:
-    case None{}:
-      s
-    case Some{th}:
-      +after = S.Sim.drawn(s)
-      +ready = Sim.missile.ready(th, (M.Random.at(S.State.rnd(after)) .&. 3 : U32))
-      Sim.missile.first.ready(ready, id, S.State.thing.put(id, ready, after))
-
 def Sim.monster.throw(+kind: U32, +target: U32, +id: U32, +s: S.State) -> S.State:
   +missile = H.Things.count(S.State.things(s))
   +spawned = S.Sim.missile.spawn(kind, Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), id),
       S.Player.body(S.State.player(s), H.Things.you(S.State.things(s)))),
     Maybe.default(&2, S.Sim.Body, S.Sim.body(S.State.things(s), S.State.player(s), target),
       S.Player.body(S.State.player(s), H.Things.you(S.State.things(s)))), id, s)
-  Sim.missile.first(H.Things.get(S.State.things(spawned), missile), missile, spawned)
+  S.Sim.missile.first.with(~Sim.missile.enter.acted, H.Things.get(S.State.things(spawned), missile), missile, spawned)
 
 def Sim.monster.hit(near: Bool, +kind: U32, +factor: U32, +target: U32, +id: U32, +s: S.State) -> S.State:
   match near:
@@ -1139,7 +1119,7 @@ def Sim.weapon.select(+cmd: K.Cmd, +s: S.State) -> S.State:
 # fixes leaves it, is compared once per read (docs/bend.md).
 def Sim.player.thinks(+cmd: K.Cmd, hurt: S.State) -> S.State:
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = hurt
-  Sim.player.counted(S.Sim.psprites.with(~Sim.damage.enter.acted, ~Sp.Sim.shoot, cmd, Sim.weapon.select(cmd, Sp.Sim.sector.secret(
+  Sim.player.counted(S.Sim.psprites.with(~Sim.missile.enter.acted, ~Sp.Sim.shoot, cmd, Sim.weapon.select(cmd, Sp.Sim.sector.secret(
     S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret}))))
 
 # Doom's P_PlayerThink for a living player, in its order: the move, the

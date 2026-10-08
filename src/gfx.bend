@@ -921,7 +921,7 @@ def Gfx.sprite.rows(s: H.Thing.Spawn) -> List<&2, U32>:
   +second = (H.Thing.Weapon.flash(H.Thing.chaingun()) + 1 : U32)
   +marks = Gfx.sprite.chase(n, False{}, second, second, marks)
   +marks = Gfx.sprite.spawned([2007, 2001, H.Thing.puff(), H.Thing.blood(), H.Thing.fireball(),
-    H.Thing.tfog(), H.Thing.baronball()], n, marks)
+    H.Thing.tfog(), H.Thing.baronball(), H.Thing.rocket()], n, marks)
   Gfx.sprite.rows.go(n, 0, Gfx.sprite.marks(things, n, marks))
 
 def Gfx.install.names(views: List<&2, Gfx.Install>) -> List<&2, String>:

@@ -82,7 +82,7 @@ with an error.
 | Run | Hold Shift |
 | Fire | Ctrl |
 | Open doors / press switches | Space / Enter |
-| Select fist / pistol / shotgun / chaingun | 1 / 2 / 3 / 4, if owned |
+| Select fist / pistol / shotgun / chaingun / rocket launcher | 1 / 2 / 3 / 4 / 5, if owned |
 | Restart after dying | Space / Enter |
 | Quit | Esc, or close the window |
 

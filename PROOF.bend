@@ -387,7 +387,7 @@ def rest_walked(+geo: L.Level.Geo, +sectors: V.Vec, +specials: V.Vec, +heard: V.
 def rest_counted(+nukage: Bool, +hellslime: Bool, counts: Bool, +sector: U32, +geo: L.Level.Geo,
   +sectors: V.Vec, +specials: V.Vec, +heard: V.Vec, +x: U32, +y: U32) -> S.State:
   Sp.Sim.use(Bool.and(Bool.not(S.Player.dead(rest_player(x, y))), Tic.Sim.pressed(K.Cmd.idle(), False{})),
-    Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.damage.enter.acted, ~Sp.Sim.shoot, K.Cmd.idle(),
+    Tic.Sim.player.counted(S.Sim.psprites.with(~Tic.Sim.missile.enter.acted, ~Sp.Sim.shoot, K.Cmd.idle(),
       Tic.Sim.weapon.select(K.Cmd.idle(), Sp.Sim.sector.secret.count(counts, sector,
         Sp.Sim.sector.damage(nukage, hellslime, 0, rest_walked(geo, sectors, specials, heard, x, y)))))))
 
