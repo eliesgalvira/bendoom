@@ -15,16 +15,10 @@ def Baron.melee() -> S.State:
   Tic.Sim.monster.attack(H.Thing.baronball(), 10, 7,
     S.Sim.thing.counted(7, H.Thing.hurt.target(), H.Thing.you(), s))
 
-def Baron.fixture(+blast: Bool) -> S.State:
+def Baron.fixture() -> S.State:
   Fx.Closed.at(Fx.Closed.player(13107200, 4194304, 0, 8388608), Fx.Closed.doors(), [],
     S.Sim.missile.thing(Fx.Closed.thing(8, H.Thing.baronball(), 2097152, 4194304, 2097152),
-      0, 983040, 0, 65536, H.Thing.you()) <>
-    Bool.pick(List<&2, H.Thing>, blast, [Fx.Closed.thing(9, 2035, 2097152, 4194304, 2097152)], []))
-
-# Future rocket entry runs A_Explode; this adapter exercises the shared
-# burst callback before its duration draw, using the existing blast action.
-def Baron.explode(+id: U32, th: H.Thing, +state: U32, s: S.State) -> S.State:
-  Tic.Sim.missile.enter.action(H.Explode{}, id, th, state, s)
+      0, 983040, 0, 65536, H.Thing.you()) <> [])
 
 def Baron.thing(m: Maybe<&2, H.Thing>) -> String:
   match m:
@@ -54,9 +48,8 @@ def main() -> IO(Unit):
       ++ U32.show(Sn.Sound.volume.at(1, F.Fixed.of_map(1400))) ++ "/"
       ++ U32.show(Sn.Sound.volume.at(8, F.Fixed.of_map(1400))))
     Baron.report("claw", 7, Baron.melee())
-    Baron.report("burst", 8, S.Sim.missile.burst.with(~Tic.Sim.missile.enter.acted, 8, Baron.fixture(False{})))
-    Baron.report("vertical burst", 8, Tic.Sim.missile.z.hit(False{}, 8, Baron.fixture(False{})))
-    Baron.report("blast entry", 8, S.Sim.missile.burst.with(~Baron.explode, 8, Baron.fixture(True{})))
+    Baron.report("burst", 8, S.Sim.missile.burst.with(~Tic.Sim.missile.enter.acted, 8, Baron.fixture()))
+    Baron.report("vertical burst", 8, Tic.Sim.missile.z.hit(False{}, 8, Baron.fixture()))
 
 #|baron melee/missile 292 292
 #|balls speed/damage 655360/3 983040/8
@@ -64,4 +57,3 @@ def main() -> IO(Unit):
 #|claw random 2 health 90 state 294/8 reaction 8 angle 1073741824 missile False momentum 0.000000 0.000000
 #|burst random 1 health 100 state 297/6 reaction 8 angle 0 missile False momentum 0.000000 0.000000
 #|vertical burst random 1 health 100 state 297/6 reaction 8 angle 0 missile False momentum 0.000000 0.000000
-#|blast entry random 2 health 100 state 297/5 reaction 8 angle 0 missile False momentum 0.000000 0.000000

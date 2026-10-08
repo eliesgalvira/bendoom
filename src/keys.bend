@@ -16,9 +16,9 @@ type Cmd is Data:
   Cmd{forward: U32, side: U32, turn: U32, buttons: U32}
 
 # The number keys read, none held: one for each weapon Bendoom fires
-# that a key selects, the fist's to the chaingun's.
+# that a key selects, the fist's to the launcher's.
 def Keys.numbers.none() -> List<&2, Bool>:
-  [False{}, False{}, False{}, False{}]
+  [False{}, False{}, False{}, False{}, False{}]
 
 def Keys.none() -> Keys:
   Keys{False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, False{}, Keys.numbers.none()}
