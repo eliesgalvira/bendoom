@@ -7,7 +7,6 @@
 # redraws the bar's widgets only where a value changed; a pure frame
 # draws the whole of it every time.
 import Base
-import ./bytes.bend as B2
 import ./level.bend as L
 import ./gfx.bend as G
 import ./sim.bend as S
@@ -59,42 +58,23 @@ def Render.view(+view: P.View, +level: L.Level, +gfx: G.Gfx, things: List<&2, H.
 # The heads-up line
 # -----------------
 
-# The line so far: the array, the column the next character is drawn at,
-# and whether the edge of the screen has stopped it.
-type Render.Line is Type:
-  Line{mem: Array<U32>, x: U32, done: Bool}
-
-# HUlib_drawTextLine's test for a glyph that would run off the screen:
-# it stops the line where it stands, undrawn.
-def Render.line.fit(fits: Bool, +x: U32, w: U32, patch: U32, mem: Array<U32>) -> Render.Line:
-  match fits:
-    case False{}:
-      Line{mem, x, True{}}
-    case True{}:
-      Line{D.Draw.patch(mem, patch, x, Msg.Message.y()), (x + w : U32), False{}}
-
-def Render.line.wide(+x: U32, patch: U32, p: Array<U32> & U32) -> Render.Line:
-  (mem, +w) = p
-  Render.line.fit(U32.is_le((x + w : U32), 320), x, w, patch, mem)
-
 # One character of HUlib_drawTextLine: a glyph is drawn and moves the
 # line on by its patch's width, and a character without one moves it on
 # by 4 and stops the line at the screen's edge.
-def Render.line.char(g: Maybe<&2, U32>, +gfx: G.Gfx, +x: U32, mem: Array<U32>) -> Render.Line:
+def Render.line.char(g: Maybe<&2, U32>, +gfx: G.Gfx, +x: U32, mem: Array<U32>) -> D.Draw.Glyph:
   match g:
     case None{}:
-      Line{mem, (x + 4 : U32), U32.is_ge((x + 4 : U32), 320)}
+      D.Glyph{mem, (x + 4 : U32), U32.is_ge((x + 4 : U32), 320)}
     case Some{i}:
-      +patch = G.Gfx.font(gfx, i)
-      Render.line.wide(x, patch, B2.Bytes.u16(mem, patch))
+      D.Draw.glyph(x, Msg.Message.y(), G.Gfx.font(gfx, i), mem)
 
-def Render.line(text: String, +gfx: G.Gfx, st: Render.Line) -> Array<U32>:
+def Render.line(text: String, +gfx: G.Gfx, st: D.Draw.Glyph) -> Array<U32>:
   match text st:
-    case SNil{} Line{mem, x, done}:
+    case SNil{} D.Glyph{mem, x, done}:
       mem
-    case SCon{c, rest} Line{mem, x, True{}}:
+    case SCon{c, rest} D.Glyph{mem, x, True{}}:
       mem
-    case SCon{c, rest} Line{mem, +x, False{}}:
+    case SCon{c, rest} D.Glyph{mem, +x, False{}}:
       Render.line(rest, gfx, Render.line.char(Msg.Message.glyph(c), gfx, x, mem))
 
 def Render.messages(on: Bool, +gfx: G.Gfx, n: U32, mem: Array<U32>) -> Array<U32>:
@@ -102,7 +82,7 @@ def Render.messages(on: Bool, +gfx: G.Gfx, n: U32, mem: Array<U32>) -> Array<U32
     case False{}:
       mem
     case True{}:
-      Render.line(Msg.Message.text(n), gfx, Line{mem, Msg.Message.x(), False{}})
+      Render.line(Msg.Message.text(n), gfx, D.Glyph{mem, Msg.Message.x(), False{}})
 
 # Doom's HU_Drawer: the message line in the WAD's font at HU_MSGX,
 # HU_MSGY, over the view, while its counter runs. A frame drawn with

@@ -14,7 +14,7 @@
 - [ ] The README's project status describes the episode.
 - [ ] All nine map start views match Chocolate Doom with zero differing pixels on the final episode build, as spec 54 requires.
 - [ ] Each map song has a zero-sample-difference comparison through `tools/listen.nu`, as spec 56 requires. Keep valid earlier evidence where the relevant path is unchanged; one map's song does not establish the others.
-- [ ] The final browser build passes the episode parity checks required by spec 51, with music and sound effects from the opened WAD.
+- [ ] The final browser build passes the episode parity checks required by spec 51, with music and sound effects from the opened WAD. Include the finale's full text and HELP2; ticket 21 verified native frames and exports, but its targeted browser RGB comparison did not finish.
 - [ ] E1M6 and E1M9 hold 35 tics/s with music synthesizing and no audio underruns, using the window bench's counter as specified in spec 57.
 
 ## Baseline (ticket 02, 2026-10-02)
