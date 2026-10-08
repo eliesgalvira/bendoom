@@ -21,4 +21,4 @@ Expected values come from installed Chocolate Doom source and WAD data. Rest-fra
 
 Sim, focused baron, fight, load and render checks pass on native and JavaScript; proof passes. Native frame, game and film builds each measure maximum arity 251, leaving four words of headroom. The type-inventory expectation's added internal kind has zero map instances, read directly from Freedoom E1M1 THINGS; no behavior or frame pins changed.
 
-No feature captures or audio comparisons have run. The actual-death fixture must keep the second baron alive so the last-baron floor action is not triggered. Native builds and regression pins alone do not establish gameplay acceptance.
+Chocolate-only route probes have run; their initial positions did not produce the required flight, impact or corpse evidence. Corrected routes remain unverified. No Bend feature or audio comparisons have run. Verified powerups integration is merged; the recorded products and width precede that merge. The actual-death fixture must keep the second baron alive so the last-baron floor action is not triggered. Native builds and regression pins alone do not establish gameplay acceptance.
