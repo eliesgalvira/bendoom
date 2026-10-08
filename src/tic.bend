@@ -352,17 +352,22 @@ def Sim.chase.newdir(w: S.Sim.Walk, +deltax: U32, +deltay: U32, +level: L.Level)
     S.Sim.thing.reads(S.State.things(s), id, H.Thing.hurt.movedir()), level)
 
 # Doom's A_FaceTarget: the thing turns to face its target.
-def Sim.chase.face.at(+level: L.Level, th: H.Thing, +tx: U32, +ty: U32) -> H.Thing:
+def Sim.chase.face.at(th: H.Thing, angle: U32) -> H.Thing:
   H.Thing{id, kind, +x, +y, z, floorz, ceilz, was, sector, state, tics, momz, +ai} = th
-  H.Thing{id, kind, x, y, z, floorz, ceilz, A.Angle.of(L.Level.tanto(level), (tx - x : U32), (ty - y : U32)),
+  H.Thing{id, kind, x, y, z, floorz, ceilz, angle,
     sector, state, tics, momz,
     V.Vec.set(ai, H.Thing.hurt.flags(), (V.Vec.get(ai, H.Thing.hurt.flags()) .&. U32.not(32) : U32))}
+
+def Sim.chase.face.put(+id: U32, th: H.Thing, p: U32 & S.State) -> S.State:
+  (angle, s) = p
+  S.State.thing.put(id, Sim.chase.face.at(th, angle), s)
 
 def Sim.chase.faced(mt: Maybe<&2, S.Sim.Body>, mm: Maybe<&2, H.Thing>, +id: U32, +level: L.Level, s: S.State) ->
   S.State:
   match mt mm:
-    case Some{S.Body{i, +tx, +ty, tz, r, h, f}} Some{th}:
-      S.State.thing.put(id, Sim.chase.face.at(level, th, tx, ty), s)
+    case Some{S.Body{i, +tx, +ty, tz, r, h, f}} Some{+th}:
+      Sim.chase.face.put(id, th, S.Sim.shadow.turn(Bool.not(U32.is_zero((f .&. 262144 : U32))),
+        A.Angle.of(L.Level.tanto(level), (tx - H.Thing.x(th) : U32), (ty - H.Thing.y(th) : U32)), 21n, s))
     case _ _:
       s
 

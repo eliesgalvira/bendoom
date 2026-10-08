@@ -70,6 +70,10 @@ def Gfx.cliptop() -> U32:
 def Gfx.clipbot() -> U32:
   65152
 
+# R_DrawFuzzColumn's position survives frames and level loads.
+def Gfx.fuzzpos() -> U32:
+  65472
+
 # PLAYPAL's fourteen palettes as RGB words, 256 a palette: the plain
 # one, the eight reds, the four golds and the radiation suit's green.
 # ST_doPaletteStuff picks which one a frame is shown in.
