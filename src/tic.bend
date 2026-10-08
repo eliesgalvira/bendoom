@@ -854,8 +854,7 @@ def Sim.missile.z.hit(sky: Bool, +id: U32, +s: S.State) -> S.State:
     case False{}:
       S.Sim.missile.burst.with(~Sim.missile.enter.acted, id, s)
 
-def Sim.missile.z.move(hit: Bool, sky: Bool, +th: H.Thing, +id: U32, +s: S.State) -> S.State:
-  +moved = H.Thing.zmove(th)
+def Sim.missile.z.move(hit: Bool, sky: Bool, +moved: H.Thing, +id: U32, +s: S.State) -> S.State:
   match hit:
     case True{}:
       Sim.missile.z.hit(sky, id, S.State.thing.put(id, moved, s))
@@ -869,7 +868,7 @@ def Sim.missile.z(+th: H.Thing, +id: U32, +s: S.State) -> S.State:
   +floor = F.Fixed.le(next, floorz)
   +ceiling = F.Fixed.gt((next + height : U32), ceilz)
   Sim.missile.z.move(Bool.or(floor, ceiling), Bool.and(ceiling, L.Level.sky(S.State.level(s), sector)),
-    H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}, id, s)
+    H.Thing.zmove(H.Thing{tid, kind, x, y, z, floorz, ceilz, angle, sector, state, tics, momz, hurt}), id, s)
 
 def Sim.thing.vertical(missile: Bool, +th: H.Thing, +id: U32, +s: S.State) -> S.State:
   match missile:
