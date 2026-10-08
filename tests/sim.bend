@@ -979,14 +979,17 @@ def free(+s: S.State) -> IO(S.State):
 # A run, then the tic, the player's place, the inventory, how many
 # things are left and the names of those taken since the case's first
 # state.
-def picked(tag: String, n: Nat, cmd: K.Cmd, +first: S.State, s: S.State) -> IO(S.State):
-  +r = ran(n, cmd, s)
-  +q = Run.state(r)
+def picked.run(tag: String, first: List<&2, H.Thing>, r: Run) -> IO(S.State):
+  Run{log, +q} = r
   do IO<S.State>:
-    IO.print(Run.log(r) ++ line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
+    IO.print(log ++ line(tag ++ " tic " ++ U32.show(S.State.clock(q)), q))
     IO.print("  " ++ I.Inventory.show(S.Player.inv(S.State.player(q)))
-      ++ H.Things.tally(H.Things.list(S.State.things(first)), S.State.things(q)) ++ said(q))
+      ++ H.Things.tally(first, S.State.things(q)) ++ said(q))
     return q
+
+def picked(tag: String, n: Nat, cmd: K.Cmd, first: S.State, s: S.State) -> IO(S.State):
+  +before = H.Things.list(S.State.things(first))
+  picked.run(tag, before, ran(n, cmd, s))
 
 # An inventory with other health, armour points and type, and ammo in
 # ammotype_t order.
