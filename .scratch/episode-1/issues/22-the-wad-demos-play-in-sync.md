@@ -49,3 +49,7 @@ Ticket19's placed-player E1M8 route retains all stock things and changes only th
 Full-frame comparisons differ at tics2176/2519/2520/2694/2830 by538/497/497/538/503 pixels, all within the status face. At2176, the green16 binary and ticket19 have byte-identical entire status bars, including the same538 differing pixels. This establishes an inherited failure, not a passing cropped comparison. The six other predefined mechanic and ending views pass all64000 pixels and the active palette.
 
 The bounded trace at clocks2100..2175 puts Bendoom's M_Random index two draws ahead of Chocolate Doom throughout:0 versus254 at2100,34 versus32 at2131,79 versus77 at2175. The last BossDeath acts at2176, after this discrepancy. Locate the first differing draw and rule out the oracle before changing code; do not fit an offset, change capture tics or mask the face.
+
+## Where it stopped
+
+Worktree `/home/bigweld/Repos/bendoom-e1-22`, branch `e1-22`, remains at preflight checkpoint `c16887b`; no job is active or queued. Final acceptance has not run on the completed episode because tickets18 and19 remain unfinished. The current ticket and inherited reproductions are on `e1-tier1-candidate`; merge the current integration and handoff before resuming. The ignored `research/ticket22-plan.md` preserves proposed checks, which are not passing evidence. Keep valid earlier audio and browser evidence only where the relevant path is unchanged.
