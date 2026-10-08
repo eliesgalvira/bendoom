@@ -30,6 +30,11 @@ def main() -> IO(Unit):
       K.Keys.cmd(keys(False{}, False{}, False{}, False{}, False{}, False{}, True{}), 0)]))
     IO.print("script " ++ cmds(K.Input.script(7n,
       K.Input{keys(False{}, True{}, False{}, False{}, False{}, False{}, False{}), 0})))
+    IO.print("weapons " ++ cmds([
+      K.Keys.cmd(K.Keys.press(53, True{}, K.Keys.none()), 0),
+      K.Keys.cmd(K.Keys.press(50, True{}, K.Keys.press(53, True{}, K.Keys.none())), 0),
+      K.Keys.cmd(K.Keys.press(53, False{}, K.Keys.press(53, True{}, K.Keys.none())), 0)]))
 
 #|cmd [25 0 0 0, 50 0 0 0, 0 24 0 0, 0 4294967256 0 0, 0 0 320 0, 0 0 640 0, 0 0 4294966016 0, 0 0 0 2]
 #|script [0 0 320 0, 0 0 320 0, 0 0 320 0, 0 0 320 0, 0 0 320 0, 0 0 640 0, 0 0 640 0]
+#|weapons [0 0 0 36, 0 0 0 12, 0 0 0 0]

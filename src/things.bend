@@ -215,6 +215,8 @@ type Thing.Action is Data:
   SargAttack{}
   BruisAttack{}
   BossDeath{}
+  GunFlash{}
+  FireMissile{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -235,7 +237,8 @@ type Thing.Row is Data:
 # barrel's explosion 176 to 180; blood 181 to 183; the imp's fireball
 # 196 to 200; the shotgun 201 to 214, the fist 215 to 222, the chainsaw
 # 223 to 229 and the chaingun 230 to 237; vanilla's S_NULL 238, which
-# the teleport destination stands in; and the baron 261 to 279 and 292 to 294, its ball 295 to 299. A
+# the teleport destination stands in; the baron 261 to 279 and 292 to 294,
+# its ball 295 to 299; the launcher 300 to 309 and its rocket 310 to 313. A
 # monster's second pain row leads back to its see state. Only player
 # sprites' rows have 0 tics: the A_ReFire that ends the chainsaw's and
 # the chaingun's attacks, and S_LIGHTDONE, which carries A_Light0 in
@@ -397,7 +400,14 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"BOSS", 6, False{}, 8, 263, BruisAttack{}, 0},
     Row{"BAL7", 0, True{}, 4, 296, Null{}, 0}, Row{"BAL7", 1, True{}, 4, 295, Null{}, 0},
     Row{"BAL7", 2, True{}, 6, 298, Null{}, 0}, Row{"BAL7", 3, True{}, 6, 299, Null{}, 0},
-    Row{"BAL7", 4, True{}, 6, 4294967295, Null{}, 0}]
+    Row{"BAL7", 4, True{}, 6, 4294967295, Null{}, 0},
+    Row{"MISG", 0, False{}, 1, 300, WeaponReady{}, 0}, Row{"MISG", 0, False{}, 1, 301, Lower{}, 0},
+    Row{"MISG", 0, False{}, 1, 302, Raise{}, 0}, Row{"MISG", 1, False{}, 8, 304, GunFlash{}, 0},
+    Row{"MISG", 1, False{}, 12, 305, FireMissile{}, 0}, Row{"MISG", 1, False{}, 0, 300, ReFire{}, 0},
+    Row{"MISF", 0, True{}, 3, 307, Null{}, 1}, Row{"MISF", 1, True{}, 4, 308, Null{}, 1},
+    Row{"MISF", 2, True{}, 4, 309, Null{}, 2}, Row{"MISF", 3, True{}, 4, 84, Null{}, 2},
+    Row{"MISL", 0, True{}, 1, 310, Null{}, 0}, Row{"MISL", 1, True{}, 8, 312, Explode{}, 0},
+    Row{"MISL", 2, True{}, 6, 313, Null{}, 0}, Row{"MISL", 3, True{}, 4, 4294967295, Null{}, 0}]
 
 def Thing.row(s: U32) -> Thing.Row:
   Maybe.default(&2, Thing.Row, List.get(&2, Thing.Row, Thing.rows(), U32.to_nat(s)),
@@ -448,10 +458,13 @@ def Thing.saw() -> Thing.Weapon:
 def Thing.chaingun() -> Thing.Weapon:
   Weapon{232, 230, 231, 0, 233, 236}
 
-# weaponinfo by weapontype_t, from wp_fist. The launcher, the plasma
-# rifle and the BFG fire nothing yet and hold the pistol's row.
+def Thing.launcher() -> Thing.Weapon:
+  Weapon{302, 300, 301, 3, 303, 306}
+
+# weaponinfo by weapontype_t, from wp_fist. The plasma rifle and BFG
+# remain outside the shareware game.
 def Thing.weapons() -> List<&2, Thing.Weapon>:
-  [Thing.fist(), Thing.pistol(), Thing.shotgun(), Thing.chaingun(), Thing.pistol(), Thing.pistol(), Thing.pistol(),
+  [Thing.fist(), Thing.pistol(), Thing.shotgun(), Thing.chaingun(), Thing.launcher(), Thing.pistol(), Thing.pistol(),
     Thing.saw()]
 
 def Thing.weapon(+weapon: U32) -> Thing.Weapon:
@@ -557,7 +570,7 @@ def Thing.defs() -> List<&2, Thing.Def>:
     Def{13, 241, 20, 16, 33554433}, Def{14, 238, 20, 16, 24}, Def{34, 243, 20, 16, 0}, Def{46, 244, 16, 16, 2},
     Def{58, 67, 30, 56, 4456454}, Def{2024, 248, 20, 16, 8388609}, Def{2025, 252, 20, 16, 1},
     Def{2026, 253, 20, 16, 8388609}, Def{2045, 259, 20, 16, 8388609}, Def{3003, 261, 24, 64, 4194310},
-    Def{4294967292, 280, 20, 16, 528}, Def{4294967291, 295, 6, 8, 67088}]
+    Def{4294967292, 280, 20, 16, 528}, Def{4294967291, 295, 6, 8, 67088}, Def{4294967290, 310, 11, 8, 67088}]
 
 # MT_PUFF's DoomEd type, -1: no THINGS record can name it, so the puff
 # only ever spawns from a shot.
@@ -575,6 +588,9 @@ def Thing.fireball() -> U32:
 
 def Thing.baronball() -> U32:
   4294967291
+
+def Thing.rocket() -> U32:
+  4294967290
 
 # MT_TFOG, the teleport fog, which only a teleport spawns.
 def Thing.tfog() -> U32:
@@ -637,6 +653,8 @@ def Thing.fight.row(kind: U32) -> List<&2, U32>:
       [1000, 0, 16, 0, 4294967295, 0, 0, 0, 0, 198, 4294967295, 17, 655360, 100, 0, 3]
     case 4294967291:
       [1000, 0, 16, 0, 4294967295, 0, 0, 0, 0, 297, 4294967295, 17, 983040, 100, 0, 8]
+    case 4294967290:
+      [1000, 0, 14, 0, 4294967295, 0, 0, 0, 0, 311, 4294967295, 82, 1310720, 100, 0, 20]
     case _:
       [1000, 0, 0, 0, 4294967295, 0, 0, 0, 0, 4294967295, 4294967295, 0, 0, 100, 0]
 
