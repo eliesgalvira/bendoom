@@ -70,24 +70,16 @@ def Finale.tile(n: Nat, +i: U32, +flat: U32, mem: Array<U32>) -> Array<U32>:
 type Finale.Pen is Type:
   Pen{mem: Array<U32>, x: U32, y: U32, done: Bool}
 
-def Finale.fit(fits: Bool, +x: U32, +y: U32, w: U32, patch: U32, mem: Array<U32>) -> Finale.Pen:
-  match fits:
-    case False{}:
-      Pen{mem, x, y, True{}}
-    case True{}:
-      Pen{D.Draw.patch(mem, patch, x, y), (x + w : U32), y, False{}}
+def Finale.drawn(y: U32, glyph: D.Draw.Glyph) -> Finale.Pen:
+  D.Glyph{mem, x, done} = glyph
+  Pen{mem, x, y, done}
 
-def Finale.wide(+x: U32, y: U32, patch: U32, p: Array<U32> & U32) -> Finale.Pen:
-  (mem, +w) = p
-  Finale.fit(U32.is_le((x + w : U32), 320), x, y, w, patch, mem)
-
-def Finale.glyph(g: Maybe<&2, U32>, +gfx: G.Gfx, +x: U32, y: U32, mem: Array<U32>) -> Finale.Pen:
+def Finale.glyph(g: Maybe<&2, U32>, +gfx: G.Gfx, +x: U32, +y: U32, mem: Array<U32>) -> Finale.Pen:
   match g:
     case None{}:
       Pen{mem, (x + 4 : U32), y, False{}}
     case Some{i}:
-      +patch = G.Gfx.font(gfx, i)
-      Finale.wide(x, y, patch, B.Bytes.u16(mem, patch))
+      Finale.drawn(y, D.Draw.glyph(x, y, G.Gfx.font(gfx, i), mem))
 
 def Finale.char(newline: Bool, c: Char, gfx: G.Gfx, x: U32, +y: U32, mem: Array<U32>) -> Finale.Pen:
   match newline:
