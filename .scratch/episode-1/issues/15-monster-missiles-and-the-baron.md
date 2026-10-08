@@ -2,23 +2,20 @@
 
 **Tier:** 3
 
-**What to build:** Typed monster missiles and vanilla baron attacks, pain, death and sounds. The shared missile path must run death-entry actions before randomizing explosion duration, including vertical impacts. E1M8 boss-death floor behavior belongs to ticket 19.
-
-**Remaining:** Shared map-context verification and sight/missile audio acceptance. Both separate source reviews are clear. Ticket 12's law and landing were approved on October 7.
+**What to build:** Typed monster missiles and vanilla baron attacks, pain, death and sounds. Missile death-entry actions run before explosion-duration randomization, including vertical impacts. E1M8 boss-death floors belong to ticket19.
 
 **Status:** ready-for-agent
 
-Typed spawn/impact metadata and baron rows 292–299 use projectile kind 4294967291. Runtime BAL7 loading now follows the existing spawn and hurt graph traversals alongside the other runtime effects. The shared missile callback runs the entered row's action before randomizing its duration; plain death rows preserve plain state entry.
+**Remaining:** Verify the loaded-level identity and E1M8 attenuation correction on affected native/JavaScript suites, proof and native products; repeat affected gameplay/rest oracles and compare sight/missile audio. Both source review axes are clear.
 
-- [x] On E1M8, visible baron ball mid-flight and impact compare with Chocolate Doom with zero differing pixels.
-- [x] The imp's existing tests and frame pins pass unchanged on native and JavaScript.
-- [ ] Actual imp flight and impact controls and the existing rest-frame oracles remain zero against Chocolate Doom.
-- [ ] A baron's actual gameplay death compares with vanilla at rest.
-- [ ] Baron sight and missile event audio still differ; claw and death full waves match after first-note alignment, with raw onsets retained.
-- [x] Focused externally derived baron/callback checks pass on native and JavaScript; native game, frame and film builds measure remaining headroom under the 255-word limit.
+Rows292–299 and projectile kind4294967291 are reserved for this ticket. Level.Geo owns the loaded Level.Name; Playing derives its identity from that level. Sound attenuation follows vanilla's gamemap8 rule. The native frame product measures197 words, leaving58 under the255-word limit; current game, film and window benchmark widths remain to be measured.
 
-Expected values come from installed Chocolate Doom source and WAD data. Rest-frame oracles remain zero; no masks or frame repins may hide mismatches.
+Reproducible E1M8 oracle cases use the same WAD fixtures in both games:
 
-Sim, focused baron, fight, load and render checks pass on native and JavaScript; proof passes. Native frame, game and film builds each measure maximum arity 251, leaving four words of headroom. The type-inventory expectation's added internal kind has zero map instances, read directly from Freedoom E1M1 THINGS; no behavior or frame pins changed.
+- Baron flight70 and impact82: player224,2592 facing0; baron record58 at608,2592 facing180. Impact selects palette8.
+- Imp flight80 and impact100: replace record58 with an imp at the same position and facing.
+- Actual rested corpse680: player416,2528 facing90; baron58 at416,2704 facing270. Commands: `40,0,0,0,0 1,25,0,0,0 39,0,0,0,0 520,0,0,0,2 80,0,0,0,0`, with normal shotgun, shells, armour and health pickups. Keep record59 an actual living baron at-128,-224, out of view, so the last-baron floor action cannot run.
 
-Actual unmasked E1M8 baron flight70/impact82 and imp flight80/impact100 compare at zero pixels. Impact palette8 matches the Chocolate diagnostic. The rested normal-combat corpse680 also compares unmasked0 after ordinary pickups following40idle; the earlier first-command pickup probe remains a five-pixel initial-display failure. Sight and combined missile waves differ and remain under investigation. Fresh products after verified powerups integration still measure251/four words free; affected render native/JS checks pass. All19 existing rest oracles compare unmasked0. The actual-death fixture must keep the second baron alive so the last-baron floor action is not triggered. Native builds and regression pins alone do not establish gameplay acceptance.
+These feature cases and all19 existing rest positions compare with zero unmasked pixels before the context correction. Repeat the affected comparisons on the final source. Expected positions, tics, states and audio come from Chocolate Doom and WAD data; no masks or output-derived repins may hide differences.
+
+Claw and death full sound waves match after first-note alignment. Sight and combined projectile waves remain unresolved. Preserve uncropped waves and raw onsets; aligned waveform equality does not settle ticket04's buffer-lead decision.
