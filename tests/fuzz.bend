@@ -39,8 +39,12 @@ def main() -> IO(Unit):
     Fuzz.report("face clear", 7, Fuzz.face(0))
     Fuzz.report("missile shadow", 0, Fuzz.missile(1))
     Fuzz.report("missile clear", 0, Fuzz.missile(0))
+    IO.print("fireball flags " ++ U32.show(H.Thing.Def.flags(H.Thing.info(H.Thing.fireball()))))
+    IO.print("baronball flags " ++ U32.show(H.Thing.Def.flags(H.Thing.info(H.Thing.baronball()))))
 
 #|face shadow random 2 angle 4083154944
 #|face clear random 0 angle 0
 #|missile shadow random 3 angle 4178575360
 #|missile clear random 1 angle 0
+#|fireball flags 67088
+#|baronball flags 67088

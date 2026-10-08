@@ -14,4 +14,6 @@
 
 Core checkpoint has full-frame zero comparisons for a placed stock E1M7 spectre at command12 and the actual E1M6 invisibility pickup at commands12,1972,1973,1974,1982,2100,2101. The latter covers blink and expiry. Native and JavaScript fuzz, powerups, player and baron tests pass. FaceTarget and missile angle/random-position expectations come from Chocolate's source.
 
-Remaining acceptance: external monster shot outcomes, nonzero phase through map transition and rebirth, Film against its actual draw schedule while preserving frame/audio counts, product widths and remaining affected checks. Native render currently differs only at `long fight 1453`, including weapon coverage; its expected hash is unchanged pending external diagnosis. That failure stopped the sequential check before render JavaScript, game and proof. No hashes have been repinned.
+External attack fixtures now match full frames for a shadow-targeted former human at150 and baron missiles at100/150. Projectile definitions had MF_SHADOW in place of vanilla MF_DROPOFF; corrected flags also restore full-frame zero for the Freedoom fight1453 and the earlier baron flight control. Existing render helpers and expected hashes are unchanged.
+
+Remaining acceptance: nonzero phase through map transition and rebirth, Film against its actual draw schedule while preserving frame/audio counts, product widths and remaining affected checks. Rerun native render after the flag correction; its earlier failure stopped the sequential check before render JavaScript, game and proof. No hashes have been repinned.
