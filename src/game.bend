@@ -132,9 +132,9 @@ def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
         playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map, didsecret, pointer}), moved)
         return (quit, Game{level, gfx, tables, I.Playing{state, map, didsecret, pointer}, input, last, owed, mem, demo,
           playing})
-    case I.Showing{+wi, +after, +trip}:
-      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(I.Showing{wi, after, trip}), music),
-        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, I.Showing{wi, after, trip}, input, last, owed,
+    case +scene:
+      IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(scene), music),
+        playing => IO.pure(Bool & Game, (quit, Game{level, gfx, tables, scene, input, last, owed,
           mem, demo, playing})))
 
 def Game.mixed(p: Bool & Game) -> IO(Bool & Game):
