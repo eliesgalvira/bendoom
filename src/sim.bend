@@ -2845,9 +2845,16 @@ def Sim.damage.taken(hurt: I.Inventory & U32, +source: U32, +s: State) -> State:
 # health the rest, which kills where the health it leaves runs out,
 # since vanilla holds the player's health at 0 exactly there. The god
 # and skill branches are left out, since no cheat is ported and the game
-# is Hurt Me Plenty, and so is the hack for sectors with special 11.
+# is Hurt Me Plenty. Sector 11 clamps lethal damage before armour.
+def Sim.damage.final(+level: L.Level, +player: Player, +damage: U32) -> U32:
+  +health = I.Inventory.health(Player.inv(player))
+  Bool.pick(U32, Bool.and(U32.is_eq(L.Level.sector.special(level,
+    L.Level.sector_at(level, Player.x(player), Player.y(player))), 11), U32.is_ge(damage, health)),
+    (health - 1 : U32), damage)
+
 def Sim.damage.player(+damage: U32, +source: U32, +s: State) -> State:
-  Sim.damage.taken(I.Inventory.hurt(Player.inv(State.player(s)), damage), source, s)
+  Sim.damage.taken(I.Inventory.hurt(Player.inv(State.player(s)),
+    Sim.damage.final(State.level(s), State.player(s), damage)), source, s)
 
 # Doom's thrust in P_DamageMobj: a hundred times an eighth of a unit a
 # point of damage over the target's mass, in C's int, which a
