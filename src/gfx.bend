@@ -9,7 +9,7 @@
 # status bar's; with the map's names go every frame of the animations
 # they touch and the partners of their switches.
 # Gfx is the directory into it: Data, so the draw takes it by copy.
-# Every other flat, texture and sprite stays a name in the WAD.
+# The finale's FLOOR4_8 and HELP2 are loaded too; other unused lumps stay in the WAD.
 import Base
 import ./vec.bend as V
 import ./bytes.bend as B

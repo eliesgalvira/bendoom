@@ -859,8 +859,7 @@ def Play.ticked(before: S.Sim.Exit, pointer: Bool, map: L.Level.Name, didsecret:
     case _ name:
       Play.after(pointer, name, didsecret, after)
 
-# A tic of the play on the map as loaded: the level's tic while it
-# runs, then the tally's. A reload makes
+# A tic of the current scene: the level, tally or finale. A reload makes
 # the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, play: Play) -> Play.Step:
   match play:
