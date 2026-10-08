@@ -2595,7 +2595,7 @@ def Sim.sound.place(source: Sn.Sound.Source, +s: State) -> Sn.Sound.Source:
 def Sim.sound.params(starting: Bool, place: Sn.Sound.Source, +level: L.Level, +p: Player) -> U32 & U32:
   match place:
     case Sn.Spot{x, y}:
-      Sn.Sound.adjust(starting, L.Level.sine(level), L.Level.tanto(level), Player.x(p), Player.y(p), Player.angle(p), x, y)
+      Sn.Sound.adjust(starting, L.Level.Name.map(L.Level.name(level)), L.Level.sine(level), L.Level.tanto(level), Player.x(p), Player.y(p), Player.angle(p), x, y)
     case _:
       (Sn.Sound.volume(), Sn.Sound.centre())
 
@@ -3861,9 +3861,14 @@ def Sim.melee.turn(+saw: Bool, target: Maybe<&2, U32>, +s: State) -> State:
       +facing = Bool.pick(U32, saw, Sim.melee.saw.angle(Player.angle(p), angle), angle)
       State.player.put(s, Player.pulled(Player.facing(p, facing), saw))
 
-def Sim.melee.sound(+saw: Bool, +hit: Bool, +s: State) -> State:
-  Bool.pick(State, saw, Sim.sound(Bool.pick(U32, hit, Sn.Sound.sawhit(), Sn.Sound.sawful()), Sn.Thing{H.Thing.you()}, s),
-    Bool.pick(State, hit, Sim.sound(Sn.Sound.punch(), Sn.Thing{H.Thing.you()}, s), s))
+def Sim.melee.sound(saw: Bool, hit: Bool, s: State) -> State:
+  match saw hit:
+    case True{} hit:
+      Sim.sound(Bool.pick(U32, hit, Sn.Sound.sawhit(), Sn.Sound.sawful()), Sn.Thing{H.Thing.you()}, s)
+    case False{} True{}:
+      Sim.sound(Sn.Sound.punch(), Sn.Thing{H.Thing.you()}, s)
+    case False{} False{}:
+      s
 
 def Sim.melee.hit.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State,
   +saw: Bool, +psp: Psprite, +s: State) -> Sim.Entering:

@@ -125,12 +125,12 @@ def Game.frame(now: Nat, events: List<Event>, g: Game) -> IO(Bool & Game):
 def Game.wrote(+quit: Bool, g: Game) -> IO(Bool & Game):
   Game{level, gfx, tables, +play, input, last, owed, mem, demo, music} = g
   match play:
-    case I.Playing{+state, +map, +didsecret, +pointer}:
+    case I.Playing{+state, +didsecret, +pointer}:
       do IO<Bool & Game>:
         moved : Maybe<M.Stream> <- IO.pure(Maybe<M.Stream>, M.Stream.update(~S.State,
           ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, music))
-        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, map, didsecret, pointer}), moved)
-        return (quit, Game{level, gfx, tables, I.Playing{state, map, didsecret, pointer}, input, last, owed, mem, demo,
+        playing : Maybe<M.Stream> <- M.Stream.play(I.Play.song(I.Playing{state, didsecret, pointer}), moved)
+        return (quit, Game{level, gfx, tables, I.Playing{state, didsecret, pointer}, input, last, owed, mem, demo,
           playing})
     case +scene:
       IO.bind(Maybe<M.Stream>, Bool & Game, M.Stream.play(I.Play.song(scene), music),
@@ -203,8 +203,8 @@ def Game.start.go(frames: Nat, input: K.Input, demo: Maybe<D.Demo.Rec>, now: Nat
 # song, which starts as vanilla's does at the level's load and the
 # tally's start. It answers what Game.shut does.
 def Game.start(frames: Nat, input: K.Input, script: List<&2, K.Cmd>, demo: Maybe<D.Demo.Rec>, now: Nat,
-  map: L.Level.Name, world: Array<U32> & G.Gfx & L.Level, music: Maybe<M.Stream>) -> IO(Maybe<U32>):
-  IO.bind(I.Play.Run, Maybe<U32>, I.Play.run(script, I.Ran{I.Play.World.start(map, world), []}),
+  world: Array<U32> & G.Gfx & L.Level, music: Maybe<M.Stream>) -> IO(Maybe<U32>):
+  IO.bind(I.Play.Run, Maybe<U32>, I.Play.run(script, I.Ran{I.Play.World.start(world), []}),
     steps => Game.start.go(frames, input, demo, now, steps, music))
 
 def Game.ready(music: Maybe<M.Stream>, p: Array<U32> & G.Gfx & L.Level) ->

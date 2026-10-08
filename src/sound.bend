@@ -203,13 +203,17 @@ def Sound.Event.draws(e: Sound.Event) -> Bool:
     case Stop{source}:
       False{}
 
-# The volume at a distance: full under S_CLOSE_DIST, 200, none past
-# S_CLIPPING_DIST, 1200, and between them the whole units left to 1200
-# over S_ATTENUATOR, 1000. The last 15 units round down to silence.
-def Sound.volume.at(+dist: U32) -> U32:
-  Bool.pick(U32, F.Fixed.lt(dist, 13107200), Sound.volume(),
-    Bool.pick(U32, F.Fixed.gt(dist, 78643200), 0,
-      ((Sound.volume() * ((78643200 - dist : U32) >> 16n) : U32) / 1000 : U32)))
+# S_AdjustSoundParams keeps map 8 audible beyond the clipping distance.
+def Sound.volume.far(eighth: Bool, +dist: U32) -> U32:
+  match eighth:
+    case True{}:
+      (15 + (((Sound.volume() - 15 : U32) * ((78643200 - U32.min(dist, 78643200) : U32) >> 16n) : U32) / 1000 : U32) : U32)
+    case False{}:
+      Bool.pick(U32, F.Fixed.gt(dist, 78643200), 0,
+        ((Sound.volume() * ((78643200 - dist : U32) >> 16n) : U32) / 1000 : U32))
+
+def Sound.volume.at(map: U32, +dist: U32) -> U32:
+  Bool.pick(U32, F.Fixed.lt(dist, 13107200), Sound.volume(), Sound.volume.far(U32.is_eq(map, 8), dist))
 
 # The separation of a source at an angle from a listener facing another:
 # 128 less S_STEREO_SWING, 96, times the sine of the angle between them,
@@ -223,8 +227,8 @@ def Sound.sep(sine: V.Vec, +angle: U32, +facing: U32) -> U32:
 # (lx, ly) facing an angle hears a source at (sx, sy) at. Volume 0 is
 # inaudible. Only S_StartSound centres a coincident source; the per-tic
 # update uses the calculated separation even at that position.
-def Sound.adjust(starting: Bool, sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
-  (Sound.volume.at(F.Fixed.approx((lx - sx : U32), (ly - sy : U32))),
+def Sound.adjust(starting: Bool, map: U32, sine: V.Vec, tanto: V.Vec, +lx: U32, +ly: U32, facing: U32, +sx: U32, +sy: U32) -> U32 & U32:
+  (Sound.volume.at(map, F.Fixed.approx((lx - sx : U32), (ly - sy : U32))),
     Bool.pick(U32, Bool.and(starting, Bool.and(U32.is_eq(lx, sx), U32.is_eq(ly, sy))), Sound.centre(),
       Sound.sep(sine, A.Angle.of(tanto, (sx - lx : U32), (sy - ly : U32)), facing)))
 
