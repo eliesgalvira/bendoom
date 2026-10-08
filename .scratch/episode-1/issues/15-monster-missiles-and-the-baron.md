@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-**Remaining:** Verify the loaded-level identity and E1M8 attenuation correction on affected native/JavaScript suites, proof and native products; repeat affected gameplay/rest oracles and compare sight/missile audio. Both source review axes are clear.
+**Remaining:** Resolve sight/missile whole-wave audio using externally traced event and callback schedules, then run final gameplay/rest oracles on the integration candidate. Affected native/JavaScript suites, proof and native products pass. Both source review axes are clear.
 
-Rows292–299 and projectile kind4294967291 are reserved for this ticket. Level.Geo owns the loaded Level.Name; Playing derives its identity from that level. Sound attenuation follows vanilla's gamemap8 rule. The native frame product measures197 words, leaving58 under the255-word limit; current game, film and window benchmark widths remain to be measured.
+Rows292–299 and projectile kind4294967291 are reserved for this ticket. Level.Geo owns the loaded Level.Name; Playing derives its identity from that level. Sound attenuation follows vanilla's gamemap8 rule. Native frame, game and window benchmark products measure197 words, leaving58 under the255-word limit; Film measures203, leaving52.
 
 Reproducible E1M8 oracle cases use the same WAD fixtures in both games:
 
