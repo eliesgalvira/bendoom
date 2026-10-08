@@ -10,15 +10,15 @@
 
 Typed spawn/impact metadata and baron rows 292–299 use projectile kind 4294967291. Runtime BAL7 loading now follows the existing spawn and hurt graph traversals alongside the other runtime effects. The shared missile callback runs the entered row's action before randomizing its duration; plain death rows preserve plain state entry.
 
-- [ ] On E1M8, visible baron ball mid-flight and impact compare with Chocolate Doom with zero differing pixels.
+- [x] On E1M8, visible baron ball mid-flight and impact compare with Chocolate Doom with zero differing pixels.
 - [x] The imp's existing tests and frame pins pass unchanged on native and JavaScript.
 - [ ] Actual imp flight and impact controls and the existing rest-frame oracles remain zero against Chocolate Doom.
 - [ ] A baron's actual gameplay death compares with vanilla at rest.
-- [ ] Baron sight, death, claw and missile attack events match Chocolate Doom audio exactly.
+- [ ] Baron sight and missile event audio still differ; claw and death full waves match after first-note alignment, with raw onsets retained.
 - [x] Focused externally derived baron/callback checks pass on native and JavaScript; native game, frame and film builds measure remaining headroom under the 255-word limit.
 
 Expected values come from installed Chocolate Doom source and WAD data. Rest-frame oracles remain zero; no masks or frame repins may hide mismatches.
 
 Sim, focused baron, fight, load and render checks pass on native and JavaScript; proof passes. Native frame, game and film builds each measure maximum arity 251, leaving four words of headroom. The type-inventory expectation's added internal kind has zero map instances, read directly from Freedoom E1M1 THINGS; no behavior or frame pins changed.
 
-Chocolate-only route probes have run; their initial positions did not produce the required flight, impact or corpse evidence. Corrected routes remain unverified. No Bend feature or audio comparisons have run. Verified powerups integration is merged; the recorded products and width precede that merge. The actual-death fixture must keep the second baron alive so the last-baron floor action is not triggered. Native builds and regression pins alone do not establish gameplay acceptance.
+Actual unmasked E1M8 baron flight70/impact82 and imp flight80/impact100 compare at zero pixels. Impact palette8 matches the Chocolate diagnostic. The rested normal-combat corpse680 differs at five weapon3 status-bar pixels; no pixels are masked. Sight and combined missile waves differ and remain under investigation. Fresh products after verified powerups integration still measure251/four words free; affected render native/JS checks pass. Existing rest oracles remain pending. The actual-death fixture must keep the second baron alive so the last-baron floor action is not triggered. Native builds and regression pins alone do not establish gameplay acceptance.
