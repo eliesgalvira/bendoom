@@ -26,7 +26,8 @@ def Rocket.report.thing(tag: String, m: Maybe<&2, H.Thing>, rnd: U32) -> IO(Unit
       IO.print(tag ++ " missing")
     case Some{+th}:
       IO.print(tag ++ " random " ++ U32.show(rnd) ++ " state " ++ U32.show(H.Thing.state(th))
-        ++ "/" ++ U32.show(H.Thing.tics(th)) ++ " missile " ++ Bool.show(H.Thing.flagged(th, 65536))
+        ++ "/" ++ U32.show(H.Thing.tics(th)) ++ " z " ++ U32.show(H.Thing.z(th))
+        ++ " missile " ++ Bool.show(H.Thing.flagged(th, 65536))
         ++ " momentum " ++ U32.show(V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.momx()))
         ++ "/" ++ U32.show(H.Thing.momz(th)))
 
@@ -43,6 +44,6 @@ def main() -> IO(Unit):
 
 #|rocket speed/damage 1310720/20
 #|launcher ammo 3
-#|burst random 2 state 311/7 missile False momentum 0/0
-#|floor random 2 state 311/7 missile False momentum 0/0
-#|ceiling random 2 state 311/7 missile False momentum 0/0
+#|burst random 2 state 311/7 z 2097152 missile False momentum 0/0
+#|floor random 2 state 311/7 z 0 missile False momentum 0/0
+#|ceiling random 2 state 311/7 z 7864320 missile False momentum 0/0
