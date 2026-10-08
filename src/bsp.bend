@@ -67,7 +67,7 @@ def Bsp.visit.if(leaf: Bool, +view: P.View, +level: L.Level, gfx: G.Gfx, +n: U32
     case True{}:
       Bsp.sub(view, level, gfx, Bool.pick(U32, U32.is_eq(n, 65535), 0, (n .&. 32767 : U32)), st)
     case False{}:
-      P.View{+x, +y, z, angle, sin, cos, tables, extralight} = view
+      P.View{+x, +y, z, angle, sin, cos, tables, extralight, fixedcolormap} = view
       +side = L.Level.side_of(level, n, x, y)
       Bsp.push([D.Visit{L.Level.node.child(level, n, side)}, D.Check{n, (side .^. 1 : U32)}], st)
 
@@ -96,7 +96,7 @@ def Bsp.shows.at(+view: P.View, +box: L.Level.Box, +pos: U32, solid: List<&2, C.
 # the eye's position about it, is not yet solid. Inside the box, or with
 # the span facing away, it might be.
 def Bsp.shows(+view: P.View, +box: L.Level.Box, solid: List<&2, C.Clip.Range>) -> Bool:
-  P.View{+x, +y, z, angle, sin, cos, tables, extralight} = view
+  P.View{+x, +y, z, angle, sin, cos, tables, extralight, fixedcolormap} = view
   L.Box{+top, +bottom, +left, +right} = box
   Bsp.shows.at(view, box,
     ((Bool.pick(U32, F.Fixed.ge(y, top), 0, Bool.pick(U32, F.Fixed.gt(y, bottom), 1, 2)) << 2n)
