@@ -214,6 +214,7 @@ type Thing.Action is Data:
   TroopAttack{}
   SargAttack{}
   BruisAttack{}
+  BossDeath{}
 
 # A state row, Doom's state_t: the sprite's four-letter name, the frame
 # (0 for A), whether it is full-bright, its tics, the row after it, its
@@ -385,7 +386,7 @@ def Thing.rows() -> List<&2, Thing.Row>:
     Row{"BOSS", 8, False{}, 8, 274, Null{}, 0}, Row{"BOSS", 9, False{}, 8, 275, Scream{}, 0},
     Row{"BOSS", 10, False{}, 8, 276, Null{}, 0}, Row{"BOSS", 11, False{}, 8, 277, Fall{}, 0},
     Row{"BOSS", 12, False{}, 8, 278, Null{}, 0}, Row{"BOSS", 13, False{}, 8, 279, Null{}, 0},
-    Row{"BOSS", 14, False{}, 4294967295, 279, Null{}, 0},
+    Row{"BOSS", 14, False{}, 4294967295, 279, BossDeath{}, 0},
     Row{"TFOG", 0, True{}, 6, 281, Null{}, 0}, Row{"TFOG", 1, True{}, 6, 282, Null{}, 0},
     Row{"TFOG", 0, True{}, 6, 283, Null{}, 0}, Row{"TFOG", 1, True{}, 6, 284, Null{}, 0},
     Row{"TFOG", 2, True{}, 6, 285, Null{}, 0}, Row{"TFOG", 3, True{}, 6, 286, Null{}, 0},
