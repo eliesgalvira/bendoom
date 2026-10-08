@@ -211,7 +211,7 @@ def captured [iwad: binary, name: string, script: binary, count: int, binary: pa
       finale-art => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "1")
     }
     if not $right { error make {msg: $"captured frame is not ($screen): ($scene)"} }
-    let raw = open --raw $target
+    let raw = open --raw $target | into binary
     if ($raw | bytes length) != 64000 { error make {msg: "capture is not a 320 by 200 frame"} }
     let playpal = $iwad | lump-pos PLAYPAL
     {indices: ($raw | encode hex | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '),
