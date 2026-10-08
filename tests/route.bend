@@ -27,6 +27,8 @@ def shown(play: N.Play) -> String:
       "still playing"
     case N.Showing{N.Inter{screen, cnt, bcnt, shown, target, anims, mrnd, down, pointer}, after, trip}:
       "intermission " ++ N.Inter.Screen.show(screen) ++ " shown" ++ N.Inter.counts.show(5n, shown, 0)
+    case N.Ending{f}:
+      "finale"
 
 # Idle tics of the play, with no map to load in them.
 def idled(n: Nat, +level: L.Level, play: N.Play) -> N.Play:

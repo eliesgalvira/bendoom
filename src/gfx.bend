@@ -9,7 +9,7 @@
 # status bar's; with the map's names go every frame of the animations
 # they touch and the partners of their switches.
 # Gfx is the directory into it: Data, so the draw takes it by copy.
-# Every other flat, texture and sprite stays a name in the WAD.
+# The finale's FLOOR4_8 and HELP2 are loaded too; other unused lumps stay in the WAD.
 import Base
 import ./vec.bend as V
 import ./bytes.bend as B
@@ -1047,7 +1047,7 @@ def Gfx.wi.names() -> List<&2, String>:
 def Gfx.bar.names() -> List<&2, String>:
   List.concat(&2, String, [Gfx.bar.numbered(10n, "STTNUM", 0), Gfx.bar.numbered(10n, "STYSNUM", 0),
     ["STTPRCNT"], Gfx.bar.numbered(6n, "STKEYS", 0), Gfx.bar.numbered(6n, "STGNUM", 2), ["STARMS", "STBAR"],
-    Gfx.bar.faces(5n, 0), Gfx.wi.names()])
+    Gfx.bar.faces(5n, 0), Gfx.wi.names(), ["HELP2"]])
 
 # The heads-up font
 # -----------------
@@ -1338,7 +1338,7 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
   Result<&1, &1, U32 & String, Array<U32> & Gfx & L.Level>:
   (a, +level) = q
   +dir = Gfx.dir(lumps, Map.new(&2, W.Wad.Lump))
-  +unnamed = {Names{Map.new(&2, U32), 0, [], []} : Gfx.Names}
+  +unnamed = Gfx.names(["FLOOR4_8"], Names{Map.new(&2, U32), 0, [], []})
   +frames = Gfx.anim.wanted(Gfx.anim.flats(), Gfx.flats.wad(lumps, False{}),
     Gfx.names(L.Level.flatnames(level), unnamed))
   +fl = Gfx.names.after(frames, L.Level.flatnames(level), unnamed)
@@ -1352,7 +1352,7 @@ def Gfx.load.go(+lumps: List<&2, W.Wad.Lump>, q: Array<U32> & L.Level) ->
     bar : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.bar.names(), dir, "W_GetNumForName")
     font : List<&2, W.Wad.Lump> <- Gfx.lookup(Gfx.font.names(), dir, "W_CacheLumpName")
     Gfx.load.textures(Base{level, fl, pal, cmap, flats, sprites,
-      Anims{Gfx.anim.of(frames, 0, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}, bar, font}, dir, a, pnames,
+      Anims{Gfx.anim.of(frames, 1, Gfx.Names.next(fl)), Gfx.anim.of([], 1, 0), 0}, bar, font}, dir, a, pnames,
       texture1)
 
 # Freedoom's DEHACKED changes S_POSS_ATK2 to full-bright. It is the

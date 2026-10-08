@@ -1,9 +1,5 @@
-# Doom's wi_stuff.c: the intermission the exit leads to, for one player
-# on episode 1, and the two modes the game plays in, the level and the
-# tally after it. The intermission is a value stepped by a pure function
-# of itself and whether a key that accelerates is down, and drawn into
-# the same 320 by 200 frame the renderer draws, so a test replays it and
-# the film shows it.
+# The shared level, intermission and finale path. Each scene steps on
+# recorded commands and draws into the same 320 by 200 frame.
 import Base
 import ./vec.bend as V
 import ./bytes.bend as B
@@ -18,6 +14,7 @@ import ./tic.bend as Tic
 import ./sound.bend as Sn
 import ./project.bend as P
 import ./render.bend as R
+import ./finale.bend as Fi
 
 # The screen it shows, wi_stuff.c's stateenum_t: the counting one
 # carries WI_updateStats' sp_state, 1 to 10, the next names the level to
@@ -803,6 +800,7 @@ def Inter.frame(+gfx: G.Gfx, +wi: Inter, +trip: Inter.Trip, mem: Array<U32>) -> 
 type Play is Data:
   Playing{state: S.State, map: L.Level.Name, didsecret: Bool, pointer: Bool}
   Showing{inter: Inter, after: S.State, trip: Inter.Trip}
+  Ending{finale: Fi.Finale}
 
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
@@ -811,29 +809,12 @@ type Play.Step is Data:
 def Play.start(+level: L.Level, map: L.Level.Name) -> Play:
   Playing{Tic.State.start(level), map, False{}, False{}}
 
-def Play.next.kind(secret: Bool, +episode: U32, +map: U32) -> L.Level.Name:
+def Play.destination(secret: Bool, +episode: U32, +map: U32) -> L.Level.Name:
   match secret:
     case True{}:
       L.Name{episode, 9}
     case False{}:
       L.Name{episode, Bool.pick(U32, U32.is_eq(map, 9), 4, (map + 1 : U32))}
-
-def Play.next.if(finale: Bool, secret: Bool, +episode: U32, +map: U32) -> Maybe<&2, L.Level.Name>:
-  match finale:
-    case True{}:
-      None{}
-    case False{}:
-      Some{Play.next.kind(secret, episode, map)}
-
-# G_DoCompleted's next map after an exit, secret or not: none after map
-# 8, whose exit of either kind ends the episode; map 9 after a secret
-# exit; map 4 after map 9, episode 1's return; else the map after.
-def Play.next(how: S.Sim.Exit, at: L.Level.Name) -> Maybe<&2, L.Level.Name>:
-  match how at:
-    case S.Unended{} L.Name{episode, map}:
-      None{}
-    case S.Ended{secret} L.Name{+episode, +map}:
-      Play.next.if(U32.is_eq(map, 8), secret, episode, map)
 
 def Play.shown(pointer: Bool, +last: L.Level.Name, next: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
   L.Name{e, +map} = last
@@ -841,20 +822,15 @@ def Play.shown(pointer: Bool, +last: L.Level.Name, next: L.Level.Name, didsecret
       Inter.buttons(S.Sim.Face.attackdown(S.State.face(after)), S.State.usedown(after)))), after,
     Trip{last, next, Bool.or(didsecret, U32.is_eq(map, 9))}}
 
-# G_DoCompleted on the tic a level ends: an exit to another map hands
-# the tally its counts, the totals, the time and the map's par, and the
-# map screen the trip, leaving E1M9 marking it done. Vanilla follows
-# map 8 with the episode's finale and no tally; until the finale is
-# drawn, its level stands still where it ended.
-def Play.completed(pointer: Bool, next: Maybe<&2, L.Level.Name>, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
-  match next:
-    case None{}:
-      Playing{after, map, didsecret, pointer}
-    case Some{name}:
-      Play.shown(pointer, map, name, didsecret, after)
+def Play.after.ended(how: S.Sim.Exit, pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  match how map:
+    case S.Unended{} name:
+      Playing{after, name, didsecret, pointer}
+    case S.Ended{secret} L.Name{+episode, +map}:
+      Play.shown(pointer, L.Name{episode, map}, Play.destination(secret, episode, map), didsecret, after)
 
-def Play.after(pointer: Bool, +map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
-  Play.completed(pointer, Play.next(S.State.ended(after), map), map, didsecret, after)
+def Play.after(pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  Play.after.ended(S.State.ended(after), pointer, map, didsecret, after)
 
 # G_DoReborn ahead of the tic: a death that asked for the level again
 # has the map as loaded reloaded.
@@ -874,8 +850,16 @@ def Play.sounds(before: S.Sim.Exit, +after: S.State) -> List<&2, Sn.Sound.Event>
     case _:
       []
 
-# A tic of the play on the map as loaded: the level's tic while it
-# runs, then the tally's. A reload makes
+def Play.ticked(before: S.Sim.Exit, pointer: Bool, map: L.Level.Name, didsecret: Bool, +after: S.State) -> Play:
+  match before map:
+    case S.Unended{} L.Name{episode, 8}:
+      Playing{after, L.Name{episode, 8}, didsecret, pointer}
+    case S.Ended{secret} L.Name{episode, 8}:
+      Ending{Fi.Finale.tic(Fi.Finale.start())}
+    case _ name:
+      Play.after(pointer, name, didsecret, after)
+
+# A tic of the current scene: the level, tally or finale. A reload makes
 # the player anew, as G_PlayerReborn does, so E1M9 is no longer done.
 def Play.step(+level: L.Level, +cmd: K.Cmd, play: Play) -> Play.Step:
   match play:
@@ -883,11 +867,13 @@ def Play.step(+level: L.Level, +cmd: K.Cmd, play: Play) -> Play.Step:
       +ended = S.State.ended(state)
       +reborn = S.State.reborn(state)
       +after = Tic.Sim.tic(cmd, Play.reborn(reborn, level, state))
-      Step{Play.after(pointer, map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
+      Step{Play.ticked(ended, pointer, map, Bool.and(didsecret, Bool.not(reborn)), after), Play.sounds(ended, after)}
     case Showing{+wi, after, trip}:
       +down = Inter.buttons(K.Cmd.attack(cmd), K.Cmd.use(cmd))
       +ticked = Inter.tic(down, wi)
       Step{Showing{ticked, after, trip}, Inter.sound(Inter.pressed(down, wi), wi, ticked)}
+    case Ending{f}:
+      Step{Ending{Fi.Finale.tic(f)}, []}
 
 def Play.Step.play(step: Play.Step) -> Play:
   Step{play, sounds} = step
@@ -986,23 +972,27 @@ def Play.run(cmds: List<&2, K.Cmd>, run: Play.Run) -> IO(Play.Run):
 
 # The scene's song, as S_Start and WI_Start name it: the map's own,
 # mus_e1m1 plus the episode's nine maps before it and the map's place,
-# which is D_ before the map's name, or D_INTER through the tally.
+# which is D_ before the map's name, D_INTER through the tally, and
+# D_VICTOR through the finale.
 def Play.song(play: Play) -> String:
   match play:
     case Playing{state, L.Name{episode, map}, didsecret, pointer}:
       "D_" ++ L.Level.marker(episode, map)
     case Showing{inter, after, trip}:
       "D_INTER"
+    case Ending{f}:
+      "D_VICTOR"
 
 # The songs a scene of the episode can name.
 def Play.songs() -> List<&2, String>:
-  ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER"]
+  ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER", "D_VICTOR"]
 
-# The frame the play shows: the level from the player's eye, or the
-# tally, both in the same 320 by 200 array.
+# Each scene draws into the same 320 by 200 array.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
     case Playing{+state, map, didsecret, pointer}:
       R.Render.frame(tables, gfx, state, messages, mem)
     case Showing{+wi, after, trip}:
       (Inter.frame(gfx, wi, trip, mem), 0)
+    case Ending{f}:
+      (Fi.Finale.frame(gfx, f, mem), 0)
