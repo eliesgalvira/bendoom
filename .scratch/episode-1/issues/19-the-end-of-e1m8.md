@@ -2,22 +2,23 @@
 
 **Tier:** 3
 
-**What to build:** on E1M8, vanilla's `A_BossDeath` lowers the floor tagged 666 to its lowest neighbour once every baron is dead, and sector special 11 hurts the player and ends the level when health falls low enough, as vanilla's does, leading straight to the finale (ticket 21): `G_DoCompleted` skips the tally after map 8.
+**What to build:** on E1M8, vanilla's `A_BossDeath` lowers the floor tagged 666 to its lowest neighbour once every baron is dead. Sector special 11 hurts the grounded player and ends the level at vanilla's health threshold, leading straight to ticket 21's finale. `G_DoCompleted` skips the tally after map 8.
 
 **Status:** ready-for-agent
 
 - [x] Killing both barons on E1M8 lowers the tagged floor; the frame at rest matches Chocolate Doom's.
-- [x] Standing in the final room ends the level at vanilla's health threshold, and the frame that follows matches vanilla's.
-- [x] Finish the affected-check rerun and independent Standards/Spec reviews.
-- [ ] Extend the unchanged tic_rest proof to cover sector11, then verify the final correction and rerun affected checks.
+- [x] Standing in the final room ends the level at vanilla's health threshold; the following frame matches vanilla's.
+- [x] Extend the unchanged tic_rest proof to cover sector 11.
+- [ ] Verify the final correction with affected native/JavaScript tests, products and six full-frame/palette comparisons.
+- [ ] Review the final correction independently on Standards and Spec.
 - [ ] Pass the orchestrator's full flake check before landing on episode-1.
 
-## Where it stopped
+## Remaining verification
 
-Source `81ca382` includes episode baseline `54288b2`. Worker branch `e1-19` is saved in `/home/bigweld/Repos/bendoom-e1-19`; the reviewed source is staged on `e1-tier1-candidate` in `/home/bigweld/Repos/bendoom-e1-candidate`. Episode-1 remains green at `54288b2`. Ending, baron, sectors, sim, fight and game tests passed on native and JavaScript. Frame, Doom, Film and window native builds passed; widths are 197, 197, 203 and 197. Actual stock-things E1M8 captures at 2131, 2788, 3489, 3517, 3518 and 3519 match all 64,000 pixels and palettes. The route only places the player; it does not complete an original-start traversal.
+Worker `e1-19` lives in `/home/bigweld/Repos/bendoom-e1-19`. It includes green integration `54288b2` and candidate handoff `9255967`. The pure predicate-order correction in `Sim.damage.final` clears the old rest_due reduction failure. The proof now splits the actual sector dispatcher before using the existing counted/secret helpers, and rest_think takes its damaged State directly. LAWS.bend is unchanged. The full proof passed on 2026-10-09 at 00:15:08 Madrid; final native/JavaScript and product builds await AC power. Failed proof attempts remain in ignored `research/production19/` and `research/resume19/`.
 
-The final no-op integration merge was followed by passing ending, baron, sectors and sim reruns on both backends. The retry script then changed directories and fight could not find `tests/fixtures/freedoom.lmp`. Root completed the missing fight/game and six full-frame/palette reruns from the repository root at2026-10-08 11:24:36 Madrid; all passed. Both independent reviewers found no implementation defects. The candidate merge changes no implementation relative to the verified worker source. Full integration verification remains due, and the ticket stays open until that gate passes. The failed runner and successful retry logs remain in ignored `research/production19/` in the worker worktree.
+Before this correction, reviewed source `81ca382` passed ending, baron, sectors, sim, fight and game on native and JavaScript. Frame, Doom, Film and window native widths were 197, 197, 203 and 197. These passes do not certify the corrected source. The existing frozen stock-things E1M8 route must be rerun at tics 2131, 2788, 3489, 3517, 3518 and 3519, comparing all 64,000 pixels and actual palettes. It covers the visibly lowered floor at 2788 and the first finale at 3519. Only player placement changes; no original-start traversal is required. Reproduction and external provenance remain in ignored `research/ticket19-external-checkpoint.md` and `research/route19-ending.commands`.
 
-Five additional full-frame failures are preserved at 2176, 2519, 2520, 2694 and 2830. Their differences are confined to the status-bar face. The verified ticket 16 baseline has the identical status bar at 2176, and cosmetic random indices differ before the last boss action. Ticket 22 owns further diagnosis. No masks or phase fitting count these failures as passes. Bounded reproduction and provenance are in ignored `research/production19/face-handoff.md` and `research/ticket19-external-checkpoint.md`.
+Five additional failures at 2176, 2519, 2520, 2694 and 2830 remain failures, confined to the status-bar face. Green ticket 16 has the identical entire status bar at 2176, and cosmetic random indices differ before the last boss action. Ticket 22 owns further diagnosis. No masks or fitted phases count these as passes. Reproduction is in ignored `research/production19/face-handoff.md`.
 
-The candidate proof failed at `PROOF.bend:409`, `rest_due`. A subsequent predicate-order correction in `Sim.damage.final` checks lethal damage before the symbolic sector test. This clears that reduction failure but the proof then fails at `PROOF.bend:463`: the existing `tic_rest` proof only follows the old nukage/hellslime dispatch and must cover sector11. The correction is an unverified checkpoint on `e1-19`; its ending tests were not reached. Candidate `9962724` retains the reviewed implementation before this correction. LAWS.bend is unchanged and must not be weakened. Preserve both failed proof logs; finish proof coverage, rerun native/JS and oracle checks affected by the final change, review that diff, then run full integration verification. No job remains active or queued.
+The earlier source passed both independent reviews. The corrected diff requires its own reviews and the full integration check. Episode-1 remains green at `54288b2`; candidate is unlanded. Preserve prior failed runner and oracle evidence.
