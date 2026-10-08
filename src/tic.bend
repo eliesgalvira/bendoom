@@ -1168,7 +1168,8 @@ def Sim.tic.done(+cmd: K.Cmd, +geo: L.Level.Geo, +clock: U32, +x: U32, +y: U32, 
 def Sim.st.ticker(s: S.State) -> S.State:
   S.State{+player, +level, +things, sidetex, thinkers, rnd, clock, ended, usedown, sounds, mrnd, reborn, totalsecret} = s
   S.State{player, level, things, sidetex, thinkers, rnd, clock, ended, usedown, sounds,
-    S.Sim.Face.melt.tic(S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd))), reborn, totalsecret}
+    S.Sim.Face.melt.tic(I.Inventory.weapons(S.Player.inv(player)),
+      S.Sim.face.tic(level, things, player, S.Sim.Face.drew(True{}, mrnd))), reborn, totalsecret}
 
 def Sim.tic.live(+cmd: K.Cmd, +level: L.Level, +geo: L.Level.Geo, +clock: U32, +usedown: Bool, +dead: Bool,
   +before: S.State) -> S.State:

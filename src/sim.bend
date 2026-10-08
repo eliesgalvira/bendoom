@@ -348,7 +348,7 @@ def Sim.Face.mrnd(+f: V.Vec) -> U32:
 def Sim.Face.attackdown(+f: V.Vec) -> Bool:
   Bool.not(U32.is_zero(V.Vec.get(f, Sim.face.attackdown())))
 
-# The weapons whose arms numbers stand as ST_Start drew them.
+# The weapons owned when ST_drawWidgets first drew the arms numbers.
 def Sim.Face.startweapons(+f: V.Vec) -> U32:
   V.Vec.get(f, Sim.face.startweapons())
 
@@ -367,18 +367,18 @@ def Sim.Face.melt.wait(remaining: U32, f: V.Vec) -> V.Vec:
 # D_DoomLoop runs a command before D_RunFrame's first command and draw.
 # Later scene changes draw after one command. Their melts consume 320
 # M_Random draws after ST_Ticker has selected that frame's face.
-def Sim.Face.melted(+remaining: U32, +f: V.Vec) -> V.Vec:
+def Sim.Face.melted(+remaining: U32, +weapons: U32, +f: V.Vec) -> V.Vec:
   match remaining:
     case 0:
       f
     case 1:
-      V.Vec.set(V.Vec.set(f, Sim.face.mrnd(), ((Sim.Face.mrnd(f) + 320 : U32) .&. 255 : U32)),
-        Sim.face.melt(), 0)
+      V.Vec.set(V.Vec.set(V.Vec.set(f, Sim.face.mrnd(), ((Sim.Face.mrnd(f) + 320 : U32) .&. 255 : U32)),
+        Sim.face.melt(), 0), Sim.face.startweapons(), weapons)
     case _:
-      V.Vec.set(f, Sim.face.melt(), (remaining - 1 : U32))
+      V.Vec.set(V.Vec.set(f, Sim.face.melt(), (remaining - 1 : U32)), Sim.face.startweapons(), weapons)
 
-def Sim.Face.melt.tic(+f: V.Vec) -> V.Vec:
-  Sim.Face.melted(V.Vec.get(f, Sim.face.melt()), f)
+def Sim.Face.melt.tic(weapons: U32, +f: V.Vec) -> V.Vec:
+  Sim.Face.melted(V.Vec.get(f, Sim.face.melt()), weapons, f)
 
 # Doom's ST_calcPainOffset: the first of the eight faces of the pain
 # level a health falls in, five levels over 101 points. Its static cache
