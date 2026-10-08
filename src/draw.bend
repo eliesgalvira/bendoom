@@ -216,3 +216,20 @@ def Draw.patch.of(+patch: U32, +x: U32, +y: U32, p: Array<U32> & List<&2, U32>) 
 # taken off, post by post, straight into the frame.
 def Draw.patch(mem: Array<U32>, +patch: U32, x: U32, y: U32) -> Array<U32>:
   Draw.patch.of(patch, x, y, B.Bytes.each(~U32, ~B.Bytes.u16, [patch, (patch + 4 : U32), (patch + 6 : U32)], mem))
+
+type Draw.Glyph is Type:
+  Glyph{mem: Array<U32>, x: U32, done: Bool}
+
+def Draw.glyph.fit(fits: Bool, +x: U32, y: U32, w: U32, patch: U32, mem: Array<U32>) -> Draw.Glyph:
+  match fits:
+    case False{}:
+      Glyph{mem, x, True{}}
+    case True{}:
+      Glyph{Draw.patch(mem, patch, x, y), (x + w : U32), False{}}
+
+def Draw.glyph.wide(+x: U32, y: U32, patch: U32, p: Array<U32> & U32) -> Draw.Glyph:
+  (mem, +w) = p
+  Draw.glyph.fit(U32.is_le((x + w : U32), 320), x, y, w, patch, mem)
+
+def Draw.glyph(x: U32, y: U32, +patch: U32, mem: Array<U32>) -> Draw.Glyph:
+  Draw.glyph.wide(x, y, patch, B.Bytes.u16(mem, patch))

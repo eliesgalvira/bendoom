@@ -16,6 +16,7 @@ import ./src/sound.bend as Sn
 import ./src/channel.bend as C
 import ./src/stream.bend as M
 import ./src/song.bend as Sg
+import ./src/finale.bend as Fi
 import ./src/show.bend as V
 import ./src/demo.bend as D
 import ./src/wad.bend as W
@@ -45,7 +46,7 @@ def Film.channels(play: I.Play, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&
   match play:
     case I.Playing{+state, map, didsecret, pointer}:
       C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
-    case I.Showing{wi, after, trip}:
+    case _:
       chans
 
 def Film.mixed(audio: File, w: M.Stream.Window,
@@ -70,12 +71,23 @@ def Film.outro.tics(fuel: Nat, screen: I.Inter.Screen, +wi: I.Inter) -> List<&2,
 def Film.outro.of(+wi: I.Inter) -> List<&2, K.Cmd>:
   Film.outro.tics(Nat.add(500n, U32.to_nat(Vec.Vec.get(I.Inter.target(wi), I.Inter.time()))), I.Inter.screen(wi), wi)
 
+def Film.outro.pending(how: S.Sim.Exit) -> List<&2, K.Cmd>:
+  match how:
+    case S.Unended{}:
+      []
+    case S.Ended{secret}:
+      List.replicate(K.Cmd, Fi.Finale.outro(Fi.Finale.start()), K.Cmd.idle())
+
 def Film.outro(play: I.Play) -> List<&2, K.Cmd>:
   match play:
+    case I.Playing{state, L.Name{episode, 8}, didsecret, pointer}:
+      Film.outro.pending(S.State.ended(state))
     case I.Playing{state, map, didsecret, pointer}:
       []
     case I.Showing{wi, after, trip}:
       Film.outro.of(wi)
+    case I.Ending{f}:
+      List.replicate(K.Cmd, Fi.Finale.outro(f), K.Cmd.idle())
 
 # A tic at a time, each in the world loaded for it, its frame and its
 # audio written.
