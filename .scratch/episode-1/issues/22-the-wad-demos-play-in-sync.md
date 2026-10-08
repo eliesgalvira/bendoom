@@ -34,3 +34,9 @@
 On stock DOOM1.WAD, place the player at E1M7 `192 -384 90` and replay `800,0,0,0,0`. Both green `eb01743` and ticket16 checkpoint `9195547` finish with the same player position and angle, differing from Chocolate Doom: Bendoom x10188759/y4274209154/angle3337576432 versus vanilla x10279438/y−20669014/angle3325546168. Viewz2490368, health0 and gameplay PRNG151 agree. These are fixed-point coordinates and binary angles. The first divergence is not yet located.
 
 The resulting death view differs by33920 pixels. Its different draw history also changes fuzz phase,46 versus32, and leaves73 differing pixels after rebirth at802. Extend the script with `1,0,0,0,1 1,0,0,0,0` for that restart. Diagnose the state divergence before changing renderer phase handling; ticket16 uses a separate hazard-death fixture for its lifecycle check. Preserve the failed reproduction, without masks or fitted phase resets.
+
+## Pending pain when firing
+
+Chocolate Doom's `P_FireWeapon` enters `S_PLAY_ATK1` before the weapon attack state. `A_FirePistol`, `A_FireShotgun` and a loaded `A_FireCGun` enter `S_PLAY_ATK2` before firing. These transitions replace any pending player pain action. The corresponding existing Bendoom fire helpers omit that player-state transition. This is a source finding, not yet an observed waveform mismatch; compare a shared demo where firing overlaps the pending `A_Pain` action before claiming or fixing an audible difference.
+
+Ticket18 handles its new `A_GunFlash` transition using the existing standing row. In the current first-person player model, the attack chain has no actions, random draws, rendered sprite or movement predicate, so collapsing it to standing preserves its observable behavior. Literal attack rows are not required merely to match internal state numbers. Any correction to the older fire paths should preserve the common transition timing and remove the cause of a surviving pain action.
