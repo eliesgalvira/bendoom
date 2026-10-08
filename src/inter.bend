@@ -992,12 +992,21 @@ def Play.song(play: Play) -> String:
 def Play.songs() -> List<&2, String>:
   ["D_E1M1", "D_E1M2", "D_E1M3", "D_E1M4", "D_E1M5", "D_E1M6", "D_E1M7", "D_E1M8", "D_E1M9", "D_INTER", "D_VICTOR"]
 
-# Each scene draws into the same 320 by 200 array.
+def Play.frame.show(first: Bool, tables: P.Project.Tables, gfx: G.Gfx, wi: Inter,
+  after: S.State, trip: Inter.Trip, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
+  match first:
+    case True{}:
+      R.Render.frame(tables, gfx, after, messages, mem)
+    case False{}:
+      (Inter.frame(gfx, wi, trip, mem), 0)
+
+# Each scene draws into the same 320 by 200 array. The completion tic
+# still draws its level; WI_Drawer starts after the first WI_Ticker.
 def Play.frame(tables: P.Project.Tables, gfx: G.Gfx, play: Play, messages: Bool, mem: Array<U32>) -> Array<U32> & U32:
   match play:
     case Playing{+state, didsecret, pointer}:
       R.Render.frame(tables, gfx, state, messages, mem)
     case Showing{+wi, after, trip}:
-      (Inter.frame(gfx, wi, trip, mem), 0)
+      Play.frame.show(U32.is_zero(Inter.bcnt(wi)), tables, gfx, wi, after, trip, messages, mem)
     case Ending{f}:
       (Fi.Finale.frame(gfx, f, mem), 0)
