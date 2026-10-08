@@ -855,11 +855,12 @@ def Sim.missile.z.hit(sky: Bool, +id: U32, +s: S.State) -> S.State:
       S.Sim.missile.burst.with(~Sim.missile.enter.acted, id, s)
 
 def Sim.missile.z.move(hit: Bool, sky: Bool, +th: H.Thing, +id: U32, +s: S.State) -> S.State:
+  +moved = H.Thing.zmove(th)
   match hit:
     case True{}:
-      Sim.missile.z.hit(sky, id, s)
+      Sim.missile.z.hit(sky, id, S.State.thing.put(id, moved, s))
     case False{}:
-      Sim.thing.moved(H.Thing.zmove(th), id, s)
+      Sim.thing.moved(moved, id, s)
 
 def Sim.missile.z(+th: H.Thing, +id: U32, +s: S.State) -> S.State:
   H.Thing{tid, kind, x, y, +z, +floorz, +ceilz, angle, +sector, state, tics, +momz, +hurt} = th
