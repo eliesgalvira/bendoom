@@ -4,7 +4,7 @@
 
 **What to build:** Typed monster missiles and vanilla baron attacks, pain, death and sounds. The shared missile path must run death-entry actions before randomizing explosion duration, including vertical impacts. E1M8 boss-death floor behavior belongs to ticket 19.
 
-**Remaining:** Two source reviews and gameplay/audio acceptance. Ticket 12's law and landing were approved on October 7.
+**Remaining:** Gameplay/audio acceptance. Both separate source reviews are clear. Ticket 12's law and landing were approved on October 7.
 
 **Status:** ready-for-agent
 
