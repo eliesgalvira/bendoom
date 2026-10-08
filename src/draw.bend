@@ -103,12 +103,50 @@ def Draw.Col.mem(st: Draw.Col) -> Array<U32>:
   Col{mem, x, frac, step, src, cmap} = st
   mem
 
-# Column x from row yl to yh: the texture column at src, its row mid at
-# the view's centre row, stepped iscale a row, lit through cmap.
-def Draw.column(mem: Array<U32>, x: U32, +yl: U32, yh: U32, src: U32, mid: U32, +iscale: U32,
+type Draw.Fuzz is Type:
+  Fuzz{mem: Array<U32>, x: U32, pos: U32}
+
+def Draw.fuzz.offset(pos: U32) -> U32:
+  Maybe.default(&2, U32, List.get(&2, U32,
+    [320, 4294966976, 320, 4294966976, 320, 320, 4294966976,
+      320, 320, 4294966976, 320, 320, 320, 4294966976,
+      320, 320, 320, 4294966976, 4294966976, 4294966976, 4294966976,
+      320, 4294966976, 4294966976, 320, 320, 320, 320, 4294966976,
+      320, 4294966976, 320, 320, 4294966976, 4294966976, 320,
+      320, 4294966976, 4294966976, 4294966976, 4294966976, 320, 320,
+      320, 320, 4294966976, 320, 320, 4294966976, 320], U32.to_nat(pos)), 320)
+
+def Draw.fuzz.lit(+row: Nat, +x: U32, +pos: U32, p: Array<U32> & U32) -> Draw.Fuzz:
+  (mem, c) = p
+  Fuzz{Array.set(U32, mem, Draw.at(x, row), c), x, ((pos + 1 : U32) % 50 : U32)}
+
+def Draw.fuzz.read(row: Nat, x: U32, pos: U32, p: Array<U32> & U32) -> Draw.Fuzz:
+  (mem, c) = p
+  Draw.fuzz.lit(row, x, pos, B.Bytes.at(mem, (G.Gfx.colormap() + 1536 + c : U32)))
+
+def Draw.fuzz.px(row: Nat, st: Draw.Fuzz) -> Draw.Fuzz:
+  Fuzz{mem, +x, +pos} = st
+  +r = row
+  Draw.fuzz.read(r, x, pos, B.Bytes.at(mem, (Draw.at(x, r) + Draw.fuzz.offset(pos) : U32)))
+
+def Draw.Fuzz.mem(st: Draw.Fuzz) -> Array<U32>:
+  Fuzz{mem, x, pos} = st
+  Array.set(U32, mem, G.Gfx.fuzzpos(), pos)
+
+def Draw.fuzz.start(+x: U32, +yl: U32, yh: U32, p: Array<U32> & U32) -> Array<U32>:
+  (mem, pos) = p
+  Draw.Fuzz.mem(Draw.each(~Draw.Fuzz, ~Draw.fuzz.px, Draw.rows(yl, yh), U32.to_nat(yl), Fuzz{mem, x, pos}))
+
+# A zero colormap is vanilla's shadow column; both sprite passes share its phase.
+def Draw.column(mem: Array<U32>, x: U32, +yl: U32, +yh: U32, src: U32, mid: U32, +iscale: U32,
   cmap: U32) -> Array<U32>:
-  Draw.Col.mem(Draw.each(~Draw.Col, ~Draw.col.px, Draw.rows(yl, yh), U32.to_nat(yl),
-    Col{mem, x, (mid + (yl - 84) * iscale : U32), iscale, src, cmap}))
+  match cmap:
+    case 0:
+      Draw.fuzz.start(x, Bool.pick(U32, U32.is_zero(yl), 1, yl), Bool.pick(U32, U32.is_eq(yh, 167), 166, yh),
+        B.Bytes.at(mem, G.Gfx.fuzzpos()))
+    case _:
+      Draw.Col.mem(Draw.each(~Draw.Col, ~Draw.col.px, Draw.rows(yl, yh), U32.to_nat(yl),
+        Col{mem, x, (mid + (yl - 84) * iscale : U32), iscale, src, cmap}))
 
 # A span's state: the array, the index of its row's first pixel, the
 # packed position in the flat at the next column with its step, and the
