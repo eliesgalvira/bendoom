@@ -9,6 +9,7 @@
 - [x] Killing both barons on E1M8 lowers the tagged floor; the frame at rest matches Chocolate Doom's.
 - [x] Standing in the final room ends the level at vanilla's health threshold, and the frame that follows matches vanilla's.
 - [x] Finish the affected-check rerun and independent Standards/Spec reviews.
+- [ ] Extend the unchanged tic_rest proof to cover sector11, then verify the final correction and rerun affected checks.
 - [ ] Pass the orchestrator's full flake check before landing on episode-1.
 
 ## Where it stopped
@@ -18,3 +19,5 @@ Source `81ca382` includes episode baseline `54288b2`. Worker branch `e1-19` is s
 The final no-op integration merge was followed by passing ending, baron, sectors and sim reruns on both backends. The retry script then changed directories and fight could not find `tests/fixtures/freedoom.lmp`. Root completed the missing fight/game and six full-frame/palette reruns from the repository root at2026-10-08 11:24:36 +02:00; all passed. Both independent reviewers found no implementation defects. The candidate merge changes no implementation relative to the verified worker source. Full integration verification remains due, and the ticket stays open until that gate passes. The failed runner and successful retry logs remain in ignored `research/production19/` in the worker worktree.
 
 Five additional full-frame failures are preserved at 2176, 2519, 2520, 2694 and 2830. Their differences are confined to the status-bar face. The verified ticket 16 baseline has the identical status bar at 2176, and cosmetic random indices differ before the last boss action. Ticket 22 owns further diagnosis. No masks or phase fitting count these failures as passes. Bounded reproduction and provenance are in ignored `research/production19/face-handoff.md` and `research/ticket19-external-checkpoint.md`.
+
+The candidate proof failed at `PROOF.bend:409`, `rest_due`. A subsequent predicate-order correction in `Sim.damage.final` checks lethal damage before the symbolic sector test. This clears that reduction failure but the proof then fails at `PROOF.bend:463`: the existing `tic_rest` proof only follows the old nukage/hellslime dispatch and must cover sector11. The correction is an unverified checkpoint on `e1-19`; its ending tests were not reached. Candidate `9962724` retains the reviewed implementation before this correction. LAWS.bend is unchanged and must not be weakened. Preserve both failed proof logs; finish proof coverage, rerun native/JS and oracle checks affected by the final change, review that diff, then run full integration verification. No job remains active or queued.
