@@ -11,7 +11,7 @@
 - [x] Extend the unchanged tic_rest proof to cover sector 11.
 - [x] Verify the corrected source with six affected native/JavaScript suites, Frame and six full-frame/palette comparisons.
 - [x] Review the final correction independently on Standards and Spec.
-- [ ] Build and measure final combined Doom, Film and window products on the integration candidate.
+- [x] Build and measure final combined Doom, Film and window products on the integration candidate.
 - [ ] Pass the orchestrator's full flake check before landing on episode-1.
 
 ## Integration gates
@@ -20,7 +20,7 @@ Verified source `5b52bd7` on worker `e1-19` includes green integration `54288b2`
 
 Ending, baron, sectors, sim, fight and game pass on native and JavaScript. Frame builds with maximum native width 197, leaving 58 words. Frozen stock-things E1M8 controls at tics 2131, 2788, 3489, 3517, 3518 and 3519 match all 64,000 pixels and actual palettes 2, 0, 3, 4, 3 and 0. They cover the visibly lowered floor at 2788 and the first finale at 3519. The final integration merge was a no-op, followed by all six suite and frame/palette reruns passing at 2026-10-09 01:11:36 Madrid. Evidence is under ignored `research/resume19/`.
 
-The orchestrator will build and measure Doom, Film and window once on the combined ticket 18/19 candidate, then run the full integration check. Their earlier widths 197, 203 and 197 predate the corrected source and do not certify it. Episode-1 remains green at `54288b2`; this ticket stays open until the remaining gates pass.
+The combined ticket18/19 source at `8441772` passes the full proof, builds Frame, Doom, Film and window with native widths197,197,203,197, and matches all77 saved complete frame/palette controls. The full flake check remains before landing. Episode-1 remains green at `54288b2`; this ticket stays open until that gate passes.
 
 Only player placement changes in the frozen route; no original-start traversal is required. Reproduction and external provenance remain in ignored `research/ticket19-external-checkpoint.md` and `research/route19-ending.commands`. Preserve earlier failed proof, runner and oracle evidence.
 
