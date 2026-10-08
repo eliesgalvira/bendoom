@@ -54,12 +54,11 @@ def Sprites.rotation(seen: U32, facing: U32) -> U32:
 # four times its depth, or its patch's edges, placed by its offsets and
 # scaled, fall wholly off the screen. The columns are held to the
 # screen, and the patch's fraction starts that far in, from its last
-# column stepping back for a mirrored patch. A full-bright frame takes
-# the first colormap; another's is picked by its sector's light, with no
-# fake contrast, and its scale.
+# column stepping back for a mirrored patch. The fixed colormap precedes
+# full-bright and sector lighting at its scale, without fake contrast.
 def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, nth: U32, thing: H.Thing,
   rest: List<&2, Sprites.Vis>) -> List<&2, Sprites.Vis>:
-  P.View{+vx, +vy, +vz, angle, +sin, +cos, tables, extralight} = view
+  P.View{+vx, +vy, +vz, angle, +sin, +cos, tables, extralight, +fixedcolormap} = view
   H.Thing{id, kind, +x, +y, +z, floorz, ceilz, facing, sector, +state, tics, momz, hurt} = thing
   +trx = (x - vx : U32)
   +try = (y - vy : U32)
@@ -80,8 +79,8 @@ def Sprites.project(+view: P.View, +level: L.Level, +gfx: G.Gfx, rank: U32, nth:
       Bool.and(F.Fixed.le(x1, 320), F.Fixed.ge(x2, 0)))),
     Vis{first, F.Fixed.min(x2, 319), xscale, x, y, z, gzt, (gzt - vz : U32),
       (Bool.pick(U32, flip, (width - 1 : U32), 0) + step * (first - x1) : U32), step,
-      G.Gfx.sprite(gfx, state, rot, 0), Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, rot, 5), 1),
-        G.Gfx.colormap(), S.Segs.colormap(P.Project.lightnum(L.Level.sector.light(level, sector), extralight),
+      G.Gfx.sprite(gfx, state, rot, 0), Bool.pick(U32, Bool.and(U32.is_zero(fixedcolormap), U32.is_eq(G.Gfx.sprite(gfx, state, rot, 5), 1)),
+        G.Gfx.colormap(), S.Segs.colormap(fixedcolormap, P.Project.lightnum(L.Level.sector.light(level, sector), extralight),
         xscale)),
       rank, nth},
     rest)
@@ -319,10 +318,9 @@ def Sprites.masked(things: List<&2, H.Thing>, seen: D.Draw.Seen, +view: P.View, 
 # Doom's R_DrawPSprite: a player sprite's state row placed at sx, sy on a
 # 320 by 200 screen whose centre column is the view's and whose row
 # 100.5 is the view's centre row, less its patch's offsets, at scale one,
-# clipped by the view's edges alone. A full-bright frame takes the first
-# colormap; another is lit as the nearest of walls is at the light
-# number. One wholly off a side has no columns.
-def Sprites.psprite(+gfx: G.Gfx, +state: U32, sx: U32, sy: U32, lightnum: U32, mem: Array<U32>) -> Array<U32>:
+# clipped by the view's edges alone. The fixed colormap precedes
+# full-bright and nearest-wall lighting. One wholly off a side has no columns.
+def Sprites.psprite(+gfx: G.Gfx, +state: U32, sx: U32, sy: U32, lightnum: U32, fixedcolormap: U32, mem: Array<U32>) -> Array<U32>:
   +width = G.Gfx.sprite(gfx, state, 0, 1)
   +left = (sx - G.Gfx.sprite(gfx, state, 0, 2) : U32)
   +x1 = F.Fixed.sarn(left, 16n)
@@ -332,5 +330,5 @@ def Sprites.psprite(+gfx: G.Gfx, +state: U32, sx: U32, sy: U32, lightnum: U32, m
   +last = F.Fixed.min((F.Fixed.sarn((left + width : U32), 16n) - 1 : U32), 319)
   Sprites.vis.draw(Vis{first, last, 65536, 0, 0, 0, 0, (6586368 - sy + G.Gfx.sprite(gfx, state, 0, 3) : U32),
     (Bool.pick(U32, flip, (width - 1 : U32), 0) + step * (first - x1) : U32), step, G.Gfx.sprite(gfx, state, 0, 0),
-    (G.Gfx.colormap() + Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, 0, 5), 1), 0,
-      P.Project.scalelight(lightnum, 47)) * 256 : U32), 0, 0}, Sprites.unclip(first, last, mem))
+    (G.Gfx.colormap() + P.Project.colormap(fixedcolormap, Bool.pick(U32, U32.is_eq(G.Gfx.sprite(gfx, state, 0, 5), 1), 0,
+      P.Project.scalelight(lightnum, 47))) * 256 : U32), 0, 0}, Sprites.unclip(first, last, mem))

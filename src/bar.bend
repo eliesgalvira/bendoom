@@ -265,12 +265,11 @@ def Bar.red(+cnt: U32) -> U32:
 def Bar.gold(+bonus: U32) -> U32:
   (9 + U32.min(3, ((bonus + 7 : U32) >> 3n : U32)) : U32)
 
-def Bar.palette.of(+cnt: U32, +bonus: U32) -> U32:
-  Bool.pick(U32, U32.is_zero(cnt), Bool.pick(U32, U32.is_zero(bonus), 0, Bar.gold(bonus)), Bar.red(cnt))
+def Bar.palette.of(+cnt: U32, +bonus: U32, suit: U32) -> U32:
+  Bool.pick(U32, U32.is_zero(cnt), Bool.pick(U32, U32.is_zero(bonus),
+    Bool.pick(U32, I.Inventory.blink(suit), 13, 0), Bar.gold(bonus)), Bar.red(cnt))
 
-# ST_doPaletteStuff: which of PLAYPAL's fourteen palettes the frame is
-# shown in. Red by the damage count or the berserk fade, whichever is
-# larger; gold by the pickup flash where no red is due; the plain
-# palette otherwise.
-def Bar.palette(+damage: U32, +strength: U32, +bonus: U32) -> U32:
-  Bar.palette.of(U32.max(damage, Bar.fade(strength)), bonus)
+# ST_doPaletteStuff: damage or berserk red precedes pickup gold, then
+# the suit's blinking green, then the plain palette.
+def Bar.palette(+damage: U32, +strength: U32, +bonus: U32, suit: U32) -> U32:
+  Bar.palette.of(U32.max(damage, Bar.fade(strength)), bonus, suit)

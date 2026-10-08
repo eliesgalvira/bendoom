@@ -212,8 +212,9 @@ def Segs.texcol(+view: P.View, distance: U32, offset: U32, centerangle: U32, x: 
 
 # The colormap of a wall column at a scale: Doom's walllights at the
 # scale's light index, which the table's end caps.
-def Segs.colormap(lightnum: U32, scale: U32) -> U32:
-  (G.Gfx.colormap() + P.Project.scalelight(lightnum, U32.min((scale >> 12n : U32), 47)) * 256 : U32)
+def Segs.colormap(fixedcolormap: U32, lightnum: U32, scale: U32) -> U32:
+  (G.Gfx.colormap() + P.Project.colormap(fixedcolormap,
+    P.Project.scalelight(lightnum, U32.min((scale >> 12n : U32), 47))) * 256 : U32)
 
 # Doom's dc_iscale: the texture rows a screen row, the reciprocal of
 # the scale by the 32-bit division.
@@ -279,7 +280,7 @@ def Segs.col.step(+x: U32, +rw: Segs.Rw, +view: P.View, +gfx: G.Gfx, +cc: U32, +
     Bool.pick(U32, F.Fixed.le(low, yh), low, (yh + 1 : U32)),
     Bool.pick(U32, markfloor, (yh + 1 : U32), fc)))
   +texcol = Segs.texcol(view, distance, offset, centerangle, x)
-  +cmap = Segs.colormap(lightnum, scale)
+  +cmap = Segs.colormap(P.View.fixedcolormap(view), lightnum, scale)
   +iscale = Segs.iscale(scale)
   Cols{Array.set(U32, Array.set(U32,
       Segs.col.wall(lower, Segs.col.wall(upper, Segs.col.wall(solid, mem, x, yl, yh, gfx, midfirst, midmask,
