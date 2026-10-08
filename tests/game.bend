@@ -106,6 +106,10 @@ def told.play(tag: String, play: I.Play, g: M.Game) -> IO(Maybe<M.Game>):
       do IO<Maybe<M.Game>>:
         IO.print(tag ++ " tally " ++ I.Inter.show(wi))
         return Some{g}
+    case I.Ending{f}:
+      do IO<Maybe<M.Game>>:
+        IO.print(tag ++ " finale")
+        return Some{g}
 
 def closed(tag: String, g: M.Game) -> IO(Maybe<M.Game>):
   M.Game{level, gfx, tables, play, input, last, owed, mem, demo, music} = g
