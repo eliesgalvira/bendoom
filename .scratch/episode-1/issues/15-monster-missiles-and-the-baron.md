@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-**Remaining:** Resolve sight/missile whole-wave audio using externally traced event and callback schedules, then run final gameplay/rest oracles on the integration candidate. Affected native/JavaScript suites, proof and native products pass. Both source review axes are clear.
+**Remaining:** Run the final combined gameplay/rest oracles and short finale Film comparison on the integration candidate, then obtain final Spec closure. Affected native/JavaScript suites, proof and native products pass. Both source review axes are clear.
 
 Rows292–299 and projectile kind4294967291 are reserved for this ticket. Level.Geo owns the loaded Level.Name; Playing derives its identity from that level. Sound attenuation follows vanilla's gamemap8 rule. Native frame, game and window benchmark products measure197 words, leaving58 under the255-word limit; Film measures203, leaving52.
 
@@ -18,4 +18,4 @@ Reproducible E1M8 oracle cases use the same WAD fixtures in both games:
 
 These feature cases and all19 existing rest positions compare with zero unmasked pixels before the context correction. Repeat the affected comparisons on the final source. Expected positions, tics, states and audio come from Chocolate Doom and WAD data; no masks or output-derived repins may hide differences.
 
-Claw and death full sound waves match after first-note alignment. Sight and combined projectile waves remain unresolved. Preserve uncropped waves and raw onsets; aligned waveform equality does not settle ticket04's buffer-lead decision.
+All four sound cases match complete raw waves on an externally prescribed44100Hz/35-tic schedule, from the loaded-level barrier through70 frozen drain blocks. Sight, projectile and claw cover100 commands each; death covers680. Independently generated starts and each tic's active voices, volumes and separation match. Death has an existing physical-slot lifecycle difference after a silent sound expires; voice multiplicity and the entire wave remain equal. Ordinary1024-frame callback failures and raw onsets remain in ignored research. The controlled1260-frame schedule does not settle ticket04's real-device buffer-lead decision.
