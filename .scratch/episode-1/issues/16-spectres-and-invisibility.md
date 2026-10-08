@@ -2,18 +2,18 @@
 
 **Tier:** 3
 
-**What to build:** things with vanilla's shadow flag draw with vanilla's fuzz column, its offset table and its running position, so the spectre shimmers as in vanilla. Partial invisibility gives the player the shadow flag for vanilla's duration: monsters aim with vanilla's spread (A_FaceTarget's MF_SHADOW branch, missing from `Sim.chase.face.at` in src/tic.bend), and the weapon sprite draws fuzzed, with the blink before it runs out.
+**What to build:** things with vanilla's shadow flag draw with vanilla's fuzz column, offset table and running position. Partial invisibility gives the player vanilla's shadow duration, monster aim spread and fuzzed weapon blink.
 
 **Blocked by:** 03
 
 **Status:** ready-for-agent
 
-- [x] A frame with a spectre in view matches Chocolate Doom with zero differing pixels (the fuzz position must match, so compare after the same commands from a map start).
-- [ ] After picking up partial invisibility, the fuzzed weapon frame matches vanilla, and a monster's shot uses vanilla's spread (compare the outcome at a chosen tic).
-- [ ] Freedoom's frame hashes are unchanged unless the oracle explains the change.
+- [x] Spectre full frame matches Chocolate after the same commands from map start.
+- [x] Actual invisibility pickup, blink and expiry match full frames; former-human shots and baron missiles use source-confirmed shadow spread and match external outcomes.
+- [x] Existing Freedoom render hashes and coverage assertions pass unchanged on native and JavaScript.
 
-Core checkpoint has full-frame zero comparisons for a placed stock E1M7 spectre at command12 and the actual E1M6 invisibility pickup at commands12,1972,1973,1974,1982,2100,2101. The latter covers blink and expiry. Native and JavaScript fuzz, powerups, player and baron tests pass. FaceTarget and missile angle/random-position expectations come from Chocolate's source.
+Full-frame comparisons cover E1M7 spectre12; E1M6 pickup12/1972/1973/1974/1982/2100/2101; former150 and baron100/150. Correcting projectile definitions from accidental MF_SHADOW to vanilla MF_DROPOFF restores the original long-fight1453 hash and coverage.
 
-External attack fixtures now match full frames for a shadow-targeted former human at150 and baron missiles at100/150. Projectile definitions had MF_SHADOW in place of vanilla MF_DROPOFF; corrected flags also restore full-frame zero for the Freedoom fight1453 and the earlier baron flight control. Existing render helpers and expected hashes are unchanged.
+A controlled hazard-only fixture retains a visible non-aggressive spectre and matches all64000 pixels at20/650/652/670. Chocolate phase38 survives actual death/rebirth, then advances38->33 on rebirth652. Normal-exit completion51, first tally52 and loaded map68 also match full frames; phase16 survives the map load. The shared renderer draws the retained level while the new tally has bcnt0, matching Chocolate's final completion-command world draw without changing simulation, songs or export counts.
 
-Remaining acceptance: nonzero phase through map transition and rebirth, Film against its actual draw schedule while preserving frame/audio counts, product widths and remaining affected checks. Rerun native render after the flag correction; its earlier failure stopped the sequential check before render JavaScript, game and proof. No hashes have been repinned.
+Remaining acceptance: actual Film fuzzy RGB under its declared command1..N draw schedule, product widths, affected checks after the final render seam, latest integration merge and review. Film keeps7006/8827560 and1680/2116800 contracts; reuse21's unchanged long audio/count evidence. Root owns the merged short finale export. No hashes have been repinned. The inherited lethal-melee death-camera divergence is preserved for22 and is not this ticket's lifecycle acceptance.
