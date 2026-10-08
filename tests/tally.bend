@@ -38,7 +38,7 @@ def beside() -> L.Level.Start:
 
 def line(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, map, didsecret, pointer}:
+    case W.Playing{+state, didsecret, pointer}:
       tag ++ " level tic " ++ U32.show(S.State.clock(state)) ++ " " ++ S.Sim.Tally.show(S.Sim.tally(state))
     case W.Showing{+wi, after, trip}:
       tag ++ " " ++ W.Inter.show(wi)
@@ -75,7 +75,7 @@ def sound.line(events: List<&2, Sn.Sound.Event>, play: W.Play) -> String:
       ""
     case _:
       match play:
-        case W.Playing{state, map, didsecret, pointer}:
+        case W.Playing{state, didsecret, pointer}:
           "sound level" ++ sound.events(events) ++ "\n"
         case W.Showing{wi, after, trip}:
           "sound bcnt " ++ U32.show(W.Inter.bcnt(wi)) ++ sound.events(events) ++ "\n"
@@ -137,7 +137,7 @@ def back() -> List<&2, K.Cmd>:
 
 def initial(+level: L.Level) -> W.Play:
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
-  W.Play.after(False{}, L.Name{1, 1}, False{}, took)
+  W.Play.after(False{}, False{}, took)
 
 def summary(+level: L.Level) -> IO(Unit):
   +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
@@ -151,9 +151,9 @@ def summary(+level: L.Level) -> IO(Unit):
 # carries and the random index; or the map the tally leads to.
 def on(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, L.Name{episode, map}, didsecret, pointer}:
+    case W.Playing{+state, didsecret, pointer}:
       +p = S.State.player(state)
-      tag ++ " " ++ L.Level.marker(episode, map) ++ " tic " ++ U32.show(S.State.clock(state)) ++ " at "
+      tag ++ " " ++ L.Level.Name.marker(L.Level.name(S.State.level(state))) ++ " tic " ++ U32.show(S.State.clock(state)) ++ " at "
         ++ F.Fixed.show(S.Player.x(p)) ++ " " ++ F.Fixed.show(S.Player.y(p)) ++ " "
         ++ I.Inventory.show(S.Player.inv(p)) ++ " random " ++ U32.show(S.State.rnd(state)) ++ " didsecret "
         ++ Bool.show(didsecret)
@@ -165,8 +165,8 @@ def on(tag: String, play: W.Play) -> String:
 
 def killed(play: W.Play) -> W.Play:
   match play:
-    case W.Playing{+state, map, didsecret, pointer}:
-      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state), map,
+    case W.Playing{+state, didsecret, pointer}:
+      W.Playing{Tic.Sim.damage(H.Things.you(S.State.things(state)), 100, H.Thing.you(), H.Thing.you(), state),
         didsecret, pointer}
     case other:
       other
@@ -191,9 +191,9 @@ def weapon(+inv: I.Inventory) -> String:
 
 def carries(tag: String, play: W.Play) -> String:
   match play:
-    case W.Playing{+state, L.Name{episode, map}, didsecret, pointer}:
+    case W.Playing{+state, didsecret, pointer}:
       +inv = S.Player.inv(S.State.player(state))
-      tag ++ " " ++ L.Level.marker(episode, map) ++ " " ++ I.Inventory.show(inv) ++ weapon(inv)
+      tag ++ " " ++ L.Level.Name.marker(L.Level.name(S.State.level(state))) ++ " " ++ I.Inventory.show(inv) ++ weapon(inv)
     case W.Showing{wi, +after, trip}:
       +inv = S.Player.inv(S.State.player(after))
       tag ++ " tally " ++ I.Inventory.show(inv) ++ weapon(inv)
@@ -249,13 +249,13 @@ def intermission(+level: L.Level) -> IO(Unit):
     p5 : W.Play <- asked("nine tics on", run(9n, level, p4))
     p6 : W.Play <- asked("ten tics on", run(1n, level, p5))
     opened : Array<U32> & G.Gfx & L.Level <- W.Play.open(L.Name{1, 2})
-    arrived(p6, W.Play.after(False{}, L.Name{1, 1}, False{}, Tic.Sim.replay(route(), armed(level))), opened)
+    arrived(p6, W.Play.after(False{}, False{}, Tic.Sim.replay(route(), armed(level))), opened)
 
 def finale.pending(play: W.Play) -> String:
   match play:
-    case W.Playing{+state, map, didsecret, pointer}:
+    case W.Playing{+state, didsecret, pointer}:
       "E1M8 exit " ++ S.Sim.Exit.show(S.State.ended(state)) ++ " "
-        ++ W.Play.song(W.Playing{state, map, didsecret, pointer})
+        ++ W.Play.song(W.Playing{state, didsecret, pointer})
     case other:
       on("E1M8 exit", other)
 
@@ -263,7 +263,7 @@ def finale.pending(play: W.Play) -> String:
 def finale(+level: L.Level) -> IO(Unit):
   +before = Tic.Sim.replay(List.take(&2, K.Cmd, route(), 6n), Tic.State.at(level, beside()))
   +pending = W.Play.Step.play(W.Play.step(level, K.Cmd.demo(0, 0, 0, 2),
-    W.Playing{before, L.Name{1, 8}, False{}, False{}}))
+    W.Playing{before, False{}, False{}}))
   do IO<Unit>:
     IO.print(finale.pending(pending))
     IO.print(on("E1M8 normal", W.Play.Step.play(W.Play.step(level, K.Cmd.demo(0, 0, 0, 0), pending))))
@@ -273,18 +273,21 @@ def finale(+level: L.Level) -> IO(Unit):
 # the tally for E1M9, and E1M8 starts its finale. Then
 # didsecret, the player's flag that E1M9 is done, which G_DoCompleted
 # sets on leaving E1M9 and the map screen reads after each map on.
+def seam(level: L.Level, name: L.Level.Name, secret: Bool, didsecret: Bool) -> W.Play:
+  W.Play.after(False{}, didsecret, Sp.State.end(secret,
+    Tic.Sim.replay(route(), Tic.State.at(L.Level.named(name, level), beside()))))
+
 def seams(+level: L.Level) -> IO(Unit):
-  +took = Tic.Sim.replay(route(), Tic.State.at(level, beside()))
   do IO<Unit>:
-    IO.print(on("E1M3 secret", W.Play.after(False{}, L.Name{1, 3}, False{}, Sp.State.end(True{}, took))))
-    finale(level)
-    IO.print(on("E1M9 normal", W.Play.after(False{}, L.Name{1, 9}, False{}, took)))
-    IO.print(on("E1M4 normal", W.Play.after(False{}, L.Name{1, 4}, True{}, took)))
+    IO.print(on("E1M3 secret", seam(level, L.Name{1, 3}, True{}, False{})))
+    finale(L.Level.named(L.Name{1, 8}, level))
+    IO.print(on("E1M9 normal", seam(level, L.Name{1, 9}, False{}, False{})))
+    IO.print(on("E1M4 normal", seam(level, L.Name{1, 4}, False{}, True{})))
 
 # A tic keeps didsecret, and G_PlayerReborn clears it once a death asks
 # for the level again.
 def done(+level: L.Level) -> W.Play:
-  W.Playing{Tic.State.at(level, beside()), L.Name{1, 4}, True{}, False{}}
+  W.Playing{Tic.State.at(level, beside()), True{}, False{}}
 
 def didsecret(+level: L.Level) -> IO(Unit):
   do IO<Unit>:
@@ -367,7 +370,7 @@ def buttons() -> String:
 
 def pointer(play: W.Play) -> Bool:
   match play:
-    case W.Playing{state, map, didsecret, pointer}:
+    case W.Playing{state, didsecret, pointer}:
       pointer
     case W.Showing{wi, after, trip}:
       W.Inter.pointer(wi)
@@ -376,13 +379,13 @@ def pointer(play: W.Play) -> Bool:
 
 def exited(play: W.Play) -> W.Play:
   match play:
-    case W.Playing{state, map, didsecret, pointer}:
-      W.Play.after(pointer, map, didsecret, Sp.State.end(False{}, state))
+    case W.Playing{state, didsecret, pointer}:
+      W.Play.after(pointer, didsecret, Sp.State.end(False{}, state))
     case showing:
       showing
 
 def pointers(+level: L.Level) -> String:
-  +first = press(level, press(level, exited(W.Play.start(level, L.Name{1, 5}))))
+  +first = press(level, press(level, exited(W.Play.start(L.Level.named(L.Name{1, 5}, level)))))
   +firston = pointer(first)
   +ticon = pointer(run(1n, level, first))
   +last = press(level, first)
@@ -417,7 +420,7 @@ def play(+level: L.Level) -> IO(Unit):
     IO.print(startup.melt(level))
     intermission(level)
     seams(level)
-    didsecret(level)
+    didsecret(L.Level.named(L.Name{1, 4}, level))
     soundcheck(level)
     secrets(level)
     secret.totals(level)

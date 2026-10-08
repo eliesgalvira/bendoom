@@ -49,10 +49,10 @@ def next_room(s: S.State) -> U32:
 
 def corridor(base: L.Level, first: U32, second: U32) -> L.Level:
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames,
-    sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = base
+    sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = base
   L.Level{L.Geo{V.Vec.of([0, 0, first, 0, 1, 0, 0, second, 2, 3]),
     V.Vec.of([0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2]), verts, segs, subs, nodes, root, blockmap,
-    things, texnames, flatnames, sine, tanto, boxes, 2, 3, reject, sidetex, switches},
+    things, texnames, flatnames, sine, tanto, boxes, 2, 3, reject, sidetex, switches, identity},
     V.Vec.of([0, 8388608, 0, 0, 160, 0, 0, 0, 8388608, 0, 0, 160, 0, 0, 0, 8388608, 0, 0, 160, 0, 0]), specials, V.Vec.of_list([], 3)}
 
 def closed(s: S.State) -> S.State:

@@ -25,6 +25,10 @@ type Level.Start is Data:
 type Level.Name is Data:
   Name{episode: U32, map: U32}
 
+def Level.Name.map(n: Level.Name) -> U32:
+  Name{episode, map} = n
+  map
+
 # The THINGS lump's five words a record (x and y in map units, the angle
 # in degrees, the DoomEd type and the options), and how many records.
 type Level.Things is Data:
@@ -57,7 +61,7 @@ type Level.Geo is Data:
   Geo{lines: V.Vec, sides: V.Vec, verts: V.Vec, segs: V.Vec, subs: V.Vec, nodes: V.Vec, root: U32,
     blockmap: Level.Blockmap, things: Level.Things, texnames: List<&2, String>,
     flatnames: List<&2, String>, sine: V.Vec, tanto: V.Vec, boxes: V.Vec, nlines: U32, nsectors: U32,
-    reject: V.Vec, sidetex: V.Vec, switches: V.Vec}
+    reject: V.Vec, sidetex: V.Vec, switches: V.Vec, identity: Level.Name}
 
 # The geometry, the sectors in the order of vanilla's sector_t (floor
 # and ceiling heights in fixed point, as a mover leaves them, floor and
@@ -66,6 +70,17 @@ type Level.Geo is Data:
 # player's gunfire.
 type Level is Data:
   Level{geo: Level.Geo, sectors: V.Vec, specials: V.Vec, heard: V.Vec}
+
+def Level.name(l: Level) -> Level.Name:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
+    boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = l
+  identity
+
+def Level.named(identity: Level.Name, l: Level) -> Level:
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
+    boxes, nlines, nsectors, reject, sidetex, switches, old}, sectors, specials, heard} = l
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto,
+    boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard}
 
 # A line as the sim sees it: its ends in fixed point, its flags, and the
 # sectors on its two sides (65535 for none).
@@ -112,22 +127,22 @@ def Level.word(v: V.Vec, i: U32, n: U32, f: U32) -> U32:
   V.Vec.get(v, Level.at(i, n, f))
 
 def Level.side.sector(+l: Level, +side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Bool.pick(U32, U32.is_eq(side, Level.none()), Level.none(), Level.word(sides, side, 3, 2))
 
 def Level.vertex.x(+l: Level, v: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   F.Fixed.of_map(Level.word(verts, v, 2, 0))
 
 def Level.vertex.y(+l: Level, v: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   F.Fixed.of_map(Level.word(verts, v, 2, 1))
 
 def Level.line(+l: Level, +i: U32) -> Level.Line:
-  Level{Geo{+lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{+lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   +a = Level.word(lines, i, 5, 0)
   +b = Level.word(lines, i, 5, 1)
@@ -137,20 +152,20 @@ def Level.line(+l: Level, +i: U32) -> Level.Line:
 
 # A line's side number: 0 the right one, 1 the left.
 def Level.line.side(+l: Level, line: U32, side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.word(lines, line, 5, (3 + side : U32))
 
 # The linedef a seg lies along.
 def Level.seg.line(+l: Level, +i: U32) -> U32:
-  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.word(segs, i, 6, 3)
 
 # Doom's P_LoadSegs: the angle and offset as the lump stores them, the
 # back sector only behind a line flagged two-sided.
 def Level.seg(+l: Level, +i: U32) -> Level.Seg:
-  Level{Geo{+lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{+lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   +a = Level.word(segs, i, 6, 0)
   +b = Level.word(segs, i, 6, 1)
@@ -165,13 +180,13 @@ def Level.seg(+l: Level, +i: U32) -> Level.Seg:
       Level.side.sector(l, Level.line.side(l, line, (side .^. 1 : U32))))}
 
 def Level.sub(+l: Level, +i: U32) -> Level.Sub:
-  Level{Geo{lines, sides, verts, segs, +subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, +subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Sub{Level.word(subs, i, 2, 0), Level.word(subs, i, 2, 1)}
 
 # A node's bounding box on a side: 0 the right child's, 1 the left's.
 def Level.box(+l: Level, +n: U32, +side: U32) -> Level.Box:
-  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Box{F.Fixed.of_map(Level.word(nodes, n, 14, (4 + side * 4 : U32))),
     F.Fixed.of_map(Level.word(nodes, n, 14, (5 + side * 4 : U32))),
@@ -220,23 +235,23 @@ def Level.tag(+l: Level, line: U32) -> U32:
 # tic on the line's front side: how far a seg's wall has scrolled after
 # clock tics, in fixed point.
 def Level.seg.scroll(+l: Level, +seg: U32, clock: U32) -> U32:
-  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, +segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   F.Fixed.of_map((clock * Bool.to_u32(Bool.and(U32.is_eq(Level.special(l, Level.word(segs, seg, 6, 3)), 48),
     U32.is_zero(Level.word(segs, seg, 6, 4)))) : U32))
 
 def Level.nlines(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   nlines
 
 def Level.nsectors(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   nsectors
 
 def Level.sidetex(+l: Level) -> V.Vec:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   sidetex
 
@@ -249,22 +264,22 @@ def Level.rejected.bit(+reject: V.Vec, +pnum: U32) -> Bool:
 # two can never see each other. A level with no REJECT lump rejects
 # nothing.
 def Level.rejected(+l: Level, +s1: U32, +s2: U32) -> Bool:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, +nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, +nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.rejected.bit(reject, ((s1 * nsectors : U32) + s2 : U32))
 
 # A switch texture's partner, 0 for a texture that is no switch.
 def Level.switch(+l: Level, texture: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   V.Vec.get(switches, texture)
 
 # The level with the graphics' numbers for its sides' textures and its
 # switches' partners.
 def Level.textured(l: Level, sidetex: V.Vec, switches: V.Vec) -> Level:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, none, no},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, none, no, identity},
     sectors, specials, heard} = l
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard}
 
 # A sector's plane: its ceiling or its floor.
@@ -313,31 +328,31 @@ def Level.blockbox.at(+bm: Level.Blockmap, +boxes: V.Vec, +at: U32) -> Level.Box
     F.Fixed.min(F.Fixed.sarn((V.Vec.get(boxes, (at + 3 : U32)) - ox + 2097152 : U32), 23n), (cols - 1 : U32))}
 
 def Level.blockbox(+l: Level, s: U32) -> Level.Box:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.blockbox.at(blockmap, boxes, (s * 4 : U32))
 
 # Doom's soundorg: the middle of a sector's box, where its sounds come
 # from.
 def Level.soundorg(+l: Level, +s: U32) -> U32 & U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, +boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, +boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   (F.Fixed.half((V.Vec.get(boxes, (s * 4 + 3 : U32)) + V.Vec.get(boxes, (s * 4 + 2 : U32)) : U32)),
     F.Fixed.half((V.Vec.get(boxes, (s * 4 : U32)) + V.Vec.get(boxes, (s * 4 + 1 : U32)) : U32)))
 
 def Level.side(+l: Level, +i: U32) -> Level.Side:
-  Level{Geo{lines, +sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, +sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Side{F.Fixed.of_map(Level.word(sides, i, 3, 0)), F.Fixed.of_map(Level.word(sides, i, 3, 1)),
     Level.word(sides, i, 3, 2)}
 
 def Level.texnames(+l: Level) -> List<&2, String>:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   texnames
 
 def Level.flatnames(+l: Level) -> List<&2, String>:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   flatnames
 
@@ -356,18 +371,18 @@ def Level.sky(+l: Level, s: U32) -> Bool:
   String.eq(Level.flat.name(l, Level.ceilpic(l, s)), "F_SKY1")
 
 def Level.sine(+l: Level) -> V.Vec:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   sine
 
 def Level.tanto(+l: Level) -> V.Vec:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   tanto
 
 # The map's THINGS records, which read the geometry alone.
 def Level.records(+l: Level) -> Level.Things:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   things
 
@@ -409,12 +424,12 @@ def Level.start_of(+l: Level) -> Level.Start:
   Level.start.go(U32.to_nat(Level.nthings(l)), l, 0, Level.is_start(Level.thing(l, 0)))
 
 def Level.blockmap_of(+l: Level) -> Level.Blockmap:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   blockmap
 
 def Level.root(+l: Level) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   root
 
@@ -459,7 +474,7 @@ def Level.cell.number(+cols: U32, +c: Level.Cell) -> U32:
 
 # The lines of a cell of the geometry's blockmap.
 def Level.cell.lines(+geo: Level.Geo, +c: Level.Cell) -> List<&2, U32>:
-  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{+words, ox, oy, +cols, +rows}, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches} = geo
+  Geo{lines, sides, verts, segs, subs, nodes, root, Blockmap{+words, ox, oy, +cols, +rows}, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity} = geo
   Level.cell.list(Level.cell.inside(cols, rows, c), words, (4 + Level.cell.number(cols, c) : U32))
 
 # The sector under a point
@@ -488,14 +503,14 @@ def Level.node_side(+x: U32, +y: U32, +nx: U32, +ny: U32, +dx: U32, +dy: U32) ->
 
 # A node's child on the side of a point: 0 the right, 1 the left.
 def Level.node.child(+l: Level, n: U32, side: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.word(nodes, n, 14, (12 + side : U32))
 
 # A node's partition line: x, y, dx and dy in fixed point as words 0 to
 # 3 of its record.
 def Level.node.part(+l: Level, +n: U32, +i: U32) -> U32:
-  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, +nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   Level.word(nodes, n, 14, i)
 
@@ -510,7 +525,7 @@ def Level.is_leaf(+n: U32) -> Bool:
 
 # A subsector's sector: its first seg's front sector.
 def Level.leaf_sector(+l: Level, ss: U32) -> U32:
-  Level{Geo{lines, sides, verts, +segs, +subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, +segs, +subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
   +seg = Level.word(subs, ss, 2, 1)
   Level.side.sector(l, Level.line.side(l, Level.word(segs, seg, 6, 3), Level.word(segs, seg, 6, 4)))
@@ -537,6 +552,10 @@ def Level.sector_at(+l: Level, +x: U32, +y: U32) -> U32:
 # ExMy.
 def Level.marker(+episode: U32, +map: U32) -> String:
   "E" ++ U32.show(episode) ++ "M" ++ U32.show(map)
+
+def Level.Name.marker(n: Level.Name) -> String:
+  Name{episode, map} = n
+  Level.marker(episode, map)
 
 def Level.map.drop(+marker: String, lumps: List<&2, W.Wad.Lump>, i: Maybe<Nat>) ->
   Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>:
@@ -603,7 +622,7 @@ def Level.room(floor: U32, ceil: U32) -> Level:
   Level{Geo{V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, 32768,
     Blockmap{V.Leaf{0}, 0, 0, 0, 0}, Things{V.Leaf{0}, 0}, [], [],
     V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0}, 0, 1,
-    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}},
+    V.Leaf{0}, V.Leaf{0}, V.Leaf{0}, Name{1, 1}},
     V.Vec.of_list([F.Fixed.of_map(floor), F.Fixed.of_map(ceil)], 7), V.Leaf{0}, V.Leaf{0}}
 
 # Doom's P_GroupLines box: each line's ends widen the box of the sector
@@ -642,9 +661,9 @@ def Level.inside_out(n: Nat) -> List<&2, U32>:
       2147483648 <> 2147483647 <> 2147483647 <> 2147483648 <> Level.inside_out(m)
 
 def Level.boxed(+l: Level, boxes: V.Vec) -> Level:
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, none, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, none, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard} = l
-  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches},
+  Level{Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, things, texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity},
     sectors, specials, heard}
 
 # Doom's P_LoadSectors from sector s on: the floor and ceiling, the
@@ -675,7 +694,7 @@ def Level.pack.go(+map: List<&2, W.Wad.Lump>, vs: List<&2, V.Vec>, texnames: Lis
         (Level.count(map, "NODES", 28) - 1 : U32), Level.blockmap(bm),
         Things{things, Level.count(map, "THINGS", 10)}, texnames, flatnames,
         V.Vec.of_list(T.Tables.finesine(), 10240), V.Vec.of_list(T.Tables.tantoangle(), 2049), V.Leaf{0},
-        Level.count(map, "LINEDEFS", 14), Level.count(map, "SECTORS", 26), reject, V.Leaf{0}, V.Leaf{0}},
+        Level.count(map, "LINEDEFS", 14), Level.count(map, "SECTORS", 26), reject, V.Leaf{0}, V.Leaf{0}, Name{1, 1}},
         Level.loaded(U32.to_nat(Level.count(map, "SECTORS", 26)), 0, sectors), specials, V.Vec.of_list([], Level.count(map, "SECTORS", 26))})
     case _:
       Level.room(0, 0)
@@ -697,20 +716,24 @@ def Level.names(+map: List<&2, W.Wad.Lump>, p: Array<U32> & List<&2, List<&2, U3
   Level.flats(map, Level.vecs(lists), B.Bytes.each(~String, ~B.Bytes.name,
     Level.fields(W.Wad.find(map, "SIDEDEFS"), 30, [4, 12, 20]), a))
 
-def Level.read(a: Array<U32>, found: Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>) ->
+def Level.identified(identity: Level.Name, p: Array<U32> & Level) -> Array<U32> & Level:
+  (a, level) = p
+  (a, Level.named(identity, level))
+
+def Level.read(identity: Level.Name, a: Array<U32>, found: Result<&1, &1, U32 & String, List<&2, W.Wad.Lump>>) ->
   Result<&1, &1, U32 & String, Array<U32> & Level>:
   match found:
     case Fail{e}:
       Fail{e}
     case Done{+map}:
-      Done{Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.file.u16, Level.plan(map), a))}
+      Done{Level.identified(identity, Level.names(map, B.Bytes.lists(~U32, ~B.Bytes.file.u16, Level.plan(map), a)))}
 
 # Map ExMy of the WAD from its bytes and directory, or Doom's error for
 # a map the WAD lacks.
 def Level.load(+episode: U32, +map: U32, p: Array<U32> & List<&2, W.Wad.Lump>) ->
   Result<&1, &1, U32 & String, Array<U32> & Level>:
   (a, +lumps) = p
-  Level.read(a, Level.map(episode, map, lumps))
+  Level.read(Name{episode, map}, a, Level.map(episode, map, lumps))
 
 # Map ExMy of the WAD BENDOOM_IWAD names; a WAD that cannot be read, or
 # a map it lacks, ends the program with the error.

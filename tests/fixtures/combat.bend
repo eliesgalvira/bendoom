@@ -20,21 +20,21 @@ def Combat.clear(n: Nat, +i: U32, +records: V.Vec) -> V.Vec:
 
 def Combat.cleared(level: L.Level) -> L.Level:
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, L.Things{records, +count}, texnames,
-    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = level
+    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = level
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap,
     L.Things{Combat.clear(U32.to_nat(count), 0, records), count},
-    texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard}
+    texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard}
 
 # The oracle's --things: one record rewritten in place as a thing of a
 # kind at x, y facing east with options 7.
 def Combat.placed(level: L.Level, +id: U32, x: U32, y: U32, kind: U32) -> L.Level:
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap, L.Things{records, count}, texnames,
-    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard} = level
+    flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard} = level
   +at = (id * 5 : U32)
   L.Level{L.Geo{lines, sides, verts, segs, subs, nodes, root, blockmap,
     L.Things{V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(V.Vec.set(records,
       at, x), (at + 1 : U32), y), (at + 2 : U32), 0), (at + 3 : U32), kind), (at + 4 : U32), 7), count},
-    texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches}, sectors, specials, heard}
+    texnames, flatnames, sine, tanto, boxes, nlines, nsectors, reject, sidetex, switches, identity}, sectors, specials, heard}
 
 # One monster alone on the map.
 def Combat.isolated(level: L.Level, +id: U32, x: U32, y: U32, kind: U32) -> L.Level:
