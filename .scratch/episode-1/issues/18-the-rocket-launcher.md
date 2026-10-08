@@ -8,14 +8,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] A scripted demo fires a rocket at a wall and at a monster; frames at the rocket mid-flight and at the explosion match Chocolate Doom with zero differing pixels.
-- [ ] Firing a rocket at a wall next to the player hurts the player as vanilla's does.
-- [ ] The README's controls table lists key 5.
+- [x] A scripted demo fires a rocket at a wall and at a monster; frames at the rocket mid-flight and at the explosion match Chocolate Doom with zero differing pixels.
+- [x] Firing a rocket at a wall next to the player hurts the player as vanilla's does.
+- [x] The README's controls table lists key 5.
 
 ## Where it stopped
 
-Branch `e1-18`, worktree `../bendoom-e1-18`, based on integration `54288b2`. Commit `fb3caac` saves the partly verified launcher; `acda90d` adds the unverified shared vertical clamp and floor/ceiling height assertions. Launcher and rocket rows300–313, shared missile spawn/first-step and barrel radius damage are implemented. Key5 and README/browser controls are updated.
+Branch `e1-18`, worktree `../bendoom-e1-18`, based on integration `54288b2`. Source through `b5a5a17` passes source/proof and rocket, baron, keys, sim and fight on native and JavaScript. Frame rebuilt. Launcher and rocket rows300–313, shared missile spawn/first-step, vertical clamp and barrel radius damage are implemented. Key5 and README/browser controls are updated. No LAWS declarations changed.
 
-Last verified checks: source term checking and proof passed before the final ammo/sprite corrections. After those corrections, rocket, baron and key-selection tests passed on native and JavaScript, and Frame rebuilt, ending2026-10-08 11:10:53 +02:00. An earlier wall80 comparison failed because launcher ammo used cells instead of rockets; corrected ammo and sprite roots have not yet been compared. No zero-pixel or waveform-equality claim.
+All eight preserved wall/monster/self flight and blast captures match64000 pixels and their active palettes. The delayed shotgun-pickup control at680 also matches64000 pixels/palette0. The first-display weapon ownership fix preserves later pickup background restoration. Complete controlled wall audio matches957600 bytes; independently generated120-tic events, physical channels and active voices match. This uses1260-frame callbacks plus70 drain, and does not settle ticket04 startup or production1024-frame device timing.
 
-Remaining: verify the vertical clamp and affected imp/baron/missile paths on native and JavaScript; rebuild Frame for the latest source; compare wall flight/blast, monster direct/radius damage and near-wall self-damage frames and active palettes against the preserved Chocolate references. Compare complete controlled launch/blast audio and independently generated events. Build final game/Film/window products, measure native widths, run independent Standards/Spec reviews and integration checks. Merge the current integration branch before final verification. Source inputs and failed/passed external evidence remain in ignored `research/rocket18/`. No job is active or queued.
+Independent Standards/Spec reviews found no required source fixes. Remaining gates belong to root integration: combined18+19 Doom/Film/window builds and final native widths, merged affected frame/proof checks and full flake. Verified local Frame width197 and controlledFilm203 remain below255. Root will delete this ticket after those gates pass. Immutable references and all failed/passed evidence remain in ignored `research/rocket18/`; no masks or output-derived values were used. No worker job is active or queued.
