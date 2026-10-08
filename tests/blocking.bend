@@ -65,8 +65,8 @@
 # out along (1, 1) from the origin has (1, 0) in front, (0, 1) behind and
 # (1, 1) on it, from the whole-unit products 1 against 0, 0 against 1 and
 # 1 against 1.
-# Last, every type that calls out on sight stands in a row that runs
-# A_Look and chases in a row of the table that runs A_Chase, so no
+# Last, every MF_COUNTKILL type stands in a row that runs A_Look and
+# chases in a row of the table that runs A_Chase, so no
 # monster can wake without a state to wake into and none can watch for
 # the player without A_Look to do it.
 import Base
