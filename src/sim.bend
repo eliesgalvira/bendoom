@@ -2157,9 +2157,16 @@ def Sim.sliding(corpse: Bool, +momx: U32, +momy: U32, floorz: U32, sectorfloor: 
     F.Fixed.gt(F.Fixed.abs(momy), 16384)), Bool.not(U32.is_eq(floorz, sectorfloor))))
 
 # No friction in the air or for a corpse still sliding off a step.
+def Sim.friction.applies(eligible: Bool, +level: L.Level, +p: Player) -> Bool:
+  match eligible:
+    case False{}:
+      Player.onground(p)
+    case True{}:
+      Bool.not(Sim.sliding(True{}, Player.momx(p), Player.momy(p), Player.floorz(p),
+        L.Level.floor(level, L.Level.sector_at(level, Player.x(p), Player.y(p)))))
+
 def Sim.friction(+level: L.Level, +cmd: K.Cmd, +p: Player) -> Player:
-  Bool.pick(Player, Bool.and(Player.onground(p), Bool.not(Sim.sliding(Player.dead(p), Player.momx(p),
-    Player.momy(p), Player.floorz(p), L.Level.floor(level, L.Level.sector_at(level, Player.x(p), Player.y(p)))))),
+  Bool.pick(Player, Sim.friction.applies(Bool.and(Player.onground(p), Player.dead(p)), level, p),
     Sim.friction.ground(cmd, p), p)
 
 def Sim.xy.slowed(+level: L.Level, +cmd: K.Cmd, t: Sim.Try) -> Sim.Try:
