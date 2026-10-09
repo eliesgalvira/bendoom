@@ -4088,12 +4088,13 @@ def Sim.fire.bullet.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
 # Doom's A_FirePistol: the shot is heard, then the bullet fired.
 def Sim.fire.pistol.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-  Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s))
+  Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo,
+    Sim.mobj.enter(H.Thing.play(), Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))
 
 def Sim.fire.cgun.loaded.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, loaded: Bool, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
   match loaded:
     case True{}:
-      Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, s)
+      Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, Sim.mobj.enter(H.Thing.play(), s))
     case False{}:
       Entering{None{}, None{}, psp, s}
 
@@ -4125,7 +4126,7 @@ def Sim.fire.shotgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 
   +slope = Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
     H.Things.you(ts), Player.angle(p))
   Entering{None{}, Some{flash}, psp, Sim.fire.pellets.with(~enter, ~shoot, 7n, slope,
-    Sim.spent(ammo, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s)))}
+    Sim.spent(ammo, Sim.mobj.enter(H.Thing.play(), Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s))))}
 
 def Sim.melee.range() -> U32:
   4194304
@@ -4212,7 +4213,7 @@ def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: Sta
   match enough:
     case True{}:
       H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-      Entering{Some{atk}, None{}, psp, s}
+      Entering{Some{atk}, None{}, psp, Sim.mobj.enter(H.Thing.play(), s)}
     case False{}:
       +p = State.player(s)
       +inv = Player.inv(p)
