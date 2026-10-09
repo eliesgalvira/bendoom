@@ -90,14 +90,13 @@ def Stream.voices(+want: U32, chans: List<&2, Maybe<&2, C.Channel>>, p: Array<U3
     case c <> rest:
       Stream.voices(want, rest, Stream.voice(want, c, p))
 
-# A channel that has played its sound out frees itself, as SDL_mixer's
-# does in the callback that mixes its last frame.
+# The device cursor stops at the end; S_UpdateSounds owns the channel.
 def Stream.played.slot(+want: U32, c: Maybe<&2, C.Channel>) -> Maybe<&2, C.Channel>:
   match c:
     case None{}:
       None{}
     case Some{C.Chan{+at, sfx, source, left, right, +end}}:
-      C.Channel.kept(U32.is_ge((at + want : U32), end), C.Chan{(at + want : U32), sfx, source, left, right, end})
+      Some{C.Chan{(at + U32.min(want, (end - at : U32)) : U32), sfx, source, left, right, end}}
 
 # The channels past want frames.
 def Stream.played(+want: U32, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
