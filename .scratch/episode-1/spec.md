@@ -1,6 +1,6 @@
 # Knee-Deep in the Dead
 
-**Status:** ready-for-human — implementation and automated episode acceptance complete; ticket 04's film audio startup decision remains pending.
+**Status:** ready-for-human
 
 ## Problem Statement
 
