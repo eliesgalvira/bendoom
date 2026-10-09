@@ -1097,9 +1097,8 @@ def friction_if_placed(applies: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player
 
 def friction_placed(+level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
   Placed(level, S.Sim.friction(level, cmd, p)):
-  friction_if_placed(Bool.and(S.Player.onground(p), Bool.not(S.Sim.sliding(S.Player.dead(p), S.Player.momx(p),
-    S.Player.momy(p), S.Player.floorz(p), L.Level.floor(level,
-      L.Level.sector_at(level, S.Player.x(p), S.Player.y(p)))))), level, cmd, p, hp)
+  friction_if_placed(S.Sim.friction.applies(Bool.and(S.Player.onground(p), S.Player.dead(p)), level, p),
+    level, cmd, p, hp)
 
 def slowed_placed(+level: L.Level, +cmd: K.Cmd, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
   Placed(level, S.Sim.Try.player(S.Sim.xy.slowed(level, cmd, t))):
