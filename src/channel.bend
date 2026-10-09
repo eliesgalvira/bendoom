@@ -1,7 +1,6 @@
 # Doom's s_sound.c channels: the eight voices a level's sounds are
-# allotted. They live outside the sim's state because vanilla frees a
-# channel when the device has finished it and not on a tic. A channel is
-# the span of the bank its sound has left to play, the sound and the
+# allotted. S_UpdateSounds frees a channel after the device finishes it.
+# A channel is the span of the bank its sound has left to play, the sound and the
 # source that made it, and the left and right volumes the device was
 # given for it. The bank is every sound expanded once from the opened
 # WAD, end to end in one array; the mixer plays from it, and this module
@@ -325,7 +324,7 @@ def Channel.keys(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Nat>
 # channel of no greater importance is kicked out, and if every one is
 # more important the sound is dropped. A sound the bank holds no frames
 # of takes its channel too, as one whose lump CacheSFX refuses does, and
-# frees it at the next mix.
+# frees it in S_UpdateSounds.
 def Channel.start(s: Channel.Sound, source: Sn.Sound.Source, +left: U32, +right: U32,
   +chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
   Sound{+sfx, at, end} = s
@@ -354,18 +353,36 @@ def Channel.hear(+sounds: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Eve
     case e <> rest:
       Channel.hear(sounds, rest, Channel.event(sounds, e, chans))
 
+def Channel.finished.slot(c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
+  match c:
+    case None{}:
+      None{}
+    case Some{Chan{+at, sfx, source, left, right, +end}}:
+      Channel.kept(U32.is_ge(at, end), Chan{at, sfx, source, left, right, end})
+
+def Channel.finished(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
+  match chans:
+    case []:
+      []
+    case c <> rest:
+      Channel.finished.slot(c) <> Channel.finished(rest)
+
 def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
   Chan{at, sfx, source, left, right, end} = c
   (+vol, +sep) = p
   Channel.kept(U32.is_zero(vol), Chan{at, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), end})
 
-def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+def Channel.update.live(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
   c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
       None{}
     case Some{Chan{at, sfx, +source, left, right, end}}:
       Channel.moved(Chan{at, sfx, source, left, right, end}, params(ctx, source))
+
+def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, ctx: Ctx,
+  c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
+  Channel.update.live(~Ctx, ~params, ctx, Channel.finished.slot(c))
 
 # S_UpdateSounds follows the current listener and source positions.
 def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
