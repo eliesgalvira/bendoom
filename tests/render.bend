@@ -79,6 +79,8 @@
 # Remaining combat fidelity gaps are recorded in milestone 6's tickets.
 # The exit and full-inventory fixtures are regression pins where a
 # vanilla demo cannot reach the same state.
+# Full inventory is injected after the first status draw, so newly
+# owned weapon numbers restore STBAR rather than start over STARMS.
 # The pickup frames show their pickup: the key is 44 pixels of the first
 # key frame and would be 347 of the second, a bonus never
 # taken would be 1465 of the second bonus frame, the green armour is 745
@@ -471,12 +473,12 @@ def frames(mem: Array<U32>, gl: G.Gfx & L.Level) -> IO(Unit):
       at(level, east(0), east(400), 90)), m25)
     m27 : Array<U32> <- frame("rocket before", tables, gfx, strafed(16, 11n, at(level, east(714), west(1011), 90)), m26)
     m28 : Array<U32> <- frame("rocket after", tables, gfx, strafed(16, 12n, at(level, east(714), west(1011), 90)), m27)
-    m29 : Array<U32> <- frame("rocket refused", tables, gfx, strafed(16, 12n,
-      full(at(level, east(714), west(1011), 90))), m28)
+    m29 : Array<U32> <- frame("rocket refused", tables, gfx, after([[K.Cmd.demo(0, 0, 16, 0)], strafe(12n)],
+      full(rested(level, east(714), west(1011), 90))), m28)
     m30 : Array<U32> <- frame("chainsaw after", tables, gfx, strafed(4294967280, 13n,
       at(level, east(3158), east(2176), 180)), m29)
-    m31 : Array<U32> <- frame("chainsaw refused", tables, gfx, strafed(4294967280, 13n,
-      full(at(level, east(3158), east(2176), 180))), m30)
+    m31 : Array<U32> <- frame("chainsaw refused", tables, gfx, after([[K.Cmd.demo(0, 0, 4294967280, 0)], strafe(13n)],
+      full(rested(level, east(3158), east(2176), 180))), m30)
     w1 : Array<U32> <- frame("pistol rising 8", tables, gfx, after([idle(8n)], Tic.State.start(level)), m31)
     w2 : Array<U32> <- frame("pistol bob low 48", tables, gfx, after([idle(20n), walk(28n)], Tic.State.start(level)), w1)
     w3 : Array<U32> <- frame("pistol bob right 64", tables, gfx, after([idle(20n), walk(44n)], Tic.State.start(level)),
