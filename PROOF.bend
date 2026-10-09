@@ -1087,20 +1087,22 @@ def ground_placed(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Placed(level, p)
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
         S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-def friction_if_placed(ground: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
-  Placed(level, Bool.pick(S.Player, ground, S.Sim.friction.ground(cmd, p), p)):
-  match ground:
+def friction_if_placed(applies: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, Bool.pick(S.Player, applies, S.Sim.friction.ground(cmd, p), p)):
+  match applies:
     case True{}:
       ground_placed(level, cmd, p, hp)
     case False{}:
       hp
 
 def friction_placed(+level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
-  Placed(level, S.Sim.friction(cmd, p)):
-  friction_if_placed(S.Player.onground(p), level, cmd, p, hp)
+  Placed(level, S.Sim.friction(level, cmd, p)):
+  friction_if_placed(Bool.and(S.Player.onground(p), Bool.not(S.Sim.sliding(S.Player.dead(p), S.Player.momx(p),
+    S.Player.momy(p), S.Player.floorz(p), L.Level.floor(level,
+      L.Level.sector_at(level, S.Player.x(p), S.Player.y(p)))))), level, cmd, p, hp)
 
 def slowed_placed(+level: L.Level, +cmd: K.Cmd, t: S.Sim.Try, ht: Placed(level, S.Sim.Try.player(t))) ->
-  Placed(level, S.Sim.Try.player(S.Sim.xy.slowed(cmd, t))):
+  Placed(level, S.Sim.Try.player(S.Sim.xy.slowed(level, cmd, t))):
   match t:
     case S.Try{ok, +p, things}:
       friction_placed(level, cmd, p, ht)
