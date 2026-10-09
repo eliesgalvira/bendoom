@@ -12,6 +12,7 @@ import ./draw.bend as D
 import ./sim.bend as S
 import ./tic.bend as Tic
 import ./sound.bend as Sn
+import ./channel.bend as C
 import ./project.bend as P
 import ./render.bend as R
 import ./finale.bend as Fi
@@ -804,6 +805,13 @@ type Play is Data:
 
 type Play.Step is Data:
   Step{play: Play, sounds: List<&2, Sn.Sound.Event>}
+
+def Play.channels(play: Play, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
+  match play:
+    case Playing{+state, didsecret, pointer}:
+      C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
+    case _:
+      C.Channel.finished(chans)
 
 # A new game on a map: G_InitNew, then G_DoLoadLevel.
 def Play.start(level: L.Level) -> Play:

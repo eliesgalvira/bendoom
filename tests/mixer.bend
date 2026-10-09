@@ -17,9 +17,9 @@
 # is dropped, so the table does not change; the removed thing's stop
 # frees its channel; and DSNOWAY from nobody cuts DSSWTCHN from nobody
 # through S_StopSound(NULL), then takes the first free channel.
-# Updating moves the remaining sectors to volume 51 and separation 204,
-# except sector 3 which leaves earshot and stops. The centred sound
-# stays centred, and stopping NULL frees it. The sides are I_SDL_UpdateSoundParams': ((254 - sep) * vol) /
+# Updating frees the zero-span sounds omitted from the filtered bank.
+# The centred sound stays centred, and stopping NULL frees it.
+# The sides are I_SDL_UpdateSoundParams': ((254 - sep) * vol) /
 # 127 and (sep * vol) / 127. Centred at the default volume that is 63
 # and 64; the door at volume 51 and separation 204 is 20 and 81, and at
 # 64 and 129 it is 62 and 65.
@@ -33,7 +33,7 @@
 # dumped under gdb: the same values tests/sfx.bend prints for DSNOWAY's
 # "heard" lines, which pass through Stream.side, the scaling this file
 # now drives through the mixer. The frame after the last is silence,
-# and the channel has freed itself.
+# and S_UpdateSounds frees the completed channel.
 #
 # Last the song from its first frame, past the chip's first buffer, with
 # two sounds over it, DSDOROPN from a sector heard at 51 and 204 from
@@ -109,13 +109,22 @@ def Test.frames(+words: List<&2, U32>, at: List<&2, U32>) -> List<&2, String>:
 def Test.sizes() -> List<&2, U32>:
   [1, 7, 100, 2048, 33, 999, 3072, 5, 3072, 3072, 3072, 3072]
 
+def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
+  match source:
+    case Sn.Nobody{}:
+      (64, 128)
+    case Sn.Sector{3}:
+      (0, 128)
+    case _:
+      (51, 204)
+
 # The grunt alone, over a deck that plays no song.
 def Test.alone(m: A.Stream.Window) -> IO(C.Channel.Bank):
   A.Window{bank, deck, +chans, +words} = m
   do IO<C.Channel.Bank>:
     IO.print("grunt " ++ U32.show(H.Fnv.words(List.take(&2, U32, words, 16996n))) ++ " "
       ++ String.join(Test.frames(words, [0, 1, 3, 2714, 16995, 16996]), " "))
-    IO.print("after " ++ String.join(Test.table(chans), " "))
+    IO.print("after " ++ String.join(Test.table(C.Channel.update(~Unit, ~Test.params, Unit{}, chans)), " "))
     return bank
 
 def Test.song.done(m: A.Stream.Window) -> IO(Unit):
@@ -140,15 +149,6 @@ def Test.song(+sounds: List<&2, C.Channel.Sound>, deck: S.Song.Deck, bank: C.Cha
   Test.song.on(sounds, Test.run([1, 7, 100, 2048],
     A.Window{bank, Test.started(S.Song.Deck.take(4096, S.Song.Deck.change("D_E1M1", deck))),
       C.Channel.hear(sounds, [Sn.Start{Sn.Sound.doropn(), Sn.Sector{2}, 51, 204}], C.Channel.none()), []}))
-
-def Test.params(ctx: Unit, source: Sn.Sound.Source) -> U32 & U32:
-  match source:
-    case Sn.Nobody{}:
-      (64, 128)
-    case Sn.Sector{3}:
-      (0, 128)
-    case _:
-      (51, 204)
 
 # The scripted sequence, one event a step.
 def Test.script(+sounds: List<&2, C.Channel.Sound>) -> IO(Unit):
@@ -216,8 +216,8 @@ def main() -> IO(Unit):
 #|14 DSPLDETH/thing 2/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
 #|15 - DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 DSSWTCHN/nobody/63,64
 #|16 DSNOWAY/nobody/63,64 DSGETPOW/sector 9/63,64 DSDORCLS/sector 3/62,65 DSPSTART/sector 4/63,64 DSPSTOP/sector 5/63,64 DSBDOPN/sector 6/63,64 DSBDCLS/sector 7/63,64 -
-#|17 DSNOWAY/nobody/63,64 DSGETPOW/sector 9/20,81 - DSPSTART/sector 4/20,81 DSPSTOP/sector 5/20,81 DSBDOPN/sector 6/20,81 DSBDCLS/sector 7/20,81 -
-#|18 - DSGETPOW/sector 9/20,81 - DSPSTART/sector 4/20,81 DSPSTOP/sector 5/20,81 DSBDOPN/sector 6/20,81 DSBDCLS/sector 7/20,81 -
+#|17 DSNOWAY/nobody/63,64 - - - - - - -
+#|18 - - - - - - - -
 #|grunt 3631499139 0 63 64 1 49 50 3 -50 -50 2714 7399 7517 16995 -43 -44 16996 0 0
 #|after - - - - - - - -
 #|song 4183762350 0 -20 -81 1 -22 -91 2155 -698 -1447 2156 -828 -1245 2157 -1038 -1548 15480 2248 6736
