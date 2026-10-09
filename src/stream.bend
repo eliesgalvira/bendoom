@@ -189,13 +189,13 @@ def Stream.hear(events: List<&2, Sn.Sound.Event>, m: Maybe<Stream>) -> Maybe<Str
     case Some{Stream{audio, deck, chans, C.Bank{a, +sounds}, dry}}:
       Some{Stream{audio, deck, C.Channel.hear(sounds, events, chans), C.Bank{a, sounds}, dry}}
 
-def Stream.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+def Stream.update(~Ctx: Data, ~channels: Ctx -> List<&2, Maybe<&2, C.Channel>> -> List<&2, Maybe<&2, C.Channel>>, ctx: Ctx,
   m: Maybe<Stream>) -> Maybe<Stream>:
   match m:
     case None{}:
       None{}
     case Some{Stream{audio, deck, chans, bank, dry}}:
-      Some{Stream{audio, deck, C.Channel.update(~Ctx, ~params, ctx, chans), bank, dry}}
+      Some{Stream{audio, deck, channels(ctx, chans), bank, dry}}
 
 def Stream.read.songs(songs: List<&2, String>, bank: C.Channel.Bank,
   p: Array<U32> & List<&2, List<&2, U32>>) -> Array<U32> & S.Song.Deck & C.Channel.Bank:

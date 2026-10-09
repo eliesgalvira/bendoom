@@ -353,19 +353,36 @@ def Channel.hear(+sounds: List<&2, Channel.Sound>, events: List<&2, Sn.Sound.Eve
     case e <> rest:
       Channel.hear(sounds, rest, Channel.event(sounds, e, chans))
 
-def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
-  Chan{+at, sfx, source, left, right, +end} = c
-  (+vol, +sep) = p
-  Channel.kept(Bool.or(U32.is_ge(at, end), U32.is_zero(vol)),
-    Chan{at, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), end})
+def Channel.finished.slot(c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
+  match c:
+    case None{}:
+      None{}
+    case Some{Chan{+at, sfx, source, left, right, +end}}:
+      Channel.kept(U32.is_ge(at, end), Chan{at, sfx, source, left, right, end})
 
-def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
+def Channel.finished(chans: List<&2, Maybe<&2, Channel>>) -> List<&2, Maybe<&2, Channel>>:
+  match chans:
+    case []:
+      []
+    case c <> rest:
+      Channel.finished.slot(c) <> Channel.finished(rest)
+
+def Channel.moved(c: Channel, p: U32 & U32) -> Maybe<&2, Channel>:
+  Chan{at, sfx, source, left, right, end} = c
+  (+vol, +sep) = p
+  Channel.kept(U32.is_zero(vol), Chan{at, sfx, source, Channel.left(vol, sep), Channel.right(vol, sep), end})
+
+def Channel.update.live(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,
   c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
   match c:
     case None{}:
       None{}
     case Some{Chan{at, sfx, +source, left, right, end}}:
       Channel.moved(Chan{at, sfx, source, left, right, end}, params(ctx, source))
+
+def Channel.update.slot(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, ctx: Ctx,
+  c: Maybe<&2, Channel>) -> Maybe<&2, Channel>:
+  Channel.update.live(~Ctx, ~params, ctx, Channel.finished.slot(c))
 
 # S_UpdateSounds follows the current listener and source positions.
 def Channel.update(~Ctx: Data, ~params: Ctx -> Sn.Sound.Source -> U32 & U32, +ctx: Ctx,

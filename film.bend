@@ -42,13 +42,6 @@ def Film.pcm(words: List<&2, U32>) -> List<&2, U32>:
       (w .&. 255 : U32) <> ((w >> 8n : U32) .&. 255 : U32) <>
         ((w >> 16n : U32) .&. 255 : U32) <> ((w >> 24n : U32) .&. 255 : U32) <> Film.pcm(rest)
 
-def Film.channels(play: I.Play, chans: List<&2, Maybe<&2, C.Channel>>) -> List<&2, Maybe<&2, C.Channel>>:
-  match play:
-    case I.Playing{+state, didsecret, pointer}:
-      C.Channel.update(~S.State, ~(s => source => S.Sim.sound.parameters(False{}, s, source)), state, chans)
-    case _:
-      chans
-
 def Film.mixed(audio: File, w: M.Stream.Window,
   next: File -> Sg.Song.Deck -> List<&2, Maybe<&2, C.Channel>> -> C.Channel.Bank -> IO(Unit)) -> IO(Unit):
   M.Window{bank, later, voices, words} = w
@@ -111,7 +104,7 @@ def Film.go(outros: Nat, cmds: List<&2, K.Cmd>, world: I.Play.World, deck: Sg.So
       +events = I.Play.Step.sounds(step)
       +next = I.Play.Step.play(step)
       Film.mixed(audio, M.Stream.window(1260, Sg.Song.Deck.change(I.Play.song(next), deck),
-          Film.channels(next, C.Channel.hear(sounds, events, chans)), C.Bank{frames, sounds}),
+          I.Play.channels(next, C.Channel.hear(sounds, events, chans)), C.Bank{frames, sounds}),
         file => later => voices => kept =>
           Film.shot(V.Show.rgb(I.Play.frame(tables, gfx, next, True{}, mem)),
             m => IO.bind(I.Play.World, Unit, I.Play.load(I.World{next, m, gfx, tables, level}),
