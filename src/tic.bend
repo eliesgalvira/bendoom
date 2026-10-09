@@ -913,6 +913,35 @@ def Sim.thing.stepped(m: Maybe<&2, H.Thing>, +id: U32, s: S.State) -> S.State:
       Sim.thing.after(id, Sim.thing.vertical.if(Bool.or(Bool.not(U32.is_eq(H.Thing.z(th), H.Thing.floorz(th))),
         Bool.not(U32.is_zero(H.Thing.momz(th)))), th, id, s))
 
+def Sim.thing.crosses(+kind: U32, flags: U32) -> Bool:
+  Bool.and(U32.is_zero((flags .&. 36864 : U32)), Bool.not(Bool.or(U32.is_eq(kind, H.Thing.fireball()),
+    Bool.or(U32.is_eq(kind, H.Thing.baronball()), U32.is_eq(kind, H.Thing.rocket())))))
+
+# P_TryMove fires the crossed specials after relinking an accepted move.
+# A refused move leaves its position unchanged and crosses no lines.
+def Sim.thing.move.cross(m: Maybe<&2, H.Thing>, +id: U32, +ox: U32, +oy: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      Sp.Sim.thing.crossed(Bool.pick(List<&2, U32>, Sim.thing.crosses(H.Thing.kind(th), H.Thing.flags(th)),
+        S.Sim.crossings(S.State.level(s), ox, oy, H.Thing.x(th), H.Thing.y(th),
+          V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.radius())), []), False{}, id, H.Thing.x(th), H.Thing.y(th),
+        H.Thing.z(th), H.Thing.angle(th), s)
+
+def Sim.thing.move.after(+id: U32, ox: U32, oy: U32, +s: S.State) -> S.State:
+  Sim.thing.move.cross(S.State.thing(id, s), id, ox, oy, s)
+
+def Sim.thing.move(m: Maybe<&2, H.Thing>, +id: U32, +dx: U32, +dy: U32, +s: S.State) -> S.State:
+  match m:
+    case None{}:
+      s
+    case Some{+th}:
+      +ox = H.Thing.x(th)
+      +oy = H.Thing.y(th)
+      Sim.thing.move.after(id, ox, oy, S.Sim.thing.fit.with(~Sim.missile.enter.acted, id, th,
+        (ox + dx : U32), (oy + dy : U32), s))
+
 # Doom's P_MobjThinker for a thing: the horizontal move a blow gave it,
 # then the vertical, then its tic through its states, whose actions run
 # as the states are entered. One already removed has no thing, and its
@@ -922,7 +951,7 @@ def Sim.thing.tic(m: Maybe<&2, H.Thing>, +id: U32, +s: S.State) -> S.State:
     case None{}:
       s
     case Some{+th}:
-      +after = S.Sim.thing.xy.with(~Sim.missile.enter.acted, id, th, s)
+      +after = S.Sim.thing.xy.with(~Sim.thing.move, id, th, s)
       Sim.thing.stepped(S.State.thing(id, after), id, after)
 
 def Sim.thing(+id: U32, +s: S.State) -> S.State:
