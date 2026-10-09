@@ -1,6 +1,6 @@
 # Bendoom
 
-Doom (E1M1) written in Bend 2, packaged as a Nix flake. The single λ-expression version is Hellbent.
+Doom written in Bend 2, packaged as a Nix flake. The single λ-expression version is Hellbent.
 
 ## Erasure
 
