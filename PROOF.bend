@@ -1087,9 +1087,9 @@ def ground_placed(+level: L.Level, cmd: K.Cmd, p: S.Player, hp: Placed(level, p)
         Bool.and(U32.is_zero(forward), U32.is_zero(side)))), level,
         S.Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, hp)
 
-def friction_if_placed(ground: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
-  Placed(level, Bool.pick(S.Player, ground, S.Sim.friction.ground(cmd, p), p)):
-  match ground:
+def friction_if_placed(applies: Bool, +level: L.Level, +cmd: K.Cmd, +p: S.Player, hp: Placed(level, p)) ->
+  Placed(level, Bool.pick(S.Player, applies, S.Sim.friction.ground(cmd, p), p)):
+  match applies:
     case True{}:
       ground_placed(level, cmd, p, hp)
     case False{}:
