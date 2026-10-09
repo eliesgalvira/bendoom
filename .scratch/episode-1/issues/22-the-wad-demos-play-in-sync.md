@@ -28,8 +28,6 @@ On stock DOOM1.WAD, place the player at E1M7 `192 -384 90` and replay `800,0,0,0
 
 Worktree `/home/bigweld/Repos/bendoom-e1-22`, branch `e1-22`. No prerequisite blockers remain.
 
-DEMO1 still diverges after2088. Chocolate starts the sector12/tag3 platform when a moving imp corpse crosses line479, special88; Bend waits until the player crosses line161 at2093. Fix the missing non-player momentum walk-over callback with vanilla trigger eligibility and ordering. The retained late controls are commands3000/4000/5026; compare every pixel and the active palette.
-
 The player body still uses a static height/flags representation after death. This is a separate source limitation from the reproduced corpse step-edge friction cause; the corrected lethal-melee control does not establish universal body-state parity.
 
 Final-source start/demo controls, sound-channel saturation and expired-channel handling, and the optional Freedoom diagnostic remain open. Separate support workers own the remaining songs and browser/performance. Acceptance remains one ticket; root aggregates their evidence.
