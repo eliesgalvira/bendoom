@@ -2181,13 +2181,11 @@ def main() -> IO(Unit):
 #|sound tic 39 stop thing 292
 #|sound tic 40 DSBAREXP from thing 25 vol 64 sep 128
 #|held tic 40 at 991.842330 697.865051 health 88 armour 94/1 rnd 165 24 hp 20 state 11/5 at 992.000000 608.000000 -128.000000 after 4294967295 25 hp 0 state 177/5 at 992.004165 628.246276 -128.000000 after 157 26 hp 14 state 11/3 at 959.800231 605.964096 -128.000000 after 240 mobj 293 type -2 at 998.861236 707.187316 -100.334213 state 183/4 mobj 294 type -1 at 966.790679 611.998947 -97.934570 state 86/3 mobj 295 type -2 at 987.953857 718.468185 -98.442047 state 182/4 mobj 296 type -1 at 986.516006 644.633132 -100.016708 state 86/3
-#|sound tic 41 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 44 stop thing 293
 #|sound tic 51 stop thing 294
 #|sound tic 51 stop thing 296
 #|sound tic 52 stop thing 295
 #|sound tic 53 DSPISTOL from thing 4294967295 vol 64 sep 128
-#|sound tic 53 DSPLPAIN from thing 4294967295 vol 64 sep 128
 #|sound tic 54 DSBAREXP from thing 24 vol 64 sep 128
 #|sound tic 54 DSBAREXP from thing 26 vol 64 sep 163
 #|held tic 54 at 991.211257 728.561431 health 31 armour 66/1 rnd 199 24 hp -98 state 177/5 at 991.994369 593.250213 -128.000000 after 4294967295 25 hp 0 state 179/6 at 992.004165 628.246276 -128.000000 after 157 26 hp -92 state 177/5 at 939.605072 586.375808 -128.000000 after 240 mobj 297 type -1 at 994.170410 580.028564 -89.593750 state 86/3
