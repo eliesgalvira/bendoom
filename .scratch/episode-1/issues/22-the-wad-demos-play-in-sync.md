@@ -4,7 +4,7 @@
 
 **What to build:** DEMO1 (E1M5, 5,026 tics), DEMO2 (E1M3, 3,836 tics) and DEMO3 (E1M7, 2,134 tics) of DOOM1.WAD replay in Bendoom to their last tic without drifting from Chocolate Doom. Find and fix each desync at its cause; a fix that belongs to another ticket's mechanic is fixed here, with the cause named in the report.
 
-**Blocked by:** 09, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21
+**Blocked by:** none; all prerequisite mechanics have landed.
 
 **Status:** ready-for-agent
 
@@ -52,4 +52,8 @@ The bounded trace at clocks2100..2175 puts Bendoom's M_Random index two draws ah
 
 ## Where it stopped
 
-Worktree `/home/bigweld/Repos/bendoom-e1-22`, branch `e1-22`, remains at preflight checkpoint `c16887b`; no job is active or queued. Final acceptance has not run on the completed episode because tickets18 and19 remain unfinished. The current ticket and inherited reproductions are on `e1-tier1-candidate`; merge the current integration and handoff before resuming. The ignored `research/ticket22-plan.md` preserves proposed checks, which are not passing evidence. Keep valid earlier audio and browser evidence only where the relevant path is unchanged.
+Worktree `/home/bigweld/Repos/bendoom-e1-22`, branch `e1-22`, has merged released integration `ddf7b99`. All nine stock map starts after twenty idle commands match all 64,000 pixels and the active palette on that build.
+
+All eighteen proposed WAD-demo checkpoints have complete comparisons. DEMO1 passes 20/1000/2000 and differs at 3000/4000/5026 by 50,979/54,391/52,711 pixels; its 3000 palette also differs. DEMO2 passes 53/750/3836 and has 459/34/34 face pixels differing at 1500/2250/3000. DEMO3 passes 72/400/800/1700/2134 and has 494 face pixels differing at 1200. These are checkpoint failures, not identified first divergences. The seven inherited face/death/rebirth comparisons still fail by their recorded pixel counts on the released build, with matching active palettes.
+
+Diagnosis is running against frozen Chocolate inputs and an assertion-based DEMO2/1500 loop. The initial minimal trace omitted the graphics loader's switch table and is not valid evidence for late random indices; the corrected trace uses the production loader. No game fix is verified yet. Remaining song and browser/performance gates are assigned to separate support workers. Evidence and exact command timings are in ignored `research/checkpoint.md`; earlier plans are not passing evidence.
