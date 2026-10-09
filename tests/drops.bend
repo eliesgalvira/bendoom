@@ -107,7 +107,7 @@ def living(+s: S.State) -> String:
 # demon 184 by (24009, 5246), but its box spans floors 136 and 64.
 # P_XYMovement refuses that drop and clears both momentum components.
 def ledge.moved(+th: H.Thing, +s: S.State) -> S.State:
-  S.Sim.thing.xy.with(~Tic.Sim.damage.enter.acted, 184, th, S.State.thing.put(184, th, s))
+  S.Sim.thing.xy.with(~Tic.Sim.thing.move, 184, th, S.State.thing.put(184, th, s))
 
 def ledge.at(+level: L.Level, +flags: U32) -> S.State:
   +th = H.Thing.mobj(H.Thing.info(3002), level, 184, 104767616, 4268374368, 8912896, 0)
