@@ -3,9 +3,9 @@
 > [!WARNING]
 > SLOP WARNING: There has been no adult supervision of the code.
 
-Doom's first level, E1M1, written in [Bend 2](https://bend-lang.com).
-Play through the level with monsters, weapons, doors, pickups, sound effects,
-OPL music and the intermission screen. Record a demo and export it as a video.
+Doom's first episode, Knee-Deep in the Dead, written in [Bend 2](https://bend-lang.com).
+Play nine maps with monsters, weapons, doors, pickups, sound effects,
+OPL music, intermissions and the finale. Record a demo and export it as a video.
 
 Choose the original Doom shareware assets or [Freedoom](https://freedoom.github.io).
 Both versions include their game data; you do not need to supply a WAD.
@@ -183,7 +183,8 @@ and audio. CI uploads the website as the `website` artifact.
 
 ## Project status
 
-E1M1 is playable with combat, sound effects and music.
+Episode 1 is playable with combat, secret exits, sound effects, music and the finale.
+Episode-wide demo, browser and audio acceptance is still in progress.
 Open issues live under [.scratch/](.scratch/).
 The next milestone is **Hellbent**: the game as a single λ-expression.
 

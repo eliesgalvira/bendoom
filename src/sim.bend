@@ -2150,13 +2150,21 @@ def Sim.friction.ground(+cmd: K.Cmd, +p: Player) -> Player:
   Sim.slow(Bool.and(Sim.crawling(momx), Bool.and(Sim.crawling(momy),
     Bool.and(U32.is_zero(forward), U32.is_zero(side)))), p)
 
-# No friction in the air.
-def Sim.friction(+cmd: K.Cmd, +p: Player) -> Player:
-  Bool.pick(Player, Player.onground(p), Sim.friction.ground(cmd, p), p)
+# P_XYMovement's corpse clause: momentum above a quarter unit keeps
+# sliding where the box's floor differs from the centre sector's.
+def Sim.sliding(corpse: Bool, +momx: U32, +momy: U32, floorz: U32, sectorfloor: U32) -> Bool:
+  Bool.and(corpse, Bool.and(Bool.or(F.Fixed.gt(F.Fixed.abs(momx), 16384),
+    F.Fixed.gt(F.Fixed.abs(momy), 16384)), Bool.not(U32.is_eq(floorz, sectorfloor))))
 
-def Sim.xy.slowed(+cmd: K.Cmd, t: Sim.Try) -> Sim.Try:
+# No friction in the air or for a corpse still sliding off a step.
+def Sim.friction(+level: L.Level, +cmd: K.Cmd, +p: Player) -> Player:
+  Bool.pick(Player, Bool.and(Player.onground(p), Bool.not(Sim.sliding(Player.dead(p), Player.momx(p),
+    Player.momy(p), Player.floorz(p), L.Level.floor(level, L.Level.sector_at(level, Player.x(p), Player.y(p)))))),
+    Sim.friction.ground(cmd, p), p)
+
+def Sim.xy.slowed(+level: L.Level, +cmd: K.Cmd, t: Sim.Try) -> Sim.Try:
   Try{ok, p, things} = t
-  Try{ok, Sim.friction(cmd, p), things}
+  Try{ok, Sim.friction(level, cmd, p), things}
 
 def Sim.clamp(+mom: U32) -> U32:
   F.Fixed.max(F.Fixed.neg(Sim.maxmove()), F.Fixed.min(mom, Sim.maxmove()))
@@ -2170,7 +2178,7 @@ def Sim.xy.moving(moving: Bool, +level: L.Level, things: H.Things, +cmd: K.Cmd, 
       Player{x, y, z, angle, momx, momy, momz, floorz, ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt} = p
       +xm = Sim.clamp(momx)
       +ym = Sim.clamp(momy)
-      Sim.xy.slowed(cmd, Sim.xy.go(2n, level, Xy{False{}, Try{False{}, Player{x, y, z, angle, xm, ym, momz, floorz,
+      Sim.xy.slowed(level, cmd, Sim.xy.go(2n, level, Xy{False{}, Try{False{}, Player{x, y, z, angle, xm, ym, momz, floorz,
         ceilz, viewheight, deltaview, viewz, crossed, inv, psprites, hurt}, things}, xm, ym}))
 
 # Doom's P_XYMovement: the momentum, capped, moves the player, in
@@ -2802,13 +2810,7 @@ def Sim.kill.tics(+s: State) -> State:
   State.player.put(s, Player.counted((M.Random.at(State.rnd(s)) .&. 3 : U32), State.player(s)))
 
 # Doom's P_KillMobj for the player: the weapon drops away and the mobj
-# enters its death state, whose tics lose a random 0 to 3. The flags
-# vanilla clears leave the sim nothing to do: a dead player takes no
-# more damage, since P_DamageMobj asks its health; no mover in either
-# map crushes what no longer fits; and the player's own sprite is never
-# drawn, so the quartered height and the cleared solid flag have no
-# reader. The gib death needs damage past the player's spawn health,
-# which nothing here deals.
+# enters its death state, whose tics lose a random 0 to 3.
 def Sim.kill(+s: State) -> State:
   Sim.kill.tics(Sim.drawn(Sim.mobj.enter(H.Thing.play.death(), Sim.drop(s))))
 
@@ -4088,12 +4090,13 @@ def Sim.fire.bullet.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
 # Doom's A_FirePistol: the shot is heard, then the bullet fired.
 def Sim.fire.pistol.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, psp: Psprite, weapon: H.Thing.Weapon, s: State) -> Sim.Entering:
   H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-  Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s))
+  Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo,
+    Sim.mobj.enter(H.Thing.play(), Sim.sound(Sn.Sound.pistol(), Sn.Thing{H.Thing.you()}, s)))
 
 def Sim.fire.cgun.loaded.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, ~shoot: @+line: U32 -> @+s: State -> State, loaded: Bool, +flash: U32, psp: Psprite, +ammo: U32, s: State) -> Sim.Entering:
   match loaded:
     case True{}:
-      Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, s)
+      Sim.fire.bullet.with(~enter, ~shoot, flash, psp, ammo, Sim.mobj.enter(H.Thing.play(), s))
     case False{}:
       Entering{None{}, None{}, psp, s}
 
@@ -4125,7 +4128,7 @@ def Sim.fire.shotgun.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 
   +slope = Sim.bulletslope(State.level(s), ts, p, Player.x(p), Player.y(p), Sim.shootz(Player.z(p), Sim.height()),
     H.Things.you(ts), Player.angle(p))
   Entering{None{}, Some{flash}, psp, Sim.fire.pellets.with(~enter, ~shoot, 7n, slope,
-    Sim.spent(ammo, Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s)))}
+    Sim.spent(ammo, Sim.mobj.enter(H.Thing.play(), Sim.sound(Sn.Sound.shotgn(), Sn.Thing{H.Thing.you()}, s))))}
 
 def Sim.melee.range() -> U32:
   4194304
@@ -4212,7 +4215,7 @@ def Sim.ammo.checked(enough: Bool, psp: Psprite, weapon: H.Thing.Weapon, +s: Sta
   match enough:
     case True{}:
       H.Weapon{up, ready, down, ammo, atk, flash} = weapon
-      Entering{Some{atk}, None{}, psp, s}
+      Entering{Some{atk}, None{}, psp, Sim.mobj.enter(H.Thing.play(), s)}
     case False{}:
       +p = State.player(s)
       +inv = Player.inv(p)
@@ -4600,14 +4603,9 @@ def Sim.thing.xy.go.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
         Sim.thing.move.with(~enter, State.thing(id, s), id, Bool.pick(U32, big, F.Fixed.half(xm), xm),
           Bool.pick(U32, big, F.Fixed.half(ym), ym), s))
 
-# P_XYMovement's corpse clause: a corpse with more than a quarter of a
-# unit of momentum, standing on a floor that is not its sector's, is
-# half off a step and keeps sliding.
 def Sim.thing.sliding(+th: H.Thing, +level: L.Level) -> Bool:
-  Bool.and(H.Thing.flagged(th, 1048576),
-    Bool.and(Bool.or(F.Fixed.gt(F.Fixed.abs(H.Thing.momx(th)), 16384),
-        F.Fixed.gt(F.Fixed.abs(H.Thing.momy(th)), 16384)),
-      Bool.not(U32.is_eq(H.Thing.floorz(th), L.Level.floor(level, H.Thing.sector(th))))))
+  Sim.sliding(H.Thing.flagged(th, 1048576), H.Thing.momx(th), H.Thing.momy(th), H.Thing.floorz(th),
+    L.Level.floor(level, H.Thing.sector(th)))
 
 def Sim.thing.slow(stops: Bool, +id: U32, +th: H.Thing, +s: State) -> State:
   match stops:
