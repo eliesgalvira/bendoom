@@ -4580,16 +4580,9 @@ def Sim.look.some(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> Sim.Acted:
 def Sim.look(+id: U32, +s: State) -> Sim.Acted:
   Sim.look.some(H.Things.get(State.things(s), id), id, s)
 
-def Sim.thing.move.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, m: Maybe<&2, H.Thing>, +id: U32, +dx: U32, +dy: U32, +s: State) -> State:
-  match m:
-    case None{}:
-      s
-    case Some{+th}:
-      Sim.thing.fit.with(~enter, id, th, (H.Thing.x(th) + dx : U32), (H.Thing.y(th) + dy : U32), s)
-
 # P_XYMovement's loop: a move past half the most is taken in halves, the
 # half tried C's division and the half kept the shift, as in Doom.
-def Sim.thing.xy.go.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, fuel: Nat, done: Bool, +id: U32, +xm: U32, +ym: U32, +s: State) -> State:
+def Sim.thing.xy.go.with(~move: @m: Maybe<&2, H.Thing> -> @+id: U32 -> @+dx: U32 -> @+dy: U32 -> @+s: State -> State, fuel: Nat, done: Bool, +id: U32, +xm: U32, +ym: U32, +s: State) -> State:
   match fuel done:
     case _ True{}:
       s
@@ -4599,8 +4592,8 @@ def Sim.thing.xy.go.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -
       +big = Sim.big(xm, ym)
       +restx = Bool.pick(U32, big, F.Fixed.sar(xm), 0)
       +resty = Bool.pick(U32, big, F.Fixed.sar(ym), 0)
-      Sim.thing.xy.go.with(~enter, f, Bool.and(U32.is_zero(restx), U32.is_zero(resty)), id, restx, resty,
-        Sim.thing.move.with(~enter, State.thing(id, s), id, Bool.pick(U32, big, F.Fixed.half(xm), xm),
+      Sim.thing.xy.go.with(~move, f, Bool.and(U32.is_zero(restx), U32.is_zero(resty)), id, restx, resty,
+        move(State.thing(id, s), id, Bool.pick(U32, big, F.Fixed.half(xm), xm),
           Bool.pick(U32, big, F.Fixed.half(ym), ym), s))
 
 def Sim.thing.sliding(+th: H.Thing, +level: L.Level) -> Bool:
@@ -4637,7 +4630,7 @@ def Sim.thing.rubbed(m: Maybe<&2, H.Thing>, +id: U32, +s: State) -> State:
 def Sim.thing.friction(+id: U32, +s: State) -> State:
   Sim.thing.rubbed(State.thing(id, s), id, s)
 
-def Sim.thing.pushed(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State,
+def Sim.thing.pushed(~move: @m: Maybe<&2, H.Thing> -> @+id: U32 -> @+dx: U32 -> @+dy: U32 -> @+s: State -> State,
   still: Bool, +id: U32, +th: H.Thing, +s: State) -> State:
   match still:
     case True{}:
@@ -4645,15 +4638,13 @@ def Sim.thing.pushed(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s
     case False{}:
       +xm = Sim.clamp(H.Thing.momx(th))
       +ym = Sim.clamp(H.Thing.momy(th))
-      Sim.thing.friction(id, Sim.thing.xy.go.with(~enter, 4n, False{}, id, xm, ym,
+      Sim.thing.friction(id, Sim.thing.xy.go.with(~move, 4n, False{}, id, xm, ym,
         State.thing.put(id, Sim.thing.mom(th, xm, ym), s)))
 
-# Doom's P_XYMovement for a thing: one with no momentum does not move;
-# otherwise the momentum is capped at MAXMOVE, the move is taken, and
-# friction slows what is left. Missiles and charging skulls, which the
-# other branches are for, have no rows here.
-def Sim.thing.xy.with(~enter: @+target: U32 -> @th: H.Thing -> @+state: U32 -> @s: State -> State, +id: U32, +th: H.Thing, +s: State) -> State:
-  Sim.thing.pushed(~enter, Bool.and(U32.is_zero(H.Thing.momx(th)), U32.is_zero(H.Thing.momy(th))), id, th, s)
+# Doom's P_XYMovement: cap momentum, take each submove through the
+# caller's movement seam, then apply friction.
+def Sim.thing.xy.with(~move: @m: Maybe<&2, H.Thing> -> @+id: U32 -> @+dx: U32 -> @+dy: U32 -> @+s: State -> State, +id: U32, +th: H.Thing, +s: State) -> State:
+  Sim.thing.pushed(~move, Bool.and(U32.is_zero(H.Thing.momx(th)), U32.is_zero(H.Thing.momy(th))), id, th, s)
 
 # Doom's A_Scream: the three zombie death sounds and the two imp ones
 # are groups, and the one played is drawn from its group; every other
