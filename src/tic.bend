@@ -919,15 +919,21 @@ def Sim.thing.crosses(+kind: U32, flags: U32) -> Bool:
 
 # P_TryMove fires the crossed specials after relinking an accepted move.
 # A refused move leaves its position unchanged and crosses no lines.
+def Sim.thing.move.cross.if(eligible: Bool, +id: U32, +ox: U32, +oy: U32, +th: H.Thing, +s: S.State) -> S.State:
+  match eligible:
+    case False{}:
+      s
+    case True{}:
+      Sp.Sim.thing.crossed(S.Sim.crossings(S.State.level(s), ox, oy, H.Thing.x(th), H.Thing.y(th),
+        V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.radius())), False{}, id, H.Thing.x(th), H.Thing.y(th),
+        H.Thing.z(th), H.Thing.angle(th), s)
+
 def Sim.thing.move.cross(m: Maybe<&2, H.Thing>, +id: U32, +ox: U32, +oy: U32, +s: S.State) -> S.State:
   match m:
     case None{}:
       s
     case Some{+th}:
-      Sp.Sim.thing.crossed(Bool.pick(List<&2, U32>, Sim.thing.crosses(H.Thing.kind(th), H.Thing.flags(th)),
-        S.Sim.crossings(S.State.level(s), ox, oy, H.Thing.x(th), H.Thing.y(th),
-          V.Vec.get(H.Thing.hurt(th), H.Thing.hurt.radius())), []), False{}, id, H.Thing.x(th), H.Thing.y(th),
-        H.Thing.z(th), H.Thing.angle(th), s)
+      Sim.thing.move.cross.if(Sim.thing.crosses(H.Thing.kind(th), H.Thing.flags(th)), id, ox, oy, th, s)
 
 def Sim.thing.move.after(+id: U32, ox: U32, oy: U32, +s: S.State) -> S.State:
   Sim.thing.move.cross(S.State.thing(id, s), id, ox, oy, s)
