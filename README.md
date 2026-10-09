@@ -184,7 +184,10 @@ and audio. CI uploads the website as the `website` artifact.
 ## Project status
 
 Episode 1 is playable with combat, secret exits, sound effects, music and the finale.
-Episode-wide demo, browser and audio acceptance is still in progress.
+The shareware episode passes automated demo, browser and audio acceptance.
+Freedoom content beyond shareware Episode 1 remains incomplete; its DEMO1
+still has unexplained floor pixels as well as unsupported lost souls.
+The film exporter's audio startup timing remains under human review.
 Open issues live under [.scratch/](.scratch/).
 The next milestone is **Hellbent**: the game as a single λ-expression.
 

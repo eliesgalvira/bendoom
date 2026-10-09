@@ -1,10 +1,10 @@
 # Knee-Deep in the Dead
 
-**Status:** ready-for-agent
+**Status:** ready-for-human — implementation and automated episode acceptance complete; ticket 04's film audio startup decision remains pending.
 
 ## Problem Statement
 
-Bendoom plays one level. The shareware WAD it ships holds a whole episode, E1M1 to E1M9, and every map already loads and renders, but no map other than E1M1 can be finished. The exit restarts E1M1 with a fresh player. Doors other than a few kinds, most lifts and floors, stairs, teleporters, light and damage specials, the secret exit, the spectre, the baron, the chaingun, the rocket launcher and the powerups do nothing or are dropped silently. Music and sound effects are rendered at package build time for E1M1 only, so every other map would play the wrong song. The demon's attack sound is missing from the sound table, so it is silent today.
+Bendoom implements the shareware episode, E1M1 to E1M9, with map transitions, inventory carry, combat, specials, runtime WAD audio and the finale. Automated episode acceptance is complete. Keep this contract while ticket 04's human review of the film's audio startup timing remains open.
 
 ## Solution
 
