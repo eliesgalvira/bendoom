@@ -2,12 +2,12 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Play Hangar, the first level of DOOM, running in Bend 2.">
+<meta name="description" content="Play DOOM's first episode, all nine maps, written in Bend 2.">
 <meta name="theme-color" content="#2f2821">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://doom.elies.site/">
 <meta property="og:title" content="Bendoom">
-<meta property="og:description" content="Play Hangar, the first level of DOOM, running in Bend 2.">
+<meta property="og:description" content="Play DOOM's first episode, all nine maps, written in Bend 2.">
 <meta property="og:image" content="https://doom.elies.site/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -54,8 +54,7 @@
   #play:disabled { opacity: .4; cursor: wait; }
   #status { margin: 0; color: var(--gold); text-transform: uppercase; letter-spacing: .12em; text-shadow: 0 2px 0 #000; }
   #sound { position: absolute; top: calc(4 * var(--px)); left: calc(4 * var(--px)); }
-  .level { --scale: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0; }
-  .level > :first-child { --scale: 4; }
+  .level { --scale: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 12px; margin: 20px 0; }
   #keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; margin: 0; padding: 20px 24px; background: #000b; }
   #keys div { display: flex; align-items: center; gap: 12px; }
   dt { display: flex; gap: 4px; }
@@ -67,12 +66,11 @@
     :root { --scale: 2; }
     h1 { --scale: 5; }
     .level { --scale: 1; }
-    .level > :first-child { --scale: 2; }
   }
 </style>
 <header>
   <h1><img src="art/bendoom.png" alt="Bendoom"></h1>
-  <p>DOOM's first level, written in Bend 2 and compiled to WebAssembly. <a href="https://github.com/eliesgalvira/bendoom">Source & downloads</a></p>
+  <p>DOOM's first episode, all nine maps, written in Bend 2 and compiled to WebAssembly. <a href="https://github.com/eliesgalvira/bendoom">Source & downloads</a></p>
 </header>
 <main>
   <div id="screen" class="bevel">
@@ -85,7 +83,7 @@
     </div>
     <button id="sound" hidden><img src="art/sound.png" alt="Click to enable sound"></button>
   </div>
-  <p class="level"><img src="art/hangar.png" alt="E1M1: Hangar"><img src="art/hurt-me-plenty.png" alt="Hurt me plenty."></p>
+  <p class="level"><img src="art/hurt-me-plenty.png" alt="Hurt me plenty."></p>
   <dl id="keys" class="bevel">
     <div><dt><kbd>W</kbd><kbd>S</kbd></dt><dd>Walk</dd></div>
     <div><dt><kbd>A</kbd><kbd>D</kbd></dt><dd>Strafe</dd></div>
