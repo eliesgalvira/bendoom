@@ -67,8 +67,11 @@ law arrows_wasd:
 law lowest_number_wins:
   for rest: List<&2, Bool>
   {(K.Keys.change(True{} <> rest, 4), K.Keys.change(False{} <> True{} <> rest, 4),
-    K.Keys.change(False{} <> False{} <> False{} <> True{} <> rest, 4), K.Keys.change(K.Keys.numbers.none(), 4))
-    == (4, 12, 28, 0) : U32 & U32 & U32 & U32}
+    K.Keys.change(False{} <> False{} <> True{} <> rest, 4),
+    K.Keys.change(False{} <> False{} <> False{} <> True{} <> rest, 4),
+    K.Keys.change(False{} <> False{} <> False{} <> False{} <> True{} <> rest, 4),
+    K.Keys.change(K.Keys.numbers.none(), 4))
+    == (4, 12, 20, 28, 36, 0) : U32 & U32 & U32 & U32 & U32 & U32}
 
 # The sim
 # -------
