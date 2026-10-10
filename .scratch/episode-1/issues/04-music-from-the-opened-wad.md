@@ -1,23 +1,28 @@
-# 04: Assess music startup and transition timing
+# 04: Judge the remaining music timing difference
 
 **Tier:** 1
 
-**Blocked by:** None
+**Blocked by:** Elies' practical sound judgment
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-## Problem
+## Open decision
 
-Runtime WAD music is implemented and its synthesis checks pass. The film now advances the OPL chip through 4096 frames before starting music, about 93 ms at 44100 Hz, and song changes align to that buffer boundary. The old film started music at frame zero. Sound effects are mixed separately.
+Runtime WAD music and controlled effects match vanilla within the retained synthesis checks. No practical defect is demonstrated. Keep the current implementation unless listening establishes a noticeable downgrade in playability or sound experience, Elies' clarified criterion. He has not unconditionally accepted the present timing.
 
-The lead matches a retained music-only Chocolate Doom capture. It is not a universal vanilla startup rule: startup depends on wall-clock timing, and the combined music/SFX device uses a different buffer size. Elies clarified on October 9 that his concern is a noticeable downgrade in playability or sound experience. A byte-level difference from the old film alone does not fail that criterion. He has not unconditionally approved the present timing.
+The film advances the OPL chip4096 frames before starting music, approximately93ms, and song changes retain already synthesized old-song samples through that buffer boundary. This changes onset and OPL phase relative to the old exporter. Repeated requests for the same song bypass `Song.change`, so scene selection does not postpone a restart indefinitely. Effects mix separately; the music lead does not add93ms to every gunshot. Already queued audio still precedes newly heard effects.
 
-## Acceptance
+Retained full-score and first-loop comparisons show exact synthesis without internal gaps or accumulating drift. Controlled effects and channel traces match vanilla, including expiration and eviction. Native E1M6/E1M9 runs show no post-start underruns or lost tics. These checks do not measure input-to-speaker latency. No listening or perceptual-equivalence claim is made.
 
-- Assess the practical effect of music startup, scene changes and SFX responsiveness against vanilla, reusing the retained waveform and performance evidence where it applies. Distinguish synthesized sample scheduling, device buffering and measured input-to-speaker latency.
-- Establish whether the current path causes missing or cut-off sounds, sustained gaps, accumulating drift, or delayed gameplay effects. State which conclusions are measured and which remain perceptual judgments; do not claim to have listened when only samples were compared.
-- If a defect affecting playability or sound is demonstrated, fix its cause and rerun the affected checks. Do not rewrite audio solely to reproduce incidental startup timing from one capture.
-- Keep exact synthesis comparisons and vanilla's musical content intact. If human listening remains necessary, provide short, concrete comparison artifacts and the precise unresolved decision.
-- Inspect the review note that `Stream.topped` has an unreachable empty-list case. Remove the invalid state if a simple checker-supported representation does so; otherwise explain the constraint without expanding this assessment into a broad refactor.
+## Concrete comparison
 
-Delete this ticket when the practical concern is resolved. Keep detailed evidence in ignored research; earlier implementation evidence remains in Git and the episode handoff.
+The final assessment worktree's ignored [assessment](../../../../bendoom-e1-04-audio-final/research/audio-assessment/assessment.md) and [clip provenance](../../../../bendoom-e1-04-audio-final/research/audio-assessment/clips.json) bind these excerpts, with unchanged rate, channels and level:
+
+- Actual retained Freedoom film startup, first3seconds: [old exporter](../../../../bendoom-e1-04-audio-final/research/audio-assessment/startup-old-freedoom.wav) and [runtime exporter](../../../../bendoom-e1-04-audio-final/research/audio-assessment/startup-runtime-freedoom.wav). First nonzero frame443 versus4536 exposes the approximately93ms onset difference and changed OPL phase. These are historical outputs rather than fresh final-runtime captures.
+- Current stock-Doom controlled transition,3.657seconds: [production Film14](../../../../bendoom-e1-04-audio-final/research/audio-assessment/transition-current-doom.wav) and [vanilla](../../../../bendoom-e1-04-audio-final/research/audio-assessment/transition-vanilla-doom.wav). They are byte-identical, retain E1M1→INTER→E1M2 cues at1.02857seconds and2.8seconds, and deliberately silence effects. They do not measure native device or wipe timing.
+
+Does the short later music onset or old-song continuation at these scene changes noticeably worsen the sound experience? Delete this ticket once that concern is resolved; do not rewrite audio solely to reproduce incidental vanilla startup timing.
+
+## Representation constraint
+
+`Stream.topped`'s empty deck case is unreachable from its producers. The singleton list is the established recursive pointer holder that avoids native arity expansion, documented in `docs/bend.md`. A custom recursive holder's checker and native representation are unverified. No simple demonstrated replacement was found in the bounded source audit, so this assessment does not attempt that refactor.
