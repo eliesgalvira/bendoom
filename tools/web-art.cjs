@@ -91,7 +91,6 @@ const art = {
   'new-game': patch('M_NGAME'),
   'hurt-me-plenty': patch('M_HURT'),
   bendoom: text('Bendoom'),
-  hangar: text('E1M1: Hangar'),
   sound: text('Click to enable sound'),
 };
 fs.mkdirSync(out, { recursive: true });
