@@ -1,10 +1,10 @@
 # Knee-Deep in the Dead
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Problem Statement
 
-Bendoom implements the shareware episode, E1M1 to E1M9, with map transitions, inventory carry, combat, specials, runtime WAD audio and the finale. The existing automated acceptance gates pass. Two follow-ups remain: assess ticket 04's audio timing against noticeable effects on playability and sound, and strengthen ticket 17's number-key law to cover all five supported keys.
+Bendoom implements the shareware episode, E1M1 to E1M9, with map transitions, inventory carry, combat, specials, runtime WAD audio and the finale. Automated acceptance and the strengthened five-key selection law pass. Keep this contract while ticket 04's human decision about noticeable effects of the music timing remains open.
 
 ## Solution
 
