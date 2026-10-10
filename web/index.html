@@ -56,7 +56,7 @@
   #sound { position: absolute; top: calc(4 * var(--px)); left: calc(4 * var(--px)); }
   .level { --scale: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 12px; margin: 20px 0; }
   #keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 24px; margin: 0; padding: 20px 24px; background: #000b; }
-  #keys div { display: flex; align-items: center; gap: 12px; }
+  #keys div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
   dt { display: flex; gap: 4px; }
   dd { margin: 0; text-transform: uppercase; letter-spacing: .08em; }
   kbd { min-width: 1.4em; padding: 1px 6px; text-align: center; font: 700 12px/1.6 inherit; color: #eee; background: #585858; border: 2px solid; border-color: #9a9a9a #262626 #262626 #9a9a9a; }
