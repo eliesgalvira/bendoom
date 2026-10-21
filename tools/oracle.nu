@@ -140,8 +140,7 @@ def face-box [wad: binary]: nothing -> list<int> {
 # 144 view), and shows messages only with --messages; the extra config binds F1,
 # scancode 59, to the screenshot, since -devparm, which binds it too,
 # writes its frame-rate dots over the bar's last row.
-def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path, messages: bool]: nothing -> record<indices: list<string>, palette: string> {
-  $iwad | save --force ($dir | path join $name)
+def vanilla [name: string, script: binary, tics: int, told: table<at: int, colour: string>, dir: path, messages: bool]: nothing -> record<indices: list<string>, palette: string> {
   $script | save --force ($dir | path join script.lmp)
   $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "key_menu_screenshot 59\n" | save --force ($dir | path join extra.cfg)
@@ -186,7 +185,6 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
 # Official timedemo mode supplies one command per frame; undrawn tics
 # are rejected by the diagnostic binary rather than drawing extra frames.
 def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path, messages: bool, timeout: duration]: nothing -> record<indices: list<string>, palette: string> {
-  $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "show_endoom 0\n" | save --force ($dir | path join extra.cfg)
@@ -265,7 +263,7 @@ def compare [
     if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
     let ours = $dump | skip 1 | str join | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '
     let shot = if $run.capture == "" {
-      vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir $run.messages
+      vanilla $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir $run.messages
     } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir $run.messages $run.timeout }
     let masked = if $run.unmasked { [] } else if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
     let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
