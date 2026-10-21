@@ -237,7 +237,7 @@ def "main game" [
       }
     }
   } catch {|e| $e.msg }
-  for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+  process-stop $dir
   if $failed != null { error make {msg: $failed} }
   let ran = open ($dir | path join game.json)
   if $ran.exit_code != 0 { error make {msg: $"the game left with ($ran.exit_code): ($ran.stderr)"} }

@@ -61,7 +61,7 @@ def check-archive [archive: path, audio: string] {
       }
       print $"PASS without /nix: window, assets, movement, recording and clean exit, ($bytes) demo bytes"
     } finally {
-      for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+      process-stop $dir
       if $sink != null { ^pactl unload-module $sink }
     }
   } finally {

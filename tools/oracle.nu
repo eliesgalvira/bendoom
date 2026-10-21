@@ -27,10 +27,15 @@ source xvfb.nu
 # runs, so dropping each marker left to right decodes it.
 def pcx-indices []: binary -> list<string> {
   let pcx = $in
-  $pcx | bytes at 128..<(($pcx | bytes length) - 769) | encode hex | str lowercase
-  | str replace --all --regex '(..)' '$1 '
-  | str replace --all --regex 'c1 (..)' '$1'
-  | str trim | split row ' '
+  if ($pcx | bytes length) < 897 or ($pcx | bytes at 0..11) != 0x[0a050108000000003f01c700] or ($pcx | bytes at 65..67) != 0x[014001] or ($pcx | bytes at (($pcx | bytes length) - 769)..(($pcx | bytes length) - 769)) != 0x[0c] {
+    error make {msg: "PCX is not a 320 by 200 indexed Chocolate Doom screenshot"}
+  }
+  let encoded = $pcx | bytes at 128..<(($pcx | bytes length) - 769) | encode hex | str lowercase
+  if $encoded !~ '^(?:[0-9ab][0-9a-f]|c1[0-9a-f]{2})+$' { error make {msg: "PCX has malformed pixel encoding"} }
+  let pixels = $encoded | str replace --all --regex '(..)' '$1 '
+    | str replace --all --regex 'c1 (..)' '$1' | str trim | split row ' '
+  if ($pixels | length) != 64000 { error make {msg: "PCX is not a complete 320 by 200 frame"} }
+  $pixels
 }
 
 # Vanilla writes PLAYPAL 0 into PCX even when the hardware palette is
@@ -41,14 +46,21 @@ def pcx-palette []: binary -> string {
   $pcx | bytes at (($pcx | bytes length) - 768).. | encode hex | str lowercase
 }
 
-# A patch's size and where its offsets put it when drawn at x, y.
-def patch-box [wad: binary, name: string, x: int, y: int]: nothing -> list<int> {
-  let patch = $wad | lump-pos $name
+# A patch's bounds after its offsets put it at x, y.
+def patch-bounds [wad: binary, patch: int, x: int, y: int]: nothing -> record {
   let width = $wad | bytes at $patch..($patch + 1) | into int --endian little
   let height = $wad | bytes at ($patch + 2)..($patch + 3) | into int --endian little
   let left = $x - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
   let top = $y - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-  0..<$height | each {|r| 0..<$width | each {|c| (($top + $r) * 320 + $left + $c) } } | flatten
+  {left: $left, top: $top, right: ($left + $width - 1), bottom: ($top + $height - 1)}
+}
+
+def box-pixels [box: record]: nothing -> list<int> {
+  $box.top..$box.bottom | each {|r| $box.left..$box.right | each {|c| $r * 320 + $c } } | flatten
+}
+
+def patch-box [wad: binary, name: string, x: int, y: int]: nothing -> list<int> {
+  box-pixels (patch-bounds $wad ($wad | lump-pos $name) $x $y)
 }
 
 # wi_stuff.c's epsd0animinfo: where each of WIMAP0's ten animations is
@@ -109,22 +121,10 @@ def entering [wad: binary, m: int]: nothing -> table<at: int, colour: string> {
 def face-box [wad: binary]: nothing -> list<int> {
   let names = ((0..4 | each {|i| [$"STFST($i)0", $"STFST($i)1", $"STFST($i)2", $"STFTR($i)0", $"STFTL($i)0",
     $"STFOUCH($i)", $"STFEVL($i)", $"STFKILL($i)"] } | flatten) ++ ["STFGOD0", "STFDEAD0"])
-  let boxes = $names | each {|n|
-    let found = $wad | lumps | where name == $n
-    if ($found | is-empty) { null } else {
-      let patch = $found | last | get pos
-      let left = 143 - ($wad | bytes at ($patch + 4)..($patch + 5) | into int --endian little --signed)
-      let top = 168 - ($wad | bytes at ($patch + 6)..($patch + 7) | into int --endian little --signed)
-      {left: $left, top: $top
-       right: ($left + ($wad | bytes at $patch..($patch + 1) | into int --endian little) - 1)
-       bottom: ($top + ($wad | bytes at ($patch + 2)..($patch + 3) | into int --endian little) - 1)}
-    }
-  } | compact
-  let top = $boxes | get top | math min
-  let bottom = $boxes | get bottom | math max
-  let left = $boxes | get left | math min
-  let right = $boxes | get right | math max
-  $top..$bottom | each {|row| $left..$right | each {|col| $row * 320 + $col } } | flatten
+  let boxes = $wad | lumps | where name in $names | group-by name | values
+    | each {|patches| patch-bounds $wad ($patches | last | get pos) 143 168 }
+  if ($boxes | is-empty) { error make {msg: "IWAD has no status-bar face patches"} }
+  box-pixels {top: ($boxes.top | math min), bottom: ($boxes.bottom | math max), left: ($boxes.left | math min), right: ($boxes.right | math max)}
 }
 
 # Chocolate Doom's frame after the demo's script, paused. It can only
@@ -146,19 +146,23 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
   $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "key_menu_screenshot 59\n" | save --force ($dir | path join extra.cfg)
   let display = xvfb $dir 1024x768
-  let game = job spawn {
+  process-start $dir Chocolate {
     cd $dir
     hide-env --ignore-errors WAYLAND_DISPLAY
     with-env {HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy} {
-      ^chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig extra.cfg -window -nosound | ignore
+      ^chocolate-doom -iwad $name -playdemo script -config default.cfg -extraconfig extra.cfg -window -nosound
     }
   }
-  let shot = try { with-env {DISPLAY: $display} {
-    let opened = 0..<150 | each {|_| sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
+  let shot = with-env {DISPLAY: $display} {
+    let opened = 0..<150 | each {|_| process-running $dir Chocolate; sleep 200ms; ^xdotool search --name "Chocolate Doom" | complete | get stdout | lines }
       | where ($it | is-not-empty) | first 1 | flatten
     if ($opened | is-empty) { error make {msg: "Chocolate Doom's window did not open"} }
-    sleep (($tics * 1000 / 35 | into int) * 1ms + 2sec)
+    for _ in 0..<(($tics * 1000 / 35 / 100 | math ceil | into int) + 20) {
+      process-running $dir Chocolate
+      sleep 100ms
+    }
     0..<40 | each {|n|
+      process-running $dir Chocolate
       let target = ^xdotool search --name "Chocolate Doom" | lines | last
       ^xdotool keydown --window $target F1
       sleep 30ms
@@ -166,13 +170,10 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
       sleep 400ms
       let file = $dir | path join $"DOOM($n | fill --alignment right --character '0' --width 2).pcx"
       if ($file | path exists) {
-        let pcx = open --raw $file
+        let pcx = open --raw $file | into binary
         {indices: ($pcx | pcx-indices), palette: ($pcx | pcx-palette)}
       } else { {indices: [], palette: ""} }
     } | where {|shot| ($shot.indices | is-not-empty) and ($told | all {|p| ($shot.indices | get $p.at) == $p.colour }) } | first 1
-  } } finally {
-    job kill $game
-    for id in (job list | where description == $dir | get id) { job kill $id }
   }
   if ($shot | is-empty) { error make {msg: "no screenshot showed the patch asked for"} }
   $shot | first
@@ -184,54 +185,54 @@ def vanilla [iwad: binary, name: string, script: binary, tics: int, told: table<
 # and face drift when comparing the pixels normally masked below.
 # Official timedemo mode supplies one command per frame; undrawn tics
 # are rejected by the diagnostic binary rather than drawing extra frames.
-def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path, messages: bool]: nothing -> record<indices: list<string>, palette: string> {
+def captured [iwad: binary, name: string, script: binary, count: int, binary: path, screen: string, dir: path, messages: bool, timeout: duration]: nothing -> record<indices: list<string>, palette: string> {
   $iwad | save --force ($dir | path join $name)
   $script | save --force ($dir | path join script.lmp)
   $"screenblocks 10\nshow_messages (if $messages { 1 } else { 0 })\n" | save --force ($dir | path join default.cfg)
   "show_endoom 0\n" | save --force ($dir | path join extra.cfg)
   let target = $dir | path join frame.raw
-  let result = try {
-    let display = xvfb $dir 1024x768
-    cd $dir
-    hide-env --ignore-errors WAYLAND_DISPLAY
-    with-env {XDG_DATA_HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy,
-      BENDOOM_CAPTURE_TIC: ($count | into string), BENDOOM_CAPTURE_FRAME: $target} {
-      ^$binary -iwad $name -timedemo script -config default.cfg -extraconfig extra.cfg -window -nosound o> ($dir | path join capture.log) e> ($dir | path join trace.log)
-    }
-    let trace = open --raw ($dir | path join trace.log)
-    let frames = $trace | lines | parse 'CAPTURE tic {tic} gamestate {gamestate} wi {wi}'
-    if ($frames | is-empty) { error make {msg: $"Chocolate did not capture command ($count): ($trace | lines | last)"} }
-    let scene = $frames | first
-    let finale = $trace | lines | parse 'FINALE tic {tic} stage {stage} count {count}'
-    let right = match $screen {
-      level => ($scene.gamestate == "0")
-      tally => ($scene.gamestate == "1" and $scene.wi == "0")
-      entering => ($scene.gamestate == "1" and $scene.wi in ["1" "-1"])
-      finale-text => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "0")
-      finale-art => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "1")
-    }
-    if not $right { error make {msg: $"captured frame is not ($screen): ($scene)"} }
-    let raw = open --raw $target | into binary
-    if ($raw | bytes length) != 64000 { error make {msg: "capture is not a 320 by 200 frame"} }
-    let playpal = $iwad | lump-pos PLAYPAL
-    {indices: ($raw | encode hex | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '),
-      palette: ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase)}
-  } finally {
-    for id in (job list | where description == $dir | get id | reverse) { job kill $id }
+  let display = xvfb $dir 1024x768
+  cd $dir
+  hide-env --ignore-errors WAYLAND_DISPLAY
+  with-env {XDG_DATA_HOME: $dir, DISPLAY: $display, SDL_VIDEODRIVER: x11, SDL_AUDIODRIVER: dummy,
+    BENDOOM_CAPTURE_TIC: ($count | into string), BENDOOM_CAPTURE_FRAME: $target} {
+    process-start $dir capture { ^$binary -iwad $name -timedemo script -config default.cfg -extraconfig extra.cfg -window -nosound }
   }
-  $result
+  process-wait $dir capture $timeout
+  let trace = open --raw ($dir | path join capture.err)
+  let frames = $trace | lines | parse 'CAPTURE tic {tic} gamestate {gamestate} wi {wi}'
+  if ($frames | is-empty) { error make {msg: $"Chocolate did not capture command ($count): ($trace | str trim)"} }
+  let scene = $frames | first
+  let finale = $trace | lines | parse 'FINALE tic {tic} stage {stage} count {count}'
+  let right = match $screen {
+    level => ($scene.gamestate == "0")
+    tally => ($scene.gamestate == "1" and $scene.wi == "0")
+    entering => ($scene.gamestate == "1" and $scene.wi in ["1" "-1"])
+    finale-text => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "0")
+    finale-art => ($scene.gamestate == "2" and ($finale | get 0.stage?) == "1")
+  }
+  if not $right { error make {msg: $"captured frame is not ($screen): ($scene)"} }
+  let raw = open --raw $target | into binary
+  if ($raw | bytes length) != 64000 { error make {msg: "capture is not a 320 by 200 frame"} }
+  let playpal = $iwad | lump-pos PLAYPAL
+  {indices: ($raw | encode hex | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '),
+    palette: ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase)}
+
 }
 
 # Our frame and vanilla's after the tics of a demo on the IWAD copy
 # given, and where they differ. The run is the flags both commands take.
 def compare [
   iwad: binary, header: binary, tics: binary
-  run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool, messages: bool>
+  run: record<wad: path, frame: path, screen: string, keep: bool, capture: string, unmasked: bool, messages: bool, timeout: duration>
 ]: nothing -> record {
   if $run.unmasked and $run.capture == "" { error make {msg: "--unmasked requires a tic-exact --capture binary"} }
   if ($run.screen | str starts-with "finale-") and (not $run.unmasked or $run.capture == "") {
     error make {msg: "finale frames require --capture and --unmasked"}
   }
+  if $run.timeout <= 0sec { error make {msg: "--timeout must be positive"} }
+  let frame = $run.frame | path expand
+  let face = face-box $iwad
   let capture = if $run.capture == "" { "" } else { $run.capture | path expand }
   hide-env --ignore-errors LD_LIBRARY_PATH
   let count = ($tics | bytes length) // 4
@@ -250,27 +251,38 @@ def compare [
   let name = $run.wad | path basename
   let idle = 0..<2100 | each { 0x[00 00 00 00] } | bytes collect
   let tail = if $inter { $idle } else { [0x[00 00 00 81] $idle] | bytes collect }
-  let shot = if $run.capture == "" {
-    vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir $run.messages
-  } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir $run.messages }
-  $tics | demo $header | save ($dir | path join ours.lmp)
-  let dump = with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp), BENDOOM_MESSAGES: (if $run.messages { "1" } else { "0" })} { ^$run.frame } | lines
-  if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
-  let ours = $dump | skip 1 | each {|row| $row | str replace --all --regex '(..)' '$1 ' | str trim | split row ' ' } | flatten
-  let face = face-box $iwad
-  let masked = if $run.unmasked { [] } else if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
-  let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
-  let differing = $off | where $it not-in $masked
-  let playpal = $iwad | lump-pos PLAYPAL
-  if not $run.keep { rm --recursive $dir }
-  {
-    differing: ($differing | length)
-    face: ($off | where $it in $face | length)
-    masked: ($masked | uniq | where $it < 200 * 320 | length)
-    palette: ($"0x($dump | first)" | into int)
-    shot_plain: ($shot.palette == ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
-    first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
-    scratch: (if $run.keep { $dir } else { null })
+  try {
+    $iwad | save --force ($dir | path join $name)
+    $tics | demo $header | save ($dir | path join ours.lmp)
+    with-env {BENDOOM_IWAD: ($dir | path join $name), DEMO: ($dir | path join ours.lmp), BENDOOM_MESSAGES: (if $run.messages { "1" } else { "0" })} {
+      process-start $dir frame { ^$frame }
+    }
+    process-wait $dir frame $run.timeout
+    let dump = open --raw ($dir | path join frame.out) | lines
+    if ($dump | length) != 201 or ($dump | first) !~ '^[0-9a-fA-F]{2}$' or not ($dump | skip 1 | all {|row| $row =~ '^[0-9a-fA-F]{640}$' }) {
+      error make {msg: "native frame must contain a palette byte and 200 rows of 320 hexadecimal pixels"}
+    }
+    if $run.keep { $dump | str join "\n" | save --force ($dir | path join ours.hex) }
+    let ours = $dump | skip 1 | str join | str lowercase | str replace --all --regex '(..)' '$1 ' | str trim | split row ' '
+    let shot = if $run.capture == "" {
+      vanilla $iwad $name ([$tics $tail] | bytes collect | demo $header) $count $told $dir $run.messages
+    } else { captured $iwad $name ([$tics $idle] | bytes collect | demo $header) $count $capture $run.screen $dir $run.messages $run.timeout }
+    let masked = if $run.unmasked { [] } else if $inter { anim-boxes $iwad } else { ($told | get at) ++ $face }
+    let off = 0..<(200 * 320) | where {|i| ($shot.indices | get $i) != ($ours | get $i) }
+    let differing = $off | where $it not-in $masked
+    let playpal = $iwad | lump-pos PLAYPAL
+    {
+      differing: ($differing | length)
+      face: ($off | where $it in $face | length)
+      masked: ($masked | uniq | where $it < 200 * 320 | length)
+      palette: ($"0x($dump | first)" | into int)
+      shot_plain: ($shot.palette == ($iwad | bytes at $playpal..($playpal + 767) | encode hex | str lowercase))
+      first: ($differing | first 5 | each {|i| {x: ($i mod 320), y: ($i // 320), vanilla: ($shot.indices | get $i), ours: ($ours | get $i)} })
+      scratch: (if $run.keep { $dir } else { null })
+    }
+  } finally {
+    process-stop $dir
+    if not $run.keep { rm --recursive $dir }
   }
 }
 
@@ -287,12 +299,13 @@ def main [
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
   --messages                               # show messages in both engines
+  --timeout: duration = 60sec              # deadline for each frame or exact-capture command
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
   let wad = $wad | default $env.BENDOOM_IWAD
   let iwad = open --raw $wad | placed $map $x $y $angle $things
   {map: $map, place: $"($x) ($y) ($angle)", script: $script}
-  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages})
+  | merge (compare $iwad (header $map) ($script | runs | tics) {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages, timeout: $timeout})
 }
 
 # The first tics of a recorded demo.
@@ -306,8 +319,10 @@ def "main demo" [
   --capture: string = ""                  # diagnostic Chocolate binary with tic-exact raw capture
   --unmasked                               # include animations and the face; requires --capture
   --messages                               # show messages in both engines
+  --timeout: duration = 60sec              # deadline for each frame or exact-capture command
   --keep                                   # keep the scratch directory
 ]: nothing -> record {
+  if $tic < 0 { error make {msg: "demo tic must be non-negative"} }
   let wad = $wad | default $env.BENDOOM_IWAD
   let bytes = open --raw $wad
   let lump = $bytes | lumps | where name == $demo | last 1 | get 0?
@@ -324,5 +339,5 @@ def "main demo" [
   if $tic > $length { error make {msg: $"($demo) ends after ($length) tics"} }
   {demo: $demo, map: $map, tic: $tic}
   | merge (compare ($bytes | retyped $map $things) $header ($lmp | bytes at 13..<(13 + 4 * $tic))
-    {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages})
+    {wad: $wad, frame: $frame, screen: $screen, keep: $keep, capture: $capture, unmasked: $unmasked, messages: $messages, timeout: $timeout})
 }

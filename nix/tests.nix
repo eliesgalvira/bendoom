@@ -13,7 +13,7 @@ llvmPackages_19.stdenv.mkDerivation {
     root = ../.;
     fileset = unions [
       ../src
-      (difference ../tests ../tests/launchers.nu)
+      (difference ../tests (unions [ ../tests/launchers.nu ../tests/oracle.nu ]))
       ../film.bend
     ];
   };

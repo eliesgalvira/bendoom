@@ -51,6 +51,7 @@ def placed [map: string, x: int, y: int, angle: int, things: string]: binary -> 
 def runs []: string -> table<tics: int, bytes: binary> {
   $in | split row ' ' | each {|run|
     let f = $run | split row ',' | into int
+    if $f.0 < 0 { error make {msg: "script tic counts must be non-negative"} }
     let buttons = ($f.4 bit-and 0xfc) + ($f.4 bit-and 1) * 2 + ($f.4 bit-and 2) // 2
     {tics: $f.0, bytes: ([($f.1 | le 1) ($f.2 | le 1) ($f.3 | le 1) ($buttons | le 1)] | bytes collect)}
   }
