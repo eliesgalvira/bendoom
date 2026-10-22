@@ -27,9 +27,23 @@ jobs:
           - runner: macos-14
             system: aarch64-darwin
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v7
+      - name: Add bounded ARM Linux build swap
+        if: matrix.system == 'aarch64-linux'
+        run: |
+          free -h
+          swapon --show
+          sudo fallocate -l 4G "$RUNNER_TEMP/bendoom-ci.swap"
+          sudo chmod 600 "$RUNNER_TEMP/bendoom-ci.swap"
+          sudo mkswap "$RUNNER_TEMP/bendoom-ci.swap"
+          sudo swapon "$RUNNER_TEMP/bendoom-ci.swap"
+          free -h
+          swapon --show
+      - name: Report macOS build memory
+        if: runner.os == 'macOS'
+        run: sysctl hw.memsize vm.swapusage
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -87,6 +101,20 @@ jobs:
           name: website
           path: website/
           if-no-files-found: error
+      - name: Diagnose ARM Linux memory failure
+        if: failure() && matrix.system == 'aarch64-linux'
+        run: |
+          free -h
+          swapon --show
+          sudo journalctl -k -b --no-pager -n 300 || true
+      - name: Remove ARM Linux build swap
+        if: always() && matrix.system == 'aarch64-linux'
+        run: |
+          swap="$RUNNER_TEMP/bendoom-ci.swap"
+          if swapon --show=NAME --noheadings --raw | grep -Fxq "$swap"; then
+            sudo swapoff "$swap"
+          fi
+          sudo rm -f "$swap"
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
