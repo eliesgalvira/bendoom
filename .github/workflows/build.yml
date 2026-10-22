@@ -60,13 +60,7 @@ jobs:
         run: nix flake check -L
       - name: Build games, exporters and portable archives
         run: |
-          if [[ '${{ matrix.system }}' == aarch64-linux ]]; then
-            nix --version
-            nix config show | grep -E '^(max-jobs|cores|sandbox|use-cgroups) ='
-            bash tools/ci-memory.sh nix build -L .#bendoom .#bendoom-freedoom .#film .#film-freedoom --no-link
-          else
-            nix build -L .#bendoom .#bendoom-freedoom .#film .#film-freedoom --no-link
-          fi
+          nix build -L .#bendoom .#bendoom-freedoom .#film .#film-freedoom --no-link
           nix build -L .#portable --out-link shareware
           nix build -L .#portable-freedoom --out-link freedoom
           mkdir artifacts
@@ -112,12 +106,7 @@ jobs:
         run: |
           free -h
           swapon --show
-          sudo journalctl -k -b --no-pager -n 300 --grep='(?i)out of memory|oom|killed process|memory cgroup' || true
-          sudo journalctl -b -u systemd-oomd.service --no-pager -n 100 || true
-          systemctl show nix-daemon.service systemd-oomd.service \
-            -p ActiveState -p Result -p ControlGroup -p MemoryMax -p MemoryHigh \
-            -p MemorySwapMax -p OOMPolicy -p ManagedOOMSwap -p ManagedOOMMemoryPressure || true
-          sudo oomctl --no-pager || true
+          sudo journalctl -k -b --no-pager -n 300 || true
       - name: Remove ARM Linux build swap
         if: always() && matrix.system == 'aarch64-linux'
         run: |
