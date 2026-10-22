@@ -29,8 +29,11 @@ The failing command is `nix build -L .#bendoom .#bendoom-freedoom .#film
 .#film-freedoom --no-link`. The workflow runs it after `nix flake check -L`.
 The macOS annotation states that the job exceeded its two-hour limit.
 
-Blockers: hosted ARM Linux and macOS acceptance remains pending. The workflow
-adds 4 GiB of ARM Linux swap, memory diagnostics and a 240-minute budget.
-Local film C emission OOMed at 4 GiB without swap and passed with a 2 GiB
-swap allowance, producing identical C. The hosted ARM kill's cause remains
-unconfirmed; inspect the failure-only kernel diagnostics if it recurs.
+Blockers: hosted ARM Linux and macOS acceptance remains pending. ARM Linux
+still killed Bend during film C emission after adding 4 GiB of swap. The
+failure-only kernel query used an invalid option, so the hosted kill's cause
+remains unconfirmed. The next run samples compiler RSS high-water marks,
+process limits, cgroup limits/events and memory pressure, and collects kernel
+and systemd-oomd evidence with supported commands. Keep the 240-minute budget
+until macOS completion is known. Local memory-cap comparisons and generated-C
+hashes are retained in ignored research; they do not establish the ARM cause.
