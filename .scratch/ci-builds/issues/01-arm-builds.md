@@ -29,4 +29,8 @@ The failing command is `nix build -L .#bendoom .#bendoom-freedoom .#film
 .#film-freedoom --no-link`. The workflow runs it after `nix flake check -L`.
 The macOS annotation states that the job exceeded its two-hour limit.
 
-Blockers: none. Final acceptance requires hosted ARM runners.
+Blockers: hosted ARM Linux and macOS acceptance remains pending. The workflow
+adds 4 GiB of ARM Linux swap, memory diagnostics and a 240-minute budget.
+Local film C emission OOMed at 4 GiB without swap and passed with a 2 GiB
+swap allowance, producing identical C. The hosted ARM kill's cause remains
+unconfirmed; inspect the failure-only kernel diagnostics if it recurs.
